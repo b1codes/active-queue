@@ -141,3 +141,21 @@ dist
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 .vite/
+.agents/modules/llc-react
+.agents/modules/llc-api-health
+.agents/modules/llc-gcp-identity-platform
+.agents/modules/llc-logging
+.agents/modules/llc-standards
+.agents/modules/llc-security
+
+# b1CodingTool generated agent files
+CLAUDE.md
+CLAUDE.local.md
+AGENTS.override.md
+.claude/
+.agents/local/
+.agents/rules/local.md
+.agents/skills/b1-rule.md
+.agents/skills/b1-edge-case.md
+.agents/skills/b1-reconcile.md
+.agents/.b1-snapshots/
