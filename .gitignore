@@ -159,3 +159,11 @@ AGENTS.override.md
 .agents/skills/b1-edge-case.md
 .agents/skills/b1-reconcile.md
 .agents/.b1-snapshots/
+
+# Impeccable design context
+# DESIGN.md derives Thermal Heat values, Glass Surface constants, and interaction
+# physics directly from the proprietary llc-standards / llc-react modules already
+# ignored above, so it inherits their Double-Lock treatment (016_proprietary-protection.md).
+PRODUCT.md
+DESIGN.md
+.impeccable/design.json
