@@ -35,10 +35,17 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
             request_id=request_id,
             method=request.method,
             path=request.url.path,
+            component="router",
         )
+
         if trace:
-            bind_contextvars(trace=f"projects/activequeue-local/traces/{trace}")
-        # uid is bound later by auth middleware (M1) via request.state
+            # Cloud Trace ID format: projects/{PROJECT_ID}/traces/{TRACE_ID}
+            trace_id = trace.split("/")[0]
+            bind_contextvars(trace=f"projects/activequeue-local/traces/{trace_id}")
+
+        uid = getattr(request.state, "uid", None)
+        if uid:
+            bind_contextvars(uid=str(uid))
 
         logger.info("request_started")
         start = time.perf_counter()
