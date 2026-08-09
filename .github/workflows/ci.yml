@@ -1,0 +1,129 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  backend:
+    name: Backend (FastAPI)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          enable-cache: true
+
+      - name: Install Node.js & Firebase Emulators
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install Firebase CLI
+        run: npm install -g firebase-tools
+
+      - name: Install backend dependencies
+        run: |
+          cd backend
+          uv sync --frozen
+
+      - name: Run Ruff Lint & Format Checks
+        run: |
+          cd backend
+          uv run ruff check app/ tests/
+          uv run ruff format --check app/ tests/
+
+      - name: Run Mypy Type Checking
+        run: |
+          cd backend
+          uv run mypy --strict app/
+
+      - name: Run Pytest Suite & Coverage
+        env:
+          ENV: local
+          GCP_PROJECT_ID: activequeue-local
+          FIRESTORE_EMULATOR_HOST: localhost:8080
+          FIREBASE_AUTH_EMULATOR_HOST: localhost:9099
+        run: |
+          cd backend
+          uv run pytest --cov=app/features --cov-fail-under=80 tests/
+
+  frontend:
+    name: Frontend (React Native Expo)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 11.21.0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "pnpm"
+          cache-dependency-path: frontend/pnpm-lock.yaml
+
+      - name: Install frontend dependencies
+        run: |
+          cd frontend
+          pnpm install --frozen-lockfile
+
+      - name: Run ESLint
+        run: |
+          cd frontend
+          pnpm lint
+
+      - name: Run TypeScript Type Check
+        run: |
+          cd frontend
+          pnpm typecheck
+
+      - name: Run Jest Unit Tests
+        run: |
+          cd frontend
+          pnpm test
+
+  terraform:
+    name: Infrastructure (Terraform)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.9.0"
+
+      - name: Terraform Format Check
+        run: |
+          cd terraform
+          terraform fmt -check
+
+      - name: Terraform Init
+        run: |
+          cd terraform
+          terraform init -backend=false
+
+      - name: Terraform Validate
+        # NOTE (SPEC §12.5): `terraform plan` is EXCLUDED until M6 because it requires real GCP credentials.
+        run: |
+          cd terraform
+          terraform validate
