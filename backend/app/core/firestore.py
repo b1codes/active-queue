@@ -17,9 +17,9 @@ _client: AsyncClient | None = None
 async def init_firestore(settings: Settings) -> None:
     """Initialize the Firestore AsyncClient with emulator wiring.
 
-    The Firestore SDK reads FIRESTORE_EMULATOR_HOST from the environment
-    to route requests to the emulator. We set it here from the Settings
-    object so that no other module needs to read os.environ directly.
+    The Firestore SDK reads FIRESTORE_EMULATOR_HOST from the environment to route
+    requests to the emulator. Firebase Auth Admin SDK reads FIREBASE_AUTH_EMULATOR_HOST.
+    We populate both from Settings so no application module reads os.environ directly.
     """
     global _client
 
@@ -28,6 +28,13 @@ async def init_firestore(settings: Settings) -> None:
         logger.info(
             "firestore_emulator_configured",
             host=settings.firestore_emulator_host,
+        )
+
+    if settings.firebase_auth_emulator_host:
+        os.environ["FIREBASE_AUTH_EMULATOR_HOST"] = settings.firebase_auth_emulator_host
+        logger.info(
+            "firebase_auth_emulator_configured",
+            host=settings.firebase_auth_emulator_host,
         )
 
     _client = AsyncClient(project=settings.gcp_project_id)

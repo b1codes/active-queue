@@ -6,6 +6,11 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
+    """Single source of truth for application settings loaded via pydantic-settings.
+
+    No module reads os.environ directly per SPEC §10.3.
+    """
+
     env: Literal["local", "dev", "staging", "prod"] = "local"
     gcp_project_id: str = "activequeue-local"
     firestore_emulator_host: str | None = "localhost:8080"
@@ -26,18 +31,27 @@ class Settings(BaseSettings):
     )
 
     def model_post_init(self, __context: Any) -> None:
-        """
-        Asserts that emulators are not used in production.
-        This is a critical security assertion: a leaked emulator host in production
-        is a full auth bypass since emulators do not enforce authentication checks.
+        """Asserts that emulator hosts are completely UNSET when env == 'prod'.
+
+        CRITICAL SECURITY ASSERTION (SPEC §10.3):
+        - A leaked FIRESTORE_EMULATOR_HOST in production silently returns empty results
+          instead of errors — a failure mode that looks like data loss.
+        - A leaked FIREBASE_AUTH_EMULATOR_HOST in production causes Firebase Admin SDK
+          to stop verifying signatures, accepting ANY forged token — a full auth bypass.
         """
         if self.env == "prod":
-            assert self.firestore_emulator_host is None, (
-                "Firestore emulator must not be enabled in production"
-            )
-            assert self.firebase_auth_emulator_host is None, (
-                "Firebase Auth emulator must not be enabled in production"
-            )
+            if self.firestore_emulator_host is not None:
+                msg = (
+                    "CRITICAL SECURITY GUARDRAIL: FIRESTORE_EMULATOR_HOST must be UNSET "
+                    "when env == 'prod'. Leaked emulator host causes silent data loss."
+                )
+                raise ValueError(msg)
+            if self.firebase_auth_emulator_host is not None:
+                msg = (
+                    "CRITICAL SECURITY GUARDRAIL: FIREBASE_AUTH_EMULATOR_HOST must be UNSET "
+                    "when env == 'prod'. Leaked emulator host allows full auth bypass."
+                )
+                raise ValueError(msg)
 
 
 settings = Settings()
