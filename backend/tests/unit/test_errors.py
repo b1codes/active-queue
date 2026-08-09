@@ -41,12 +41,16 @@ def test_app_error_with_details() -> None:
 
 def test_error_subclass_status_codes() -> None:
     """Each error subclass sets the correct default HTTP status code."""
+    from app.core.errors import NotImplementedAppError, UnprocessableEntityError
+
     assert ValidationError(code="V", message="m").status_code == 400
     assert AuthenticationError(code="A", message="m").status_code == 401
     assert AuthorizationError(code="Z", message="m").status_code == 403
     assert NotFoundError(code="N", message="m").status_code == 404
     assert ConflictError(code="C", message="m").status_code == 409
+    assert UnprocessableEntityError(code="U", message="m").status_code == 422
     assert RateLimitError(code="R", message="m").status_code == 429
+    assert NotImplementedAppError(code="NI", message="m").status_code == 501
     assert ProviderError(code="P", message="m").status_code == 503
     assert InternalError(code="I", message="m").status_code == 500
 

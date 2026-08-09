@@ -56,6 +56,16 @@ class ProviderError(AppError):
         super().__init__(code, message, 503, details)
 
 
+class UnprocessableEntityError(AppError):
+    def __init__(self, code: str, message: str, details: list[ErrorDetail] | None = None) -> None:
+        super().__init__(code, message, 422, details)
+
+
+class NotImplementedAppError(AppError):
+    def __init__(self, code: str, message: str, details: list[ErrorDetail] | None = None) -> None:
+        super().__init__(code, message, 501, details)
+
+
 class InternalError(AppError):
     def __init__(self, code: str, message: str, details: list[ErrorDetail] | None = None) -> None:
         super().__init__(code, message, 500, details)
