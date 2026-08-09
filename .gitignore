@@ -167,3 +167,16 @@ AGENTS.override.md
 PRODUCT.md
 DESIGN.md
 .impeccable/design.json
+
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+*.egg
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+htmlcov/
+.coverage
+*.cover
