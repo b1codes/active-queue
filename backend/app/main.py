@@ -10,6 +10,7 @@ from starlette.exceptions import HTTPException
 from app.core.config import settings
 from app.core.firestore import close_firestore, init_firestore
 from app.core.logging import configure_logging
+from app.core.security import init_firebase_admin
 from app.features.health.router import router as health_router
 from app.middleware.errors import (
     ErrorHandlingMiddleware,
@@ -27,6 +28,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     """Startup and shutdown lifecycle for the FastAPI application."""
     configure_logging(debug=settings.debug, log_level=settings.log_level)
     await init_firestore(settings)
+    init_firebase_admin(settings)
     yield
     await close_firestore()
 
