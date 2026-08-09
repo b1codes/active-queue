@@ -48,6 +48,8 @@ select = [
 ignore = [
     "E501",  # line length handled by formatter
     "B008",  # function call in argument defaults (FastAPI Depends)
+    "TC001", # move import into type-checking block (Pydantic needs runtime types)
+    "TC003", # move stdlib import into type-checking block
 ]
 
 [tool.ruff.lint.isort]
@@ -83,7 +85,6 @@ omit = [
     "app/features/activities/*",
     "app/features/content/*",
     "app/features/sessions/*",
-    "app/features/users/*",
 ]
 
 [tool.coverage.report]
