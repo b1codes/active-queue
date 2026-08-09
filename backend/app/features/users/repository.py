@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING, Any
 
 import structlog
 
+from app.features.users.cache import auth_cache
 from app.features.users.models import User, UserAuthorization
 
 if TYPE_CHECKING:
@@ -15,7 +16,7 @@ logger = structlog.get_logger(__name__)
 class UserRepository:
     """Firestore repository for users and user_authorization collections per SPEC §3.2 & §4.4.
 
-    Owns all query construction and Firestore transactional logic.
+    Owns all query construction, Firestore transactional logic, and in-process TTL caching.
     """
 
     def __init__(self, client: AsyncClient) -> None:
@@ -30,14 +31,31 @@ class UserRepository:
         data = snapshot.to_dict() or {}
         return User.from_firestore(data)
 
-    async def get_authorization(self, uid: str) -> UserAuthorization | None:
-        """Fetch user authorization document from user_authorization/{uid}."""
+    async def get_authorization(
+        self, uid: str, use_cache: bool = True
+    ) -> UserAuthorization | None:
+        """Fetch user authorization document from user_authorization/{uid}.
+
+        Uses in-process TTL cache (60s TTL, max 1000 entries) to prevent an extra
+        Firestore read (~5-15 ms) on every request per SPEC §3.2.
+        """
+        if use_cache:
+            cached_auth = auth_cache.get(uid)
+            if cached_auth is not None:
+                return cached_auth
+
         doc_ref = self._client.collection("user_authorization").document(uid)
         snapshot = await doc_ref.get()
         if not snapshot.exists:
             return None
+
         data = snapshot.to_dict() or {}
-        return UserAuthorization.from_firestore(data)
+        auth_doc = UserAuthorization.from_firestore(data)
+
+        if use_cache:
+            auth_cache.set(uid, auth_doc)
+
+        return auth_doc
 
     async def provision_user_transactional(
         self, user: User, auth: UserAuthorization
@@ -45,7 +63,7 @@ class UserRepository:
         """Atomically provision users/{uid} and user_authorization/{uid} documents.
 
         Per SPEC §3.2, first-login provisioning MUST create both documents in a single
-        atomic batch/transaction.
+        atomic batch/transaction. Updates in-process auth cache.
         """
         batch = self._client.batch()
 
@@ -56,6 +74,10 @@ class UserRepository:
         batch.set(auth_ref, auth.to_firestore())
 
         await batch.commit()
+
+        # Update in-process cache
+        auth_cache.set(auth.uid, auth)
+
         logger.info(
             "user_provisioned_transactional",
             uid=user.uid,
