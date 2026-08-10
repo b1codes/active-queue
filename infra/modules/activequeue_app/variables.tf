@@ -37,3 +37,41 @@ variable "content_provider" {
   description = "Content provider mode (fixture or youtube)"
   default     = "youtube"
 }
+
+variable "google_oauth_client_id" {
+  type        = string
+  description = "Environment-specific Google OAuth Client ID"
+  default     = "dummy-google-client-id.apps.googleusercontent.com"
+}
+
+variable "google_oauth_client_secret" {
+  type        = string
+  description = "Environment-specific Google OAuth Client Secret"
+  default     = "dummy-google-client-secret"
+  sensitive   = true
+}
+
+variable "apple_services_id" {
+  type        = string
+  description = "Environment-specific Apple Services ID"
+  default     = "com.activequeue.auth"
+}
+
+variable "apple_team_id" {
+  type        = string
+  description = "Apple Developer Team ID"
+  default     = "ABC123XYZ8"
+}
+
+variable "apple_key_id" {
+  type        = string
+  description = "Apple OAuth Key ID"
+  default     = "KEY123XYZ8"
+}
+
+variable "apple_client_secret" {
+  type        = string
+  description = "Apple OAuth Client Secret / Generated JWT"
+  default     = "dummy-apple-client-secret"
+  sensitive   = true
+}

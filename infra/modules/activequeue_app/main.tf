@@ -55,6 +55,26 @@ resource "google_secret_manager_secret" "youtube_api_key" {
   }
 }
 
+# Secret Manager for Google OAuth Client Secret per house standard 007 §2
+resource "google_secret_manager_secret" "google_oauth_client_secret" {
+  project   = var.gcp_project_id
+  secret_id = "google-oauth-client-secret-${var.env}"
+
+  replication {
+    auto {}
+  }
+}
+
+# Secret Manager for Apple OAuth Client Secret per house standard 007 §2
+resource "google_secret_manager_secret" "apple_oauth_client_secret" {
+  project   = var.gcp_project_id
+  secret_id = "apple-oauth-client-secret-${var.env}"
+
+  replication {
+    auto {}
+  }
+}
+
 # Cloud Run v2 Service per SPEC §10.5
 resource "google_cloud_run_v2_service" "api_service" {
   name     = "activequeue-api-${var.env}"
@@ -127,4 +147,24 @@ resource "google_identity_platform_config" "ic_config" {
     "activequeue.app",
     "${var.gcp_project_id}.firebaseapp.com",
   ]
+}
+
+# Google Provider IDP Config in Identity Platform
+resource "google_identity_platform_default_supported_idp_config" "google_idp" {
+  project       = var.gcp_project_id
+  idp_id        = "google.com"
+  client_id     = var.google_oauth_client_id
+  client_secret = var.google_oauth_client_secret
+  enabled       = true
+}
+
+# Apple Provider IDP Config in Identity Platform
+resource "google_identity_platform_oauth_idp_config" "apple_idp" {
+  name          = "apple.com"
+  project       = var.gcp_project_id
+  display_name  = "Apple"
+  client_id     = var.apple_services_id
+  issuer        = "https://appleid.apple.com"
+  enabled       = true
+  client_secret = var.apple_client_secret
 }
