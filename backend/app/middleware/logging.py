@@ -8,6 +8,8 @@ import structlog
 from starlette.middleware.base import BaseHTTPMiddleware
 from structlog.contextvars import bind_contextvars, clear_contextvars
 
+from app.core.config import settings
+
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable
 
@@ -41,7 +43,7 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
         if trace:
             # Cloud Trace ID format: projects/{PROJECT_ID}/traces/{TRACE_ID}
             trace_id = trace.split("/")[0]
-            bind_contextvars(trace=f"projects/activequeue-local/traces/{trace_id}")
+            bind_contextvars(trace=f"projects/{settings.gcp_project_id}/traces/{trace_id}")
 
         uid = getattr(request.state, "uid", None)
         if uid:

@@ -4,7 +4,7 @@ import { initializeAuth, getAuth, getReactNativePersistence, connectAuthEmulator
 const firebaseConfig = {
   apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY || "fake-api-key",
   authDomain: process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN || "auth.activequeue.app",
-  projectId: process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID || "activequeue-local",
+  projectId: process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID || "demo-activequeue-local",
 };
 
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();

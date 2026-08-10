@@ -16,7 +16,7 @@ def test_settings_default_local_env() -> None:
     assert s.env == "local"
     assert s.firestore_emulator_host == "localhost:9090"
     assert s.firebase_auth_emulator_host == "localhost:9099"
-    assert s.gcp_project_id == "activequeue-local"
+    assert s.gcp_project_id == "demo-activequeue-local"
 
 
 def test_settings_prod_disallows_firestore_emulator() -> None:
