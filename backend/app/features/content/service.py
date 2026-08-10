@@ -8,7 +8,10 @@ import structlog
 from app.core.config import settings
 from app.core.errors import ConflictError, NotFoundError, ProviderError, ValidationError
 from app.features.activities.schemas import ActivitySchema
-from app.features.content.matcher import match_content_to_activities
+from app.features.content.matcher import (
+    match_content_to_activities,
+    match_time_block_asymmetric,
+)
 from app.features.content.models import ContentCacheItem, FeedItem, Source
 from app.features.content.repository import ContentRepository, SourceRepository, decode_cursor
 from app.features.content.schemas import (
@@ -16,6 +19,7 @@ from app.features.content.schemas import (
     FeedItemSchema,
     FeedResponse,
     SyncResponse,
+    TimeMatchResponse,
     format_duration_label,
 )
 from app.providers.base import format_content_id, parse_content_id
@@ -28,7 +32,7 @@ SYSTEM_PLAYLIST_IDS = ("WL", "LL", "HL")
 
 
 class ContentService:
-    """Business logic for content sources, ingestion, and matching per SPEC §5.2, §8.2, §9.2, §9.3, §9.4, & §9.6.
+    """Business logic for content sources, ingestion, and matching per SPEC §5.2, §5.3, §8.2, §9.2, §9.3, §9.4, & §9.6.
 
     Enforces business rules:
     - Max 5 sources per user (SOURCE_LIMIT_REACHED).
@@ -43,6 +47,7 @@ class ContentService:
     - Cursor-based feed pagination with server duration_label formatting.
     - total_unconsumed count aggregation on first page only (cursor is None).
     - Content-first activity matching with distinct rejection reasons (duration_out_of_range & no_matching_activity).
+    - Time-first matching with asymmetric primary [B, B+300] and fallback [B-120, B) windows.
     """
 
     def __init__(
@@ -412,6 +417,75 @@ class ContentService:
             matching_activities=[
                 ActivitySchema.from_domain(act) for act in match_res.matching_activities
             ],
+            is_valid=match_res.is_valid,
+            rejection_reason=match_res.rejection_reason,
+        )
+
+    async def match_time_block(
+        self, user_id: str, target_duration_seconds: int
+    ) -> TimeMatchResponse:
+        """Match target time block duration against user feed using asymmetric windows per SPEC §5.3 & §9.6."""
+        if not self._content_repo:
+            return TimeMatchResponse(
+                target_duration_seconds=target_duration_seconds,
+                target_duration_label=format_duration_label(target_duration_seconds),
+                matched_items=[],
+                window_type=None,
+                is_valid=False,
+                rejection_reason="no_content_in_window",
+            )
+
+        unconsumed = await self._content_repo.get_all_unconsumed_feed_items(user_id)
+        match_res = match_time_block_asymmetric(target_duration_seconds, unconsumed)
+
+        if not match_res.matched_items:
+            return TimeMatchResponse(
+                target_duration_seconds=target_duration_seconds,
+                target_duration_label=format_duration_label(target_duration_seconds),
+                matched_items=[],
+                window_type=None,
+                is_valid=False,
+                rejection_reason="no_content_in_window",
+            )
+
+        content_ids = [fi.content_id for fi in match_res.matched_items]
+        cache_map = await self._content_repo.get_content_cache_batch(content_ids)
+
+        enriched_items: list[FeedItemSchema] = []
+        for fi in match_res.matched_items:
+            cache_doc = cache_map.get(fi.content_id)
+
+            provider_name = "fixture"
+            external_id = fi.content_id
+            if ":" in fi.content_id:
+                provider_name, external_id = parse_content_id(fi.content_id)
+
+            title = cache_doc.title if cache_doc else f"Feed Video {external_id}"
+            thumb_url = cache_doc.thumbnail_url if cache_doc else None
+            vid_url = cache_doc.video_url if cache_doc else None
+
+            enriched_items.append(
+                FeedItemSchema(
+                    id=fi.id,
+                    content_id=fi.content_id,
+                    source_id=fi.source_id,
+                    title=title,
+                    provider=provider_name,
+                    external_id=external_id,
+                    duration_seconds=fi.duration_seconds,
+                    duration_label=format_duration_label(fi.duration_seconds),
+                    published_at=fi.published_at,
+                    thumbnail_url=thumb_url,
+                    video_url=vid_url,
+                    consumed=fi.consumed,
+                )
+            )
+
+        return TimeMatchResponse(
+            target_duration_seconds=target_duration_seconds,
+            target_duration_label=format_duration_label(target_duration_seconds),
+            matched_items=enriched_items,
+            window_type=match_res.window_type,
             is_valid=match_res.is_valid,
             rejection_reason=match_res.rejection_reason,
         )

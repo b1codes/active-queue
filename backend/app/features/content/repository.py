@@ -161,7 +161,6 @@ class ContentRepository:
         )
         count_query = query.count()
         results = await count_query.get()  # type: ignore[call-arg]
-        # count_query.get() returns [[AggregationResult(count=N)]]
         if results and len(results) > 0 and len(results[0]) > 0:
             return int(results[0][0].value)
         return 0
@@ -185,7 +184,6 @@ class ContentRepository:
         if cursor_dt is not None:
             query = query.start_after({"published_at": cursor_dt})
 
-        # Fetch extra items if duration filtering is active
         fetch_limit = (
             limit + 1 if (min_duration is None and max_duration is None) else min(limit * 3, 100)
         )
@@ -212,6 +210,18 @@ class ContentRepository:
             next_cursor = encode_cursor(last_item.published_at)
 
         return results, next_cursor
+
+    async def get_all_unconsumed_feed_items(self, user_id: str) -> list[FeedItem]:
+        """Fetch all unconsumed feed items for user_id to perform time-first matching."""
+        query = (
+            self._client.collection("feed_items")
+            .where(field_path="user_id", op_string="==", value=user_id)
+            .where(field_path="consumed", op_string="==", value=False)
+            .order_by("duration_seconds", direction="ASCENDING")
+            .limit(250)
+        )
+        snapshots = await query.get()
+        return [FeedItem.from_firestore(snap.to_dict() or {}) for snap in snapshots]
 
     async def mark_feed_item_consumed(self, user_id: str, content_id: str) -> None:
         """Mark feed item as consumed by setting consumed = True."""

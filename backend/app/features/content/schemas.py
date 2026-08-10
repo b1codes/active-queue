@@ -134,3 +134,26 @@ class ContentMatchResponse(BaseModel):
     matching_activities: list[ActivitySchema]
     is_valid: bool
     rejection_reason: Literal["duration_out_of_range", "no_matching_activity"] | None = None
+
+
+class TimeMatchRequest(BaseModel):
+    """Request payload for POST /content/match-time per SPEC §9.6."""
+
+    target_duration_seconds: int = Field(
+        ...,
+        ge=300,
+        le=10800,
+        description="Target session time block duration in seconds (300s - 10800s)",
+        examples=[1800],
+    )
+
+
+class TimeMatchResponse(BaseModel):
+    """Response payload for POST /content/match-time per SPEC §9.6."""
+
+    target_duration_seconds: int
+    target_duration_label: str
+    matched_items: list[FeedItemSchema]
+    window_type: Literal["primary", "fallback"] | None = None
+    is_valid: bool
+    rejection_reason: Literal["no_content_in_window"] | None = None

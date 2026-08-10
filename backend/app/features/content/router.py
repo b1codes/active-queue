@@ -15,6 +15,8 @@ from app.features.content.schemas import (
     FeedResponse,
     SourceSchema,
     SyncResponse,
+    TimeMatchRequest,
+    TimeMatchResponse,
 )
 from app.features.content.service import ContentService
 
@@ -108,4 +110,24 @@ async def match_content(
 ) -> SuccessEnvelope[dict[str, Any]]:
     """POST /api/v1/content/match endpoint."""
     match_resp: ContentMatchResponse = await service.match_content(body.content_id)
+    return success_response(match_resp.model_dump())
+
+
+# Time-First Matching endpoint
+@router.post(
+    "/content/match-time",
+    status_code=status.HTTP_200_OK,
+    response_model=None,
+    summary="Match time block duration to candidate feed items",
+    description="Match target time block duration against unconsumed feed items using asymmetric primary [B, B+300] and fallback [B-120, B) windows per SPEC §5.3 & §9.6.",
+)
+async def match_time_block(
+    body: TimeMatchRequest,
+    current_user: AuthenticatedUser = Depends(get_current_user),
+    service: ContentService = Depends(get_content_service),
+) -> SuccessEnvelope[dict[str, Any]]:
+    """POST /api/v1/content/match-time endpoint."""
+    match_resp: TimeMatchResponse = await service.match_time_block(
+        current_user.uid, body.target_duration_seconds
+    )
     return success_response(match_resp.model_dump())
