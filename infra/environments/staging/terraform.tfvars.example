@@ -1,0 +1,2 @@
+gcp_project_id = "activequeue-staging"
+gcp_region     = "us-central1"

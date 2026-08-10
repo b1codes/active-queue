@@ -1,0 +1,2 @@
+gcp_project_id = "activequeue-prod"
+gcp_region     = "us-central1"
