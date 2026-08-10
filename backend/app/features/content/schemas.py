@@ -54,3 +54,14 @@ class SourceListResponse(BaseModel):
     """API response payload for GET /sources list."""
 
     items: list[SourceSchema]
+
+
+class SyncResponse(BaseModel):
+    """API response payload for POST /sources/{source_id}/sync per SPEC §9.4."""
+
+    source_id: str
+    status: str  # "active" | "syncing" | "error"
+    items_synced: int
+    has_more: bool
+    next_page_token: str | None = None
+    message: str | None = None
