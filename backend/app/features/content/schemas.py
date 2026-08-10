@@ -3,10 +3,12 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
+from app.core.sanitizer import sanitize_identifier, sanitize_text
 from app.features.activities.schemas import ActivitySchema
 from app.features.content.models import Source
+
 
 
 def format_duration_label(duration_seconds: int) -> str:
@@ -39,9 +41,19 @@ class CreateSourceRequest(BaseModel):
 
     url_or_id: str = Field(
         ...,
+        min_length=1,
+        max_length=2048,
         description="Pasted YouTube playlist/channel URL or raw playlist/channel ID",
         examples=["https://www.youtube.com/playlist?list=PL12345", "PL12345"],
     )
+
+    @field_validator("url_or_id")
+    @classmethod
+    def sanitize_url_or_id(cls, v: str) -> str:
+        sanitized = sanitize_text(v, max_length=2048)
+        if not sanitized:
+            raise ValueError("url_or_id must not be empty or contain only control/HTML characters")
+        return sanitized
 
 
 class SourceSchema(BaseModel):
@@ -122,7 +134,21 @@ class FeedResponse(BaseModel):
 class ContentMatchRequest(BaseModel):
     """Request payload for POST /content/match per SPEC §9.6."""
 
-    content_id: str = Field(..., description="Namespaced content ID, e.g. yt:video123 or fx:item1")
+    content_id: str = Field(
+        ...,
+        min_length=1,
+        max_length=200,
+        description="Namespaced content ID, e.g. yt:video123 or fx:item1",
+    )
+
+    @field_validator("content_id")
+    @classmethod
+    def sanitize_content_id(cls, v: str) -> str:
+        sanitized = sanitize_identifier(v, max_length=200)
+        if not sanitized:
+            raise ValueError("content_id must not be empty or contain invalid characters")
+        return sanitized
+
 
 
 class ContentMatchResponse(BaseModel):

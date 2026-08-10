@@ -11,15 +11,28 @@ export class ApiError extends Error {
   code: string;
   status: number;
   details: ApiErrorDetail[];
+  retryAfterSeconds?: number;
 
-  constructor(code: string, message: string, status: number, details: ApiErrorDetail[] = []) {
+  constructor(
+    code: string,
+    message: string,
+    status: number,
+    details: ApiErrorDetail[] = [],
+    retryAfterSeconds?: number
+  ) {
     super(message);
     this.name = "ApiError";
     this.code = code;
     this.status = status;
     this.details = details;
+    this.retryAfterSeconds = retryAfterSeconds;
+  }
+
+  get isRateLimited(): boolean {
+    return this.status === 429 || this.code === "RATE_LIMITED";
   }
 }
+
 
 interface ApiResponseEnvelope<T> {
   status: "success" | "error";
@@ -95,13 +108,26 @@ export async function apiClient<T>(
       code: "UNKNOWN_ERROR",
       message: `HTTP request failed with status ${response.status}`,
     };
+
+    let retryAfterSeconds: number | undefined;
+    const retryAfterHeader = response.headers?.get?.("Retry-After") || response.headers?.get?.("retry-after");
+    if (retryAfterHeader) {
+      const parsed = parseInt(retryAfterHeader, 10);
+      if (!isNaN(parsed)) {
+        retryAfterSeconds = parsed;
+      }
+    }
+
+
     throw new ApiError(
       errorBody.code,
       errorBody.message,
       response.status,
-      errorBody.details || []
+      errorBody.details || [],
+      retryAfterSeconds
     );
   }
+
 
   return json.data as T;
 }

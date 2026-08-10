@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, Path, Query, status
+
 
 from app.core.dependencies import get_db
 from app.core.envelopes import SuccessEnvelope, success_response
@@ -41,8 +42,8 @@ def get_session_service(db: AsyncClient = Depends(get_db)) -> SessionService:
 )
 async def get_user_sessions(
     limit: int = Query(20, ge=1, le=100),
-    cursor: str | None = Query(None),
-    status_filter: str | None = Query(None, alias="status"),
+    cursor: str | None = Query(None, max_length=200),
+    status_filter: str | None = Query(None, alias="status", max_length=50),
     current_user: AuthenticatedUser = Depends(get_current_user),
     service: SessionService = Depends(get_session_service),
 ) -> SuccessEnvelope[dict[str, Any]]:
@@ -104,7 +105,7 @@ async def create_session(
     description="Start a pending workout session (idempotent) per SPEC §7.1 & §9.5.",
 )
 async def start_session(
-    session_id: str,
+    session_id: str = Path(..., min_length=1, max_length=200, pattern=r"^[a-zA-Z0-9_\-\.:/]+$"),
     current_user: AuthenticatedUser = Depends(get_current_user),
     service: SessionService = Depends(get_session_service),
 ) -> SuccessEnvelope[dict[str, Any]]:
@@ -124,7 +125,7 @@ async def start_session(
     description="Atomically complete a workout session, set feed item consumed, and arrayUnion content ID per SPEC §7.1 & §9.6.",
 )
 async def complete_session(
-    session_id: str,
+    session_id: str = Path(..., min_length=1, max_length=200, pattern=r"^[a-zA-Z0-9_\-\.:/]+$"),
     body: CompleteSessionRequest | None = None,
     current_user: AuthenticatedUser = Depends(get_current_user),
     service: SessionService = Depends(get_session_service),
@@ -150,7 +151,7 @@ async def complete_session(
     description="Explicitly abandon a workout session per SPEC §7.1 & §9.5.",
 )
 async def abandon_session(
-    session_id: str,
+    session_id: str = Path(..., min_length=1, max_length=200, pattern=r"^[a-zA-Z0-9_\-\.:/]+$"),
     current_user: AuthenticatedUser = Depends(get_current_user),
     service: SessionService = Depends(get_session_service),
 ) -> SuccessEnvelope[dict[str, Any]]:
@@ -170,7 +171,7 @@ async def abandon_session(
     description="Hard delete a pending session per Decision #6 & SPEC §9.5.",
 )
 async def discard_session(
-    session_id: str,
+    session_id: str = Path(..., min_length=1, max_length=200, pattern=r"^[a-zA-Z0-9_\-\.:/]+$"),
     current_user: AuthenticatedUser = Depends(get_current_user),
     service: SessionService = Depends(get_session_service),
 ) -> SuccessEnvelope[dict[str, Any]]:

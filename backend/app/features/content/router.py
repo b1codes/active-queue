@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, Path, Query, status
+
 
 from app.core.dependencies import get_db
 from app.core.envelopes import SuccessEnvelope, success_response
@@ -59,7 +60,7 @@ async def create_source(
     description="Process one chunk (<= 5 pages / ~250 items) of resumable sync per SPEC §9.4.",
 )
 async def sync_source_chunk(
-    source_id: str,
+    source_id: str = Path(..., min_length=1, max_length=200, pattern=r"^[a-zA-Z0-9_\-\.:/]+$"),
     current_user: AuthenticatedUser = Depends(get_current_user),
     service: ContentService = Depends(get_content_service),
 ) -> SuccessEnvelope[dict[str, Any]]:
@@ -78,9 +79,9 @@ async def sync_source_chunk(
 )
 async def get_user_feed(
     limit: int = Query(20, ge=1, le=100),
-    cursor: str | None = Query(None),
-    min_duration: int | None = Query(None, ge=0),
-    max_duration: int | None = Query(None, ge=0),
+    cursor: str | None = Query(None, max_length=200),
+    min_duration: int | None = Query(None, ge=0, le=86400),
+    max_duration: int | None = Query(None, ge=0, le=86400),
     current_user: AuthenticatedUser = Depends(get_current_user),
     service: ContentService = Depends(get_content_service),
 ) -> SuccessEnvelope[dict[str, Any]]:
@@ -103,7 +104,7 @@ async def get_user_feed(
     description="Mark feed item as consumed and update user consumed_content for media consumed outside a workout per SPEC §9.1 & §9.2.",
 )
 async def hide_feed_item(
-    content_id: str,
+    content_id: str = Path(..., min_length=1, max_length=200, pattern=r"^[a-zA-Z0-9_\-\.:/]+$"),
     current_user: AuthenticatedUser = Depends(get_current_user),
     service: ContentService = Depends(get_content_service),
 ) -> SuccessEnvelope[dict[str, Any]]:

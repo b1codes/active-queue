@@ -44,6 +44,14 @@ export const TRACKER_REGISTRY: Record<string, TrackerConfig> = {
   },
 };
 
+export function sanitizeExternalId(externalId?: string): string {
+  if (!externalId) return '';
+  // Remove control characters, null bytes, and trim whitespace
+  const cleaned = externalId.replace(/[\x00-\x1F\x7F-\x9F]/g, '').trim();
+  // Encode URI components to prevent deep link injection or query parameter tampering
+  return encodeURIComponent(cleaned);
+}
+
 export async function launchTrackerApp(
   trackerId: string,
   externalId?: string
@@ -54,12 +62,14 @@ export async function launchTrackerApp(
     return { success: true, launchedVia: 'guided' };
   }
 
+  const safeExternalId = sanitizeExternalId(externalId);
   const primaryUrl = config.primarySchemeTemplate
-    ? config.primarySchemeTemplate.replace('{external_id}', externalId || '')
+    ? config.primarySchemeTemplate.replace('{external_id}', safeExternalId)
     : null;
   const fallbackUrl = config.fallbackUrlTemplate
-    ? config.fallbackUrlTemplate.replace('{external_id}', externalId || '')
+    ? config.fallbackUrlTemplate.replace('{external_id}', safeExternalId)
     : null;
+
 
   if (primaryUrl) {
     try {

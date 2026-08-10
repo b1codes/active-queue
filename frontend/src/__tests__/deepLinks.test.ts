@@ -54,4 +54,15 @@ describe('Deep Link Tracker Registry & Launcher', () => {
     expect(Linking.canOpenURL).not.toHaveBeenCalled();
     expect(Linking.openURL).not.toHaveBeenCalled();
   });
+
+  it('sanitizes externalId against injection characters', async () => {
+    (Linking.canOpenURL as jest.Mock).mockResolvedValue(true);
+    (Linking.openURL as jest.Mock).mockResolvedValue(true);
+
+    const res = await launchTrackerApp('youtube', 'vid123\x00&malicious=1');
+
+    expect(res.success).toBe(true);
+    expect(Linking.canOpenURL).toHaveBeenCalledWith('youtube://watch?v=vid123%26malicious%3D1');
+  });
 });
+

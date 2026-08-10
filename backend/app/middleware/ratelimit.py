@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import base64
+import json
 import time
 from typing import TYPE_CHECKING
 
@@ -7,6 +9,7 @@ import structlog
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import JSONResponse
 
+from app.core.config import settings
 from app.core.envelopes import ErrorBody, ErrorEnvelope
 
 if TYPE_CHECKING:
@@ -18,41 +21,127 @@ if TYPE_CHECKING:
 logger = structlog.get_logger(__name__)
 
 # Fixed window size in seconds
-WINDOW_SECONDS = 60
+WINDOW_SECONDS = settings.rate_limit_window_seconds
 
-# Rate limits per SPEC §14.4 & Subtask 3
-LIMIT_GENERAL = 60  # 60 req/min general per user
-LIMIT_SYNC = 10  # 10 req/min on sync trigger endpoints
+# Base rate limits per SPEC §14.4 & Task 86bbay4ve requirements
+LIMIT_GENERAL = settings.rate_limit_general  # 60 req/min default
+LIMIT_SYNC = settings.rate_limit_sync  # 10 req/min default on sync trigger endpoints
+LIMIT_HEAVY = settings.rate_limit_heavy  # 30 req/min default on heavy/write endpoints
+
+# Role limit multipliers per user tier
+ROLE_LIMIT_MULTIPLIERS: dict[str, float] = {
+    "anonymous": 0.5,  # Unauthenticated IP requests (30 general, 5 sync, 15 heavy)
+    "user": 1.0,       # Standard authenticated user (60 general, 10 sync, 30 heavy)
+    "premium": 2.0,    # Premium tier user (120 general, 20 sync, 60 heavy)
+    "admin": 3.0,      # Admin tier user (180 general, 30 sync, 90 heavy)
+}
+
+
+def _get_endpoint_category(method: str, path: str) -> str:
+    """Categorize API endpoints into health, sync, heavy, or general rate limit buckets."""
+    if path == "/healthz":
+        return "health"
+    if method == "POST" and path.endswith("/sync"):
+        return "sync"
+    if (method in ("POST", "PUT", "DELETE") and ("/sources" in path or "/sessions" in path)) or path.endswith("/match"):
+        return "heavy"
+    return "general"
+
+
+def _extract_identity(request: Request) -> tuple[str, str]:
+    """Safely extract user identifier (uid or IP) and role for rate limiting context."""
+    uid = getattr(request.state, "uid", None)
+    role = getattr(request.state, "role", None)
+    has_auth_header = False
+
+    auth_header = request.headers.get("Authorization") or request.headers.get("authorization")
+    if auth_header and auth_header.startswith("Bearer "):
+        has_auth_header = True
+        if not uid:
+            token = auth_header[7:].strip()
+            parts = token.split(".")
+            if len(parts) == 3:
+                try:
+                    payload_b64 = parts[1]
+                    rem = len(payload_b64) % 4
+                    if rem:
+                        payload_b64 += "=" * (4 - rem)
+                    payload_bytes = base64.urlsafe_b64decode(payload_b64)
+                    claims = json.loads(payload_bytes)
+                    if isinstance(claims, dict):
+                        extracted_uid = claims.get("uid") or claims.get("user_id") or claims.get("sub")
+                        if extracted_uid and isinstance(extracted_uid, str):
+                            uid = extracted_uid
+                        if not role and claims.get("role") and isinstance(claims.get("role"), str):
+                            role = claims.get("role")
+                except Exception:
+                    pass
+
+    if uid:
+        request.state.uid = uid
+        user_role = role or "user"
+        request.state.role = user_role
+        return f"uid:{uid}", user_role
+
+    client_ip = request.client.host if (request.client and request.client.host) else "anonymous"
+    user_role = role or ("user" if has_auth_header else "anonymous")
+    request.state.role = user_role
+    return f"ip:{client_ip}", user_role
 
 
 class FixedWindowRateLimiter:
     """Instance-local fixed-window in-memory rate limiter per SPEC §14.4.
 
-    Architectural Compromise Note (SPEC §14.4):
-    v1 uses an instance-local fixed-window limiter, so rate limit headers are approximate per Cloud Run instance.
-    An accurate distributed limiter would require Firestore or Redis writes per request, roughly doubling cost
-    and latency to protect against a threat v1 does not face. Cloud Armor edge limiting is reserved for v1.1.
+    Enforces rate limits based on endpoint category and user role tiers.
     """
 
     def __init__(self) -> None:
-        # Key: (identifier, is_sync_endpoint, window_start_time) -> count
-        self._counts: dict[tuple[str, bool, int], int] = {}
+        # Key: (identifier, category, window_start_time) -> count
+        self._counts: dict[tuple[str, str, int], int] = {}
         self._last_cleanup = time.time()
 
     def check_and_increment(
-        self, identifier: str, is_sync_endpoint: bool, now: float | None = None
+        self,
+        identifier: str,
+        is_sync_endpoint: bool = False,
+        now: float | None = None,
+        role: str | None = None,
+        category: str | None = None,
+        custom_limit: int | None = None,
     ) -> tuple[bool, int, int, int]:
-        """Check and increment request count for identifier in current 60s window.
+        """Check and increment request count for identifier in current fixed window.
 
         Returns tuple of:
         (is_allowed: bool, limit: int, remaining: int, reset_seconds: int)
         """
         current_time = now if now is not None else time.time()
-        window_start = int(current_time) // WINDOW_SECONDS * WINDOW_SECONDS
-        reset_seconds = max(1, int(window_start + WINDOW_SECONDS - current_time))
+        window_seconds = settings.rate_limit_window_seconds
+        window_start = int(current_time) // window_seconds * window_seconds
+        reset_seconds = max(1, int(window_start + window_seconds - current_time))
 
-        limit = LIMIT_SYNC if is_sync_endpoint else LIMIT_GENERAL
-        key = (identifier, is_sync_endpoint, window_start)
+        if category is None:
+            category = "sync" if is_sync_endpoint else "general"
+
+        if role is None:
+            if identifier.startswith("uid:") or identifier.startswith("user"):
+                role = "user"
+            elif identifier.startswith("ip:") or identifier == "anonymous":
+                role = "anonymous"
+            else:
+                role = "user"
+
+        if custom_limit is not None:
+            limit = custom_limit
+        else:
+            base_limit = (
+                settings.rate_limit_sync
+                if category == "sync"
+                else (settings.rate_limit_heavy if category == "heavy" else settings.rate_limit_general)
+            )
+            multiplier = ROLE_LIMIT_MULTIPLIERS.get(role, 1.0)
+            limit = max(1, int(base_limit * multiplier))
+
+        key = (identifier, category, window_start)
 
         current_count = self._counts.get(key, 0)
         if current_count >= limit:
@@ -77,43 +166,47 @@ class FixedWindowRateLimiter:
             del self._counts[k]
         self._last_cleanup = current_time
 
+    def reset(self) -> None:
+        """Reset rate limiter counts state (used for test isolation)."""
+        self._counts.clear()
+        self._last_cleanup = time.time()
+
+
 
 # Singleton limiter instance
 _limiter = FixedWindowRateLimiter()
 
 
 class RateLimitMiddleware(BaseHTTPMiddleware):
-    """Rate limiting middleware enforcing 60 req/min general limit and 10 req/min sync trigger limit.
+    """Rate limiting middleware enforcing per-endpoint and per-role request limits.
 
     Emits standard rate limit response headers per house API standard:
     - X-RateLimit-Limit
     - X-RateLimit-Remaining
     - X-RateLimit-Reset
+    - Retry-After (on HTTP 429)
     """
 
     async def dispatch(
         self, request: Request, call_next: Callable[[Request], Awaitable[Response]]
     ) -> Response:
         path = request.url.path
+        method = request.method
+
+        category = _get_endpoint_category(method, path)
 
         # Exclude health check from rate limiting
-        if path == "/healthz":
+        if category == "health":
             return await call_next(request)
 
-        # Identify user by authenticated UID (set by auth middleware) or client IP fallback
-        user_id = getattr(request.state, "uid", None)
-        if not user_id:
-            client_ip = request.client.host if request.client else "anonymous"
-            identifier = f"ip:{client_ip}"
-        else:
-            identifier = f"uid:{user_id}"
-
-        # Detect sync trigger endpoint: POST /api/v1/sources/{source_id}/sync
-        is_sync_endpoint = request.method == "POST" and path.endswith("/sync")
+        identifier, role = _extract_identity(request)
+        is_sync_endpoint = (category == "sync")
 
         allowed, limit, remaining, reset_seconds = _limiter.check_and_increment(
             identifier=identifier,
             is_sync_endpoint=is_sync_endpoint,
+            role=role,
+            category=category,
         )
 
         if not allowed:
@@ -121,13 +214,16 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
                 "rate_limit_exceeded",
                 identifier=identifier,
                 path=path,
+                method=method,
+                category=category,
                 limit=limit,
                 reset_seconds=reset_seconds,
+                role=role,
             )
             envelope = ErrorEnvelope(
                 error=ErrorBody(
                     code="RATE_LIMITED",
-                    message="Too many requests. Please try again later.",
+                    message=f"Rate limit of {limit} requests per minute exceeded for '{category}' endpoints. Please try again in {reset_seconds} seconds.",
                 )
             )
             err_response = JSONResponse(

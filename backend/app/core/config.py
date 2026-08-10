@@ -23,6 +23,10 @@ class Settings(BaseSettings):
     sync_stall_timeout_seconds: int = 3600
     full_walk_interval_days: int = 7
     auth_cache_ttl_seconds: int = 60
+    rate_limit_general: int = 60
+    rate_limit_sync: int = 10
+    rate_limit_heavy: int = 30
+    rate_limit_window_seconds: int = 60
     debug: bool = False
     log_level: str = "INFO"
 

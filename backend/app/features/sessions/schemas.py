@@ -3,35 +3,72 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
+from app.core.sanitizer import sanitize_identifier, sanitize_url
 from app.features.sessions.models import Session
 
 
 class CreateSessionRequest(BaseModel):
     """Request payload for POST /sessions per SPEC §9.5."""
 
-    activity_id: str = Field(..., description="ID of catalog activity, e.g. running or strength")
+    activity_id: str = Field(
+        ...,
+        min_length=1,
+        max_length=100,
+        description="ID of catalog activity, e.g. running or strength",
+    )
     match_mode: Literal["content_first", "time_first"] = Field(
         ..., description="Session match mode: content_first or time_first"
     )
     content_id: str | None = Field(
-        None, description="Namespaced content ID if matched from content"
+        None, max_length=200, description="Namespaced content ID if matched from content"
     )
     target_duration_seconds: int | None = Field(
-        None, description="Target duration in seconds for bare time-first sessions"
+        None, ge=300, le=86400, description="Target duration in seconds for bare time-first sessions"
     )
+
+    @field_validator("activity_id")
+    @classmethod
+    def sanitize_act_id(cls, v: str) -> str:
+        sanitized = sanitize_identifier(v, max_length=100)
+        if not sanitized:
+            raise ValueError("activity_id must not be empty or contain invalid characters")
+        return sanitized
+
+    @field_validator("content_id")
+    @classmethod
+    def sanitize_cnt_id(cls, v: str | None) -> str | None:
+        if v is None:
+            return None
+        sanitized = sanitize_identifier(v, max_length=200)
+        return sanitized or None
 
 
 class CompleteSessionRequest(BaseModel):
     """Request payload for POST /sessions/{id}/complete per SPEC §9.6."""
 
     external_workout_url: str | None = Field(
-        None, description="External workout URL (reserved for v1.1)"
+        None, max_length=2048, description="External workout URL (reserved for v1.1)"
     )
     healthkit_uuid: str | None = Field(
-        None, description="Apple HealthKit UUID (reserved for v1.1)"
+        None, max_length=100, description="Apple HealthKit UUID (reserved for v1.1)"
     )
+
+    @field_validator("external_workout_url")
+    @classmethod
+    def sanitize_ext_url(cls, v: str | None) -> str | None:
+        if v is None:
+            return None
+        return sanitize_url(v)
+
+    @field_validator("healthkit_uuid")
+    @classmethod
+    def sanitize_hk_uuid(cls, v: str | None) -> str | None:
+        if v is None:
+            return None
+        return sanitize_identifier(v, max_length=100)
+
 
 
 class SessionSchema(BaseModel):

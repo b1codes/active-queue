@@ -71,3 +71,42 @@ def test_fixed_window_rate_limiter_window_reset() -> None:
     )
     assert allowed_t2 is True
     assert remaining == 59
+
+
+def test_rate_limiter_role_multipliers() -> None:
+    """FixedWindowRateLimiter applies role multipliers (anonymous=0.5x, premium=2.0x, admin=3.0x)."""
+    limiter = FixedWindowRateLimiter()
+    now = 1000.0
+
+    # Anonymous IP (general limit 30)
+    allowed, limit, _, _ = limiter.check_and_increment("ip:1.2.3.4", role="anonymous", category="general", now=now)
+    assert allowed is True
+    assert limit == 30
+
+    # Premium user (general limit 120)
+    allowed, limit, _, _ = limiter.check_and_increment("uid:prem_1", role="premium", category="general", now=now)
+    assert allowed is True
+    assert limit == 120
+
+    # Admin user (general limit 180)
+    allowed, limit, _, _ = limiter.check_and_increment("uid:admin_1", role="admin", category="general", now=now)
+    assert allowed is True
+    assert limit == 180
+
+
+def test_rate_limiter_heavy_endpoint_category() -> None:
+    """FixedWindowRateLimiter enforces heavy endpoint limit (30 req/min for standard user)."""
+    limiter = FixedWindowRateLimiter()
+    now = 2000.0
+
+    # Standard user on heavy category (30 limit)
+    for _ in range(30):
+        allowed, limit, _, _ = limiter.check_and_increment("uid:heavy_user", role="user", category="heavy", now=now)
+        assert allowed is True
+        assert limit == 30
+
+    allowed, limit, remaining, _ = limiter.check_and_increment("uid:heavy_user", role="user", category="heavy", now=now)
+    assert allowed is False
+    assert limit == 30
+    assert remaining == 0
+

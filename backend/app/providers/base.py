@@ -3,9 +3,11 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Protocol
 
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
 from app.core.errors import ValidationError
+from app.core.sanitizer import sanitize_text, sanitize_url
+
 
 # Provider name <-> prefix mapping per SPEC §4.1
 PROVIDER_PREFIXES: dict[str, str] = {
@@ -59,6 +61,25 @@ class PlaylistMetadata(BaseModel):
     item_count: int | None = None
     thumbnail_url: str | None = None
 
+    @field_validator("title")
+    @classmethod
+    def sanitize_title(cls, v: str) -> str:
+        return sanitize_text(v, max_length=500) or v.strip()
+
+    @field_validator("description")
+    @classmethod
+    def sanitize_desc(cls, v: str | None) -> str | None:
+        if v is None:
+            return None
+        return sanitize_text(v, max_length=5000)
+
+    @field_validator("thumbnail_url")
+    @classmethod
+    def sanitize_thumb(cls, v: str | None) -> str | None:
+        if v is None:
+            return None
+        return sanitize_url(v)
+
 
 class RawContentItem(BaseModel):
     """Raw item fetched from a content provider per SPEC §8.4."""
@@ -69,6 +90,18 @@ class RawContentItem(BaseModel):
     published_at: datetime
     thumbnail_url: str | None = None
     video_url: str | None = None
+
+    @field_validator("title")
+    @classmethod
+    def sanitize_title(cls, v: str) -> str:
+        return sanitize_text(v, max_length=500) or v.strip()
+
+    @field_validator("thumbnail_url", "video_url")
+    @classmethod
+    def sanitize_media_urls(cls, v: str | None) -> str | None:
+        if v is None:
+            return None
+        return sanitize_url(v)
 
 
 class PlaylistPage(BaseModel):

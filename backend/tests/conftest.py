@@ -40,3 +40,12 @@ def mock_firestore_client(monkeypatch: pytest.MonkeyPatch) -> MagicMock:
         mock_client,
     )
     return mock_client
+
+
+@pytest.fixture(autouse=True)
+def reset_rate_limiter() -> None:
+    """Reset rate limiter state before each test for test isolation."""
+    from app.middleware.ratelimit import _limiter
+
+    _limiter.reset()
+
