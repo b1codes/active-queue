@@ -14,6 +14,7 @@ from app.core.security import init_firebase_admin
 from app.features.activities.router import router as activities_router
 from app.features.content.router import router as content_router
 from app.features.health.router import router as health_router
+from app.features.sessions.router import router as sessions_router
 from app.features.users.router import router as users_router
 from app.middleware.errors import (
     ErrorHandlingMiddleware,
@@ -57,4 +58,4 @@ app.include_router(health_router)
 app.include_router(users_router, prefix="/api/v1")
 app.include_router(content_router, prefix="/api/v1")
 app.include_router(activities_router, prefix="/api/v1")
-# app.include_router(sessions_router, prefix="/api/v1")
+app.include_router(sessions_router, prefix="/api/v1")

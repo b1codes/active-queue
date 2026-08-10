@@ -1,3 +1,60 @@
 from __future__ import annotations
 
-"""Sessions API request/response schemas."""
+from datetime import datetime
+from typing import Literal
+
+from pydantic import BaseModel, Field
+
+from app.features.sessions.models import Session
+
+
+class CreateSessionRequest(BaseModel):
+    """Request payload for POST /sessions per SPEC §9.5."""
+
+    activity_id: str = Field(..., description="ID of catalog activity, e.g. running or strength")
+    match_mode: Literal["content_first", "time_first"] = Field(
+        ..., description="Session match mode: content_first or time_first"
+    )
+    content_id: str | None = Field(
+        None, description="Namespaced content ID if matched from content"
+    )
+    target_duration_seconds: int | None = Field(
+        None, description="Target duration in seconds for bare time-first sessions"
+    )
+
+
+class SessionSchema(BaseModel):
+    """API response schema for a session per SPEC §9.5."""
+
+    id: str
+    user_id: str
+    activity_id: str
+    match_mode: Literal["content_first", "time_first"]
+    content_id: str | None = None
+    duration_seconds: int
+    status: Literal["pending", "in_progress", "completed", "abandoned"]
+    checklist_completed: bool
+    started_at: datetime | None = None
+    completed_at: datetime | None = None
+    abandoned_at: datetime | None = None
+    created_at: datetime
+    updated_at: datetime
+
+    @classmethod
+    def from_domain(cls, session: Session) -> SessionSchema:
+        """Convert Session domain model to SessionSchema response."""
+        return cls(
+            id=session.id,
+            user_id=session.user_id,
+            activity_id=session.activity_id,
+            match_mode=session.match_mode,
+            content_id=session.content_id,
+            duration_seconds=session.duration_seconds,
+            status=session.status,
+            checklist_completed=session.checklist_completed,
+            started_at=session.started_at,
+            completed_at=session.completed_at,
+            abandoned_at=session.abandoned_at,
+            created_at=session.created_at,
+            updated_at=session.updated_at,
+        )
