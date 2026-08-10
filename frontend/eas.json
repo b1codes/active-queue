@@ -1,0 +1,41 @@
+{
+  "cli": {
+    "version": ">= 12.0.0",
+    "appVersionSource": "remote"
+  },
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal",
+      "ios": {
+        "simulator": true
+      }
+    },
+    "preview": {
+      "distribution": "internal",
+      "ios": {
+        "simulator": false
+      }
+    },
+    "production": {
+      "autoIncrement": true,
+      "ios": {
+        "simulator": false
+      },
+      "env": {
+        "EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN": "auth.activequeue.app",
+        "EXPO_PUBLIC_FIREBASE_PROJECT_ID": "activequeue-prod",
+        "EXPO_PUBLIC_API_BASE_URL": "https://activequeue-api-prod-uc.a.run.app"
+      }
+    }
+  },
+  "submit": {
+    "production": {
+      "ios": {
+        "appleId": "developer@activequeue.app",
+        "ascAppId": "6400000000",
+        "appleTeamId": "ABC123XYZ8"
+      }
+    }
+  }
+}
