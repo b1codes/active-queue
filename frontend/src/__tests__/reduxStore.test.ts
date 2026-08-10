@@ -1,7 +1,7 @@
 import { store } from '../store';
-import { authSlice, setAuthState, clearError } from '../features/auth/authSlice';
-import { queueSlice, setQueueState, setSyncProgress, cancelSync, hideFeedItemOptimistic } from '../features/queue/queueSlice';
-import { sessionSlice, setSessionFromServer, skipTrackerStep, advanceStep, clearSession } from '../features/sessions/sessionSlice';
+import { setAuthState, clearError } from '../features/auth/authSlice';
+import { setQueueState, setSyncProgress, cancelSync, hideFeedItemOptimistic } from '../features/queue/queueSlice';
+import { setSessionFromServer, skipTrackerStep, advanceStep, clearSession } from '../features/sessions/sessionSlice';
 
 describe('Redux Store & Slices', () => {
   describe('Auth Slice', () => {

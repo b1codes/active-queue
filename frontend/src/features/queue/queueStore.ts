@@ -1,7 +1,7 @@
 import { store } from '@/store';
 import { useAppSelector } from '@/store/hooks';
 import { apiClient } from '../../core/api/apiClient';
-import { FeedItem, FeedResponse, Source, SyncChunkResponse, SyncProgressState } from './types';
+import { FeedResponse, Source, SyncChunkResponse } from './types';
 import {
   setQueueState,
   setSyncProgress,
@@ -9,7 +9,6 @@ import {
   clearErrors as clearErrorsAction,
   hideFeedItemOptimistic,
   QueueState,
-  INITIAL_SYNC_STATE,
 } from './queueSlice';
 
 export interface QueueActions {
