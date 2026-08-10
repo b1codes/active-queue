@@ -23,8 +23,19 @@ class CreateSessionRequest(BaseModel):
     )
 
 
+class CompleteSessionRequest(BaseModel):
+    """Request payload for POST /sessions/{id}/complete per SPEC §9.6."""
+
+    external_workout_url: str | None = Field(
+        None, description="External workout URL (reserved for v1.1)"
+    )
+    healthkit_uuid: str | None = Field(
+        None, description="Apple HealthKit UUID (reserved for v1.1)"
+    )
+
+
 class SessionSchema(BaseModel):
-    """API response schema for a session per SPEC §9.5."""
+    """API response schema for a session per SPEC §9.5 & §9.6."""
 
     id: str
     user_id: str

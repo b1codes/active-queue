@@ -10,7 +10,11 @@ from app.core.security import AuthenticatedUser, get_current_user
 from app.features.activities.service import ActivityService
 from app.features.content.repository import ContentRepository
 from app.features.sessions.repository import SessionRepository
-from app.features.sessions.schemas import CreateSessionRequest, SessionSchema
+from app.features.sessions.schemas import (
+    CompleteSessionRequest,
+    CreateSessionRequest,
+    SessionSchema,
+)
 from app.features.sessions.service import SessionService
 
 if TYPE_CHECKING:
@@ -66,5 +70,31 @@ async def start_session(
     session = await service.start_session(
         user_id=current_user.uid,
         session_id=session_id,
+    )
+    return success_response(SessionSchema.from_domain(session).model_dump())
+
+
+@router.post(
+    "/{session_id}/complete",
+    status_code=status.HTTP_200_OK,
+    response_model=None,
+    summary="Complete a workout session",
+    description="Atomically complete a workout session, set feed item consumed, and arrayUnion content ID per SPEC §7.1 & §9.6.",
+)
+async def complete_session(
+    session_id: str,
+    body: CompleteSessionRequest | None = None,
+    current_user: AuthenticatedUser = Depends(get_current_user),
+    service: SessionService = Depends(get_session_service),
+) -> SuccessEnvelope[dict[str, Any]]:
+    """POST /api/v1/sessions/{session_id}/complete endpoint."""
+    ext_url = body.external_workout_url if body else None
+    hk_uuid = body.healthkit_uuid if body else None
+
+    session = await service.complete_session(
+        user_id=current_user.uid,
+        session_id=session_id,
+        external_workout_url=ext_url,
+        healthkit_uuid=hk_uuid,
     )
     return success_response(SessionSchema.from_domain(session).model_dump())

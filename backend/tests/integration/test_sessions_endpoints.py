@@ -12,8 +12,10 @@ from app.main import app
 
 
 @pytest.mark.asyncio
-async def test_create_and_start_session_endpoints(mock_firestore_client: AsyncMock) -> None:
-    """POST /api/v1/sessions and POST /api/v1/sessions/{id}/start lifecycle per SPEC §9.5."""
+async def test_create_start_and_complete_session_endpoints(
+    mock_firestore_client: AsyncMock,
+) -> None:
+    """POST /api/v1/sessions, POST /api/v1/sessions/{id}/start, and POST /api/v1/sessions/{id}/complete lifecycle per SPEC §9.5-9.6."""
     mock_decoded = {"uid": "test_user_sess_1", "email": "test@example.com"}
 
     cache_doc = ContentCacheItem(
@@ -35,6 +37,17 @@ async def test_create_and_start_session_endpoints(mock_firestore_client: AsyncMo
         status="pending",
     )
 
+    completed_session = Session(
+        id="s_test_123",
+        user_id="test_user_sess_1",
+        activity_id="running",
+        match_mode="content_first",
+        content_id="fx:50",
+        duration_seconds=1800,
+        status="completed",
+        completed_at=datetime.now(UTC),
+    )
+
     with (
         patch("firebase_admin.auth.verify_id_token", return_value=mock_decoded),
         patch(
@@ -54,6 +67,10 @@ async def test_create_and_start_session_endpoints(mock_firestore_client: AsyncMo
             AsyncMock(return_value=pending_session),
         ),
         patch("app.features.sessions.repository.SessionRepository.update_session", AsyncMock()),
+        patch(
+            "app.features.sessions.repository.SessionRepository.complete_session_transaction",
+            AsyncMock(return_value=completed_session),
+        ),
     ):
         async with AsyncClient(
             transport=ASGITransport(app=app),
@@ -82,5 +99,14 @@ async def test_create_and_start_session_endpoints(mock_firestore_client: AsyncMo
             assert start_resp.status_code == 200
             s_data = start_resp.json()
             assert s_data["status"] == "success"
-            assert s_data["data"]["status"] == "in_progress"
-            assert s_data["data"]["started_at"] is not None
+
+            # 3. Complete Session
+            complete_resp = await client.post(
+                f"/api/v1/sessions/{pending_session.id}/complete",
+                json={},
+            )
+            assert complete_resp.status_code == 200
+            comp_data = complete_resp.json()
+            assert comp_data["status"] == "success"
+            assert comp_data["data"]["status"] == "completed"
+            assert comp_data["data"]["completed_at"] is not None

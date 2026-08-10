@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from app.core.errors import ConflictError, NotFoundError, ValidationError
+from app.core.errors import AppError, ConflictError, NotFoundError, ValidationError
 from app.features.content.models import ContentCacheItem
 from app.features.sessions.models import Session
 from app.features.sessions.service import SessionService
@@ -143,3 +143,52 @@ async def test_start_session_idempotent_refire() -> None:
 
     assert res.status == "in_progress"
     assert res.started_at == original_start
+
+
+@pytest.mark.asyncio
+async def test_complete_session_v11_fields_rejection() -> None:
+    """Providing external_workout_url or healthkit_uuid returns 501 FEATURE_NOT_AVAILABLE."""
+    mock_session_repo = MagicMock()
+    service = SessionService(mock_session_repo)
+
+    with pytest.raises(AppError) as exc_info:
+        await service.complete_session(
+            user_id="u1",
+            session_id="s1",
+            external_workout_url="https://strava.com/activity/123",
+        )
+    assert exc_info.value.code == "FEATURE_NOT_AVAILABLE"
+    assert exc_info.value.status_code == 501
+
+
+@pytest.mark.asyncio
+async def test_complete_session_idempotent_and_status_rules() -> None:
+    """Completing completed session is idempotent (200 OK); completing pending session returns SESSION_NOT_STARTED (409)."""
+    mock_session_repo = MagicMock()
+
+    # 1. Idempotent completed session
+    completed_session = Session(
+        id="s_comp",
+        user_id="u1",
+        activity_id="running",
+        match_mode="content_first",
+        content_id="fx:1",
+        duration_seconds=1800,
+        status="completed",
+    )
+    mock_session_repo.complete_session_transaction = AsyncMock(return_value=completed_session)
+
+    service = SessionService(mock_session_repo)
+    res = await service.complete_session("u1", "s_comp")
+    assert res.status == "completed"
+
+    # 2. Completing pending session returns 409 SESSION_NOT_STARTED
+    mock_session_repo.complete_session_transaction = AsyncMock(
+        side_effect=ConflictError(
+            code="SESSION_NOT_STARTED", message="Session has not been started yet"
+        )
+    )
+    with pytest.raises(ConflictError) as exc_info:
+        await service.complete_session("u1", "s_pending")
+    assert exc_info.value.code == "SESSION_NOT_STARTED"
+    assert exc_info.value.status_code == 409

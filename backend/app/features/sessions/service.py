@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 import structlog
 
 from app.core.envelopes import ErrorDetail
-from app.core.errors import ConflictError, NotFoundError, ValidationError
+from app.core.errors import AppError, ConflictError, NotFoundError, ValidationError
 from app.features.activities.service import ActivityService
 from app.features.sessions.models import MatchMode, Session
 from app.features.sessions.repository import SessionRepository
@@ -22,13 +22,17 @@ VALID_TIME_BLOCK_DURATIONS = {900, 1200, 1800, 2700, 3600, 4500, 5400}
 
 
 class SessionService:
-    """Business logic for workout time-boxing sessions per SPEC §4.4, §7.1, & §9.5.
+    """Business logic for workout time-boxing sessions per SPEC §4.4, §7.1, & §9.5-9.6.
 
     Enforces business rules:
     - Content duration is READ FROM content_cache, NEVER from request body.
     - Bare time-first duration validated against predefined 7-block allowlist.
     - Single active session guardrail (ACTIVE_SESSION_EXISTS, 409).
     - Idempotent session start preserving original started_at timestamp.
+    - Single transaction session completion (updates session, feed_item.consumed, and user.consumed_content).
+    - Idempotent completion (completing completed session returns 200).
+    - Completing pending session returns SESSION_NOT_STARTED (409).
+    - Reject external_workout_url & healthkit_uuid with 501 FEATURE_NOT_AVAILABLE until v1.1.
     - Cross-user session access returns 404 (SESSION_NOT_FOUND), never 403.
     """
 
@@ -167,3 +171,26 @@ class SessionService:
 
         logger.info("session_started", session_id=session_id, user_id=user_id)
         return session
+
+    async def complete_session(
+        self,
+        user_id: str,
+        session_id: str,
+        external_workout_url: str | None = None,
+        healthkit_uuid: str | None = None,
+    ) -> Session:
+        """Atomically complete a workout session per SPEC §7.1 & §9.6."""
+        # Reject v1.1 integration fields with 501 FEATURE_NOT_AVAILABLE per task instructions
+        if external_workout_url is not None or healthkit_uuid is not None:
+            raise AppError(
+                code="FEATURE_NOT_AVAILABLE",
+                message="External workout URLs and HealthKit UUID integration are reserved for v1.1",
+                status_code=501,
+            )
+
+        now = datetime.now(UTC)
+        return await self._session_repo.complete_session_transaction(
+            session_id=session_id,
+            user_id=user_id,
+            now=now,
+        )
