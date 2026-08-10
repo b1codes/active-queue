@@ -8,9 +8,14 @@ import structlog
 from app.core.config import settings
 from app.core.errors import ConflictError, NotFoundError, ProviderError, ValidationError
 from app.features.content.models import ContentCacheItem, FeedItem, Source
-from app.features.content.repository import ContentRepository, SourceRepository
-from app.features.content.schemas import SyncResponse
-from app.providers.base import format_content_id
+from app.features.content.repository import ContentRepository, SourceRepository, decode_cursor
+from app.features.content.schemas import (
+    FeedItemSchema,
+    FeedResponse,
+    SyncResponse,
+    format_duration_label,
+)
+from app.providers.base import format_content_id, parse_content_id
 from app.providers.factory import get_provider
 
 logger = structlog.get_logger(__name__)
@@ -20,7 +25,7 @@ SYSTEM_PLAYLIST_IDS = ("WL", "LL", "HL")
 
 
 class ContentService:
-    """Business logic for content sources and ingestion per SPEC §5.2, §8.2, §9.3 & §9.4.
+    """Business logic for content sources and ingestion per SPEC §5.2, §8.2, §9.2, §9.3 & §9.4.
 
     Enforces business rules:
     - Max 5 sources per user (SOURCE_LIMIT_REACHED).
@@ -32,6 +37,8 @@ class ContentService:
     - Preflight change detection using itemCount and 7-day full walk force interval.
     - Stalled sync expiration (1 hour timeout).
     - Sync start throttling (15 mins), never throttling continuation chunks.
+    - Cursor-based feed pagination with server duration_label formatting.
+    - total_unconsumed count aggregation on first page only (cursor is None).
     """
 
     def __init__(
@@ -161,7 +168,6 @@ class ContentService:
         provider_impl = get_provider(source.provider)
 
         if not is_resuming:
-            # Check 15-minute start throttle for new syncs
             if source.last_sync_at:
                 elapsed_since_last = (now - source.last_sync_at).total_seconds()
                 if elapsed_since_last < settings.sync_throttle_seconds:
@@ -179,7 +185,6 @@ class ContentService:
                         message="Sync throttled: source was synced recently",
                     )
 
-            # Preflight itemCount check
             try:
                 meta = await provider_impl.get_playlist_metadata(source.external_source_id)
             except (NotFoundError, ProviderError) as err:
@@ -191,7 +196,6 @@ class ContentService:
                 )
                 raise
 
-            # If itemCount is unchanged AND last_sync_at is within 7 days, skip walk!
             force_full_walk = False
             if not source.last_sync_at:
                 force_full_walk = True
@@ -288,7 +292,6 @@ class ContentService:
             await self._content_repo.upsert_content_cache_batch(chunk_cache_items)
             await self._content_repo.upsert_feed_items_batch(chunk_feed_items)
 
-        # Only after writes land, persist new page token on Source document per SPEC §5.2
         is_complete = current_token is None
         new_status = "active" if is_complete else "syncing"
 
@@ -317,4 +320,81 @@ class ContentService:
             has_more=not is_complete,
             next_page_token=current_token,
             message="Chunk sync complete" if not is_complete else "Full sync complete",
+        )
+
+    async def get_user_feed(
+        self,
+        user_id: str,
+        limit: int = 20,
+        cursor: str | None = None,
+        min_duration: int | None = None,
+        max_duration: int | None = None,
+    ) -> FeedResponse:
+        """Fetch user feed items with cursor pagination, duration filters, and server duration_label per SPEC §9.2."""
+        if not self._content_repo:
+            return FeedResponse(items=[], next_cursor=None, total_unconsumed=0)
+
+        # Compute total_unconsumed count aggregation ONLY on first page per SPEC §9.2
+        total_unconsumed: int | None = None
+        if cursor is None:
+            total_unconsumed = await self._content_repo.get_user_feed_count(user_id)
+
+        # Decode cursor to datetime
+        cursor_dt = decode_cursor(cursor) if cursor else None
+
+        # Fetch feed items page
+        feed_items, next_cursor = await self._content_repo.get_user_feed_items_page(
+            user_id=user_id,
+            limit=limit,
+            cursor_dt=cursor_dt,
+            min_duration=min_duration,
+            max_duration=max_duration,
+        )
+
+        if not feed_items:
+            return FeedResponse(
+                items=[],
+                next_cursor=next_cursor,
+                total_unconsumed=total_unconsumed,
+            )
+
+        # Fetch matching content_cache documents
+        content_ids = [fi.content_id for fi in feed_items]
+        cache_map = await self._content_repo.get_content_cache_batch(content_ids)
+
+        # Enrich feed items into FeedItemSchema
+        enriched_items: list[FeedItemSchema] = []
+        for fi in feed_items:
+            cache_doc = cache_map.get(fi.content_id)
+
+            provider_name = "fixture"
+            external_id = fi.content_id
+            if ":" in fi.content_id:
+                provider_name, external_id = parse_content_id(fi.content_id)
+
+            title = cache_doc.title if cache_doc else f"Feed Video {external_id}"
+            thumb_url = cache_doc.thumbnail_url if cache_doc else None
+            vid_url = cache_doc.video_url if cache_doc else None
+
+            enriched_items.append(
+                FeedItemSchema(
+                    id=fi.id,
+                    content_id=fi.content_id,
+                    source_id=fi.source_id,
+                    title=title,
+                    provider=provider_name,
+                    external_id=external_id,
+                    duration_seconds=fi.duration_seconds,
+                    duration_label=format_duration_label(fi.duration_seconds),
+                    published_at=fi.published_at,
+                    thumbnail_url=thumb_url,
+                    video_url=vid_url,
+                    consumed=fi.consumed,
+                )
+            )
+
+        return FeedResponse(
+            items=enriched_items,
+            next_cursor=next_cursor,
+            total_unconsumed=total_unconsumed,
         )

@@ -2,19 +2,24 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Query, status
 
 from app.core.dependencies import get_db
 from app.core.envelopes import SuccessEnvelope, success_response
 from app.core.security import AuthenticatedUser, get_current_user
 from app.features.content.repository import ContentRepository, SourceRepository
-from app.features.content.schemas import CreateSourceRequest, SourceSchema, SyncResponse
+from app.features.content.schemas import (
+    CreateSourceRequest,
+    FeedResponse,
+    SourceSchema,
+    SyncResponse,
+)
 from app.features.content.service import ContentService
 
 if TYPE_CHECKING:
     from google.cloud.firestore import AsyncClient
 
-router = APIRouter(prefix="/sources", tags=["sources"])
+router = APIRouter(tags=["content"])
 
 
 def get_content_service(db: AsyncClient = Depends(get_db)) -> ContentService:
@@ -24,8 +29,9 @@ def get_content_service(db: AsyncClient = Depends(get_db)) -> ContentService:
     return ContentService(source_repo, content_repo)
 
 
+# Sources endpoints
 @router.post(
-    "",
+    "/sources",
     status_code=status.HTTP_201_CREATED,
     response_model=None,
     summary="Add content source",
@@ -42,7 +48,7 @@ async def create_source(
 
 
 @router.post(
-    "/{source_id}/sync",
+    "/sources/{source_id}/sync",
     status_code=status.HTTP_200_OK,
     response_model=None,
     summary="Trigger source sync chunk",
@@ -56,3 +62,30 @@ async def sync_source_chunk(
     """Trigger chunked resumable sync endpoint."""
     sync_resp: SyncResponse = await service.sync_source_chunk(current_user.uid, source_id)
     return success_response(sync_resp.model_dump())
+
+
+# Feed endpoint
+@router.get(
+    "/content/feed",
+    status_code=status.HTTP_200_OK,
+    response_model=None,
+    summary="Get user content feed",
+    description="Fetch user unconsumed feed items with cursor pagination, duration filters, and server duration_label per SPEC §9.2.",
+)
+async def get_user_feed(
+    limit: int = Query(20, ge=1, le=100),
+    cursor: str | None = Query(None),
+    min_duration: int | None = Query(None, ge=0),
+    max_duration: int | None = Query(None, ge=0),
+    current_user: AuthenticatedUser = Depends(get_current_user),
+    service: ContentService = Depends(get_content_service),
+) -> SuccessEnvelope[dict[str, Any]]:
+    """GET /api/v1/content/feed endpoint."""
+    feed_resp: FeedResponse = await service.get_user_feed(
+        user_id=current_user.uid,
+        limit=limit,
+        cursor=cursor,
+        min_duration=min_duration,
+        max_duration=max_duration,
+    )
+    return success_response(feed_resp.model_dump())

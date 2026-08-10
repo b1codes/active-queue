@@ -155,7 +155,7 @@ async def test_content_repository_get_user_feed_items() -> None:
     mock_client.collection.return_value = mock_query
 
     repo = ContentRepository(mock_client)
-    results = await repo.get_user_feed_items("u1", limit=10)
+    results, _next_cursor = await repo.get_user_feed_items_page("u1", limit=10)
 
     assert len(results) == 1
     assert results[0].content_id == "fx:1"

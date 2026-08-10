@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import base64
+from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
 import structlog
@@ -10,6 +12,21 @@ if TYPE_CHECKING:
     from google.cloud.firestore import AsyncClient
 
 logger = structlog.get_logger(__name__)
+
+
+def encode_cursor(dt: datetime) -> str:
+    """Encode datetime cursor to base64 string."""
+    iso_str = dt.isoformat()
+    return base64.urlsafe_b64encode(iso_str.encode("utf-8")).decode("utf-8")
+
+
+def decode_cursor(cursor_str: str) -> datetime | None:
+    """Decode base64 cursor string into datetime object."""
+    try:
+        raw_str = base64.urlsafe_b64decode(cursor_str.encode("utf-8")).decode("utf-8")
+        return datetime.fromisoformat(raw_str)
+    except Exception:
+        return None
 
 
 class SourceRepository:
@@ -120,11 +137,7 @@ class ContentRepository:
         logger.info("content_cache_batch_upserted", count=len(items))
 
     async def upsert_feed_items_batch(self, items: list[FeedItem]) -> None:
-        """Batch upsert items into feed_items collection using deterministic doc IDs.
-
-        Per SPEC §4.7, using deterministic composite doc ID {userId}_{contentId} guarantees
-        that sync re-runs overwrite rather than duplicate feed items (idempotency).
-        """
+        """Batch upsert items into feed_items collection using deterministic doc IDs."""
         if not items:
             return
 
@@ -139,21 +152,44 @@ class ContentRepository:
 
         logger.info("feed_items_batch_upserted", count=len(items))
 
-    async def get_user_feed_items(
+    async def get_user_feed_count(self, user_id: str) -> int:
+        """Compute total unconsumed feed items count using Firestore count() aggregation per SPEC §9.2."""
+        query = (
+            self._client.collection("feed_items")
+            .where(field_path="user_id", op_string="==", value=user_id)
+            .where(field_path="consumed", op_string="==", value=False)
+        )
+        count_query = query.count()
+        results = await count_query.get()  # type: ignore[call-arg]
+        # count_query.get() returns [[AggregationResult(count=N)]]
+        if results and len(results) > 0 and len(results[0]) > 0:
+            return int(results[0][0].value)
+        return 0
+
+    async def get_user_feed_items_page(
         self,
         user_id: str,
         limit: int = 20,
+        cursor_dt: datetime | None = None,
         min_duration: int | None = None,
         max_duration: int | None = None,
-    ) -> list[FeedItem]:
-        """Fetch unconsumed feed items for user_id with optional duration filtering."""
+    ) -> tuple[list[FeedItem], str | None]:
+        """Fetch paginated unconsumed feed items for user_id using cursor-based pagination."""
         query = (
             self._client.collection("feed_items")
             .where(field_path="user_id", op_string="==", value=user_id)
             .where(field_path="consumed", op_string="==", value=False)
             .order_by("published_at", direction="DESCENDING")
-            .limit(limit)
         )
+
+        if cursor_dt is not None:
+            query = query.start_after({"published_at": cursor_dt})
+
+        # Fetch extra items if duration filtering is active
+        fetch_limit = (
+            limit + 1 if (min_duration is None and max_duration is None) else min(limit * 3, 100)
+        )
+        query = query.limit(fetch_limit)
 
         snapshots = await query.get()
         results: list[FeedItem] = []
@@ -167,8 +203,15 @@ class ContentRepository:
                 continue
 
             results.append(item)
+            if len(results) == limit:
+                break
 
-        return results
+        next_cursor: str | None = None
+        if len(results) == limit and len(snapshots) > limit:
+            last_item = results[-1]
+            next_cursor = encode_cursor(last_item.published_at)
+
+        return results, next_cursor
 
     async def mark_feed_item_consumed(self, user_id: str, content_id: str) -> None:
         """Mark feed item as consumed by setting consumed = True."""
