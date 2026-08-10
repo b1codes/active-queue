@@ -28,10 +28,9 @@ services:
       - firebase-data:/workspace/.firebase-data
     command: >
       firebase emulators:start
-      --project activequeue-local
+      --project demo-activequeue-local
       --only auth,firestore
       --export-on-exit /workspace/.firebase-data
-      --import /workspace/.firebase-data
     ports:
       - "9099:9099"   # Firebase Auth emulator
       - "8080:8080"   # Firestore emulator

@@ -1,11 +1,12 @@
-FROM node:22-slim
+# Use Eclipse Temurin JRE 21 (Ubuntu Noble base — reliable arm64 + amd64 support)
+# firebase-tools requires Java >= 21 (Firestore emulator is JVM-based)
+FROM eclipse-temurin:21-jre-noble
 
-# Install Java (required by Firebase Firestore emulator)
-# Auth emulator is Go-based (no Java), but Firestore still needs JRE
+# Install Node.js 22 + curl
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends \
-       openjdk-17-jre-headless \
-       curl \
+    && apt-get install -y --no-install-recommends curl ca-certificates gnupg \
+    && curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
+    && apt-get install -y nodejs \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Firebase CLI globally at build time (cached layer)
