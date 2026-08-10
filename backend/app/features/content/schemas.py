@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
+from app.features.activities.schemas import ActivitySchema
 from app.features.content.models import Source
 
 
@@ -110,11 +112,25 @@ class FeedItemSchema(BaseModel):
 
 
 class FeedResponse(BaseModel):
-    """API response payload for GET /feed per SPEC §9.2.
-
-    total_unconsumed is computed on first page only (cursor is None).
-    """
+    """API response payload for GET /feed per SPEC §9.2."""
 
     items: list[FeedItemSchema]
     next_cursor: str | None = None
     total_unconsumed: int | None = None
+
+
+class ContentMatchRequest(BaseModel):
+    """Request payload for POST /content/match per SPEC §9.6."""
+
+    content_id: str = Field(..., description="Namespaced content ID, e.g. yt:video123 or fx:item1")
+
+
+class ContentMatchResponse(BaseModel):
+    """Response payload for POST /content/match per SPEC §9.6."""
+
+    content_id: str
+    duration_seconds: int
+    duration_label: str
+    matching_activities: list[ActivitySchema]
+    is_valid: bool
+    rejection_reason: Literal["duration_out_of_range", "no_matching_activity"] | None = None

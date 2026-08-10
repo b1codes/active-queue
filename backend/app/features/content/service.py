@@ -7,9 +7,12 @@ import structlog
 
 from app.core.config import settings
 from app.core.errors import ConflictError, NotFoundError, ProviderError, ValidationError
+from app.features.activities.schemas import ActivitySchema
+from app.features.content.matcher import match_content_to_activities
 from app.features.content.models import ContentCacheItem, FeedItem, Source
 from app.features.content.repository import ContentRepository, SourceRepository, decode_cursor
 from app.features.content.schemas import (
+    ContentMatchResponse,
     FeedItemSchema,
     FeedResponse,
     SyncResponse,
@@ -25,7 +28,7 @@ SYSTEM_PLAYLIST_IDS = ("WL", "LL", "HL")
 
 
 class ContentService:
-    """Business logic for content sources and ingestion per SPEC §5.2, §8.2, §9.2, §9.3 & §9.4.
+    """Business logic for content sources, ingestion, and matching per SPEC §5.2, §8.2, §9.2, §9.3, §9.4, & §9.6.
 
     Enforces business rules:
     - Max 5 sources per user (SOURCE_LIMIT_REACHED).
@@ -39,6 +42,7 @@ class ContentService:
     - Sync start throttling (15 mins), never throttling continuation chunks.
     - Cursor-based feed pagination with server duration_label formatting.
     - total_unconsumed count aggregation on first page only (cursor is None).
+    - Content-first activity matching with distinct rejection reasons (duration_out_of_range & no_matching_activity).
     """
 
     def __init__(
@@ -58,7 +62,6 @@ class ContentService:
                 message="Source URL or ID cannot be empty",
             )
 
-        # Step 1: Pre-check system playlists (WL, LL, HL)
         extracted_id = raw_input
         match_list = re.search(r"list=([A-Za-z0-9_-]+)", raw_input)
         if match_list:
@@ -75,7 +78,6 @@ class ContentService:
 
         provider_impl = get_provider()
 
-        # Step 2: Validate URL & parse external source ID via provider
         try:
             provider_name, external_id = await provider_impl.validate_source_url(raw_input)
         except ValidationError:
@@ -86,7 +88,6 @@ class ContentService:
                 message=f"Unable to parse source URL: {err!s}",
             ) from err
 
-        # Step 3: Check max 5 sources guardrail per user
         existing_sources = await self._source_repo.get_user_sources(user_id)
         if len(existing_sources) >= 5:
             raise ValidationError(
@@ -94,7 +95,6 @@ class ContentService:
                 message="Maximum limit of 5 content sources reached",
             )
 
-        # Step 4: Duplicate source check
         duplicate = await self._source_repo.get_user_source_by_external_id(
             user_id, provider_name, external_id
         )
@@ -104,7 +104,6 @@ class ContentService:
                 message="Source has already been added to your account",
             )
 
-        # Step 5: Verify accessibility & fetch metadata
         try:
             meta = await provider_impl.get_playlist_metadata(external_id)
         except NotFoundError as err:
@@ -115,7 +114,6 @@ class ContentService:
         except ProviderError:
             raise
 
-        # Step 6: Construct and persist Source object
         source_doc_id = f"{user_id}_{provider_name}_{external_id}"
         now = datetime.now(UTC)
 
@@ -153,7 +151,6 @@ class ContentService:
 
         now = datetime.now(UTC)
 
-        # Step 1: Check stalled sync expiration (1 hour timeout per SPEC §9.4)
         if source.status == "syncing" and source.updated_at:
             elapsed_stalled = (now - source.updated_at).total_seconds()
             if elapsed_stalled > settings.sync_stall_timeout_seconds:
@@ -163,7 +160,6 @@ class ContentService:
                 source.status = "active"
                 source.next_page_token = None
 
-        # Step 2: Preflight Change Detection (1 unit check) — only on NEW sync start
         is_resuming = bool(source.next_page_token)
         provider_impl = get_provider(source.provider)
 
@@ -225,7 +221,6 @@ class ContentService:
                     message="No changes detected in preflight check",
                 )
 
-        # Step 3: Execute Chunked Walk (<= 5 pages, max 250 items)
         current_token = source.next_page_token
         chunk_cache_items: list[ContentCacheItem] = []
         chunk_feed_items: list[FeedItem] = []
@@ -287,7 +282,6 @@ class ContentService:
             if not current_token:
                 break
 
-        # Step 4: Write batch to Firestore & update Source state atomically
         if self._content_repo:
             await self._content_repo.upsert_content_cache_batch(chunk_cache_items)
             await self._content_repo.upsert_feed_items_batch(chunk_feed_items)
@@ -334,15 +328,12 @@ class ContentService:
         if not self._content_repo:
             return FeedResponse(items=[], next_cursor=None, total_unconsumed=0)
 
-        # Compute total_unconsumed count aggregation ONLY on first page per SPEC §9.2
         total_unconsumed: int | None = None
         if cursor is None:
             total_unconsumed = await self._content_repo.get_user_feed_count(user_id)
 
-        # Decode cursor to datetime
         cursor_dt = decode_cursor(cursor) if cursor else None
 
-        # Fetch feed items page
         feed_items, next_cursor = await self._content_repo.get_user_feed_items_page(
             user_id=user_id,
             limit=limit,
@@ -358,11 +349,9 @@ class ContentService:
                 total_unconsumed=total_unconsumed,
             )
 
-        # Fetch matching content_cache documents
         content_ids = [fi.content_id for fi in feed_items]
         cache_map = await self._content_repo.get_content_cache_batch(content_ids)
 
-        # Enrich feed items into FeedItemSchema
         enriched_items: list[FeedItemSchema] = []
         for fi in feed_items:
             cache_doc = cache_map.get(fi.content_id)
@@ -397,4 +386,32 @@ class ContentService:
             items=enriched_items,
             next_cursor=next_cursor,
             total_unconsumed=total_unconsumed,
+        )
+
+    async def match_content(self, content_id: str) -> ContentMatchResponse:
+        """Match content duration against activity catalog with distinct rejection reasons per SPEC §5.2 & §9.6."""
+        if not self._content_repo:
+            raise NotFoundError(
+                code="CONTENT_NOT_FOUND",
+                message=f"Content '{content_id}' not found",
+            )
+
+        cache_doc = await self._content_repo.get_content_cache(content_id)
+        if not cache_doc:
+            raise NotFoundError(
+                code="CONTENT_NOT_FOUND",
+                message=f"Content item '{content_id}' not found in cache",
+            )
+
+        match_res = match_content_to_activities(content_id, cache_doc.duration_seconds)
+
+        return ContentMatchResponse(
+            content_id=content_id,
+            duration_seconds=cache_doc.duration_seconds,
+            duration_label=format_duration_label(cache_doc.duration_seconds),
+            matching_activities=[
+                ActivitySchema.from_domain(act) for act in match_res.matching_activities
+            ],
+            is_valid=match_res.is_valid,
+            rejection_reason=match_res.rejection_reason,
         )

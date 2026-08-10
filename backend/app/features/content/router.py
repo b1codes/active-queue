@@ -9,6 +9,8 @@ from app.core.envelopes import SuccessEnvelope, success_response
 from app.core.security import AuthenticatedUser, get_current_user
 from app.features.content.repository import ContentRepository, SourceRepository
 from app.features.content.schemas import (
+    ContentMatchRequest,
+    ContentMatchResponse,
     CreateSourceRequest,
     FeedResponse,
     SourceSchema,
@@ -89,3 +91,21 @@ async def get_user_feed(
         max_duration=max_duration,
     )
     return success_response(feed_resp.model_dump())
+
+
+# Content Matching endpoint
+@router.post(
+    "/content/match",
+    status_code=status.HTTP_200_OK,
+    response_model=None,
+    summary="Match content item to physical activity catalog",
+    description="Match content item by content_id against activity catalog with distinct rejection reasons per SPEC §5.2 & §9.6.",
+)
+async def match_content(
+    body: ContentMatchRequest,
+    _current_user: AuthenticatedUser = Depends(get_current_user),
+    service: ContentService = Depends(get_content_service),
+) -> SuccessEnvelope[dict[str, Any]]:
+    """POST /api/v1/content/match endpoint."""
+    match_resp: ContentMatchResponse = await service.match_content(body.content_id)
+    return success_response(match_resp.model_dump())
