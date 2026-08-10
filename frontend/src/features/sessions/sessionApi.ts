@@ -35,3 +35,7 @@ export async function startSession(sessionId: string): Promise<Session> {
     method: 'POST',
   });
 }
+
+export async function getActiveSession(): Promise<Session | null> {
+  return apiClient<Session | null>('/api/v1/sessions/active');
+}

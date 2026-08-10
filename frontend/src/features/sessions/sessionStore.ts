@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { createSession, startSession, Session, CreateSessionInput } from './sessionApi';
+import { createSession, startSession, getActiveSession, Session, CreateSessionInput } from './sessionApi';
 import { launchTrackerApp } from './deepLinks';
 
 export type ChecklistStep = 1 | 2 | 3;
@@ -11,13 +11,14 @@ interface SessionStoreState {
   error: string | null;
   trackerError: string | null;
   mediaError: string | null;
-  
+
   // Actions
   createNewSession: (input: CreateSessionInput) => Promise<Session | null>;
   startCurrentSession: (trackerId: string, externalId?: string) => Promise<boolean>;
   skipTrackerStep: () => void;
   advanceStep: () => void;
   setSessionFromServer: (session: Session) => void;
+  checkActiveSession: () => Promise<Session | null>;
   clearSession: () => void;
 }
 
@@ -41,6 +42,20 @@ export const useSessionStore = create<SessionStoreState>((set, get) => ({
       currentStep: derivedStep,
       error: null,
     });
+  },
+
+  checkActiveSession: async () => {
+    try {
+      const activeSession = await getActiveSession();
+      if (activeSession) {
+        get().setSessionFromServer(activeSession);
+      } else {
+        set({ currentSession: null });
+      }
+      return activeSession;
+    } catch {
+      return null;
+    }
   },
 
   createNewSession: async (input: CreateSessionInput) => {

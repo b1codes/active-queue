@@ -8,6 +8,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { WatchLaterRejectedState } from '../../../core/components/states';
 import { colors, rounded, spacing, typography } from '../../../core/theme';
 import { useQueueStore } from '../queueStore';
 
@@ -19,6 +20,12 @@ interface AddSourceModalProps {
 export const AddSourceModal: React.FC<AddSourceModalProps> = ({ visible, onClose }) => {
   const [urlOrId, setUrlOrId] = useState('');
   const { addSource, isAddingSource, addSourceError, clearErrors } = useQueueStore();
+
+  const isWatchLaterError =
+    addSourceError &&
+    (addSourceError.includes('Watch Later') ||
+      addSourceError.includes('SOURCE_UNSUPPORTED') ||
+      addSourceError.includes('system playlist'));
 
   const handleAdd = async () => {
     if (!urlOrId.trim()) {
@@ -41,47 +48,58 @@ export const AddSourceModal: React.FC<AddSourceModalProps> = ({ visible, onClose
     <Modal visible={visible} transparent animationType="fade" onRequestClose={handleClose}>
       <View style={styles.overlay}>
         <View style={styles.modalContent}>
-          <Text style={styles.title}>Add Content Source</Text>
-          <Text style={styles.description}>
-            Paste a YouTube playlist URL (e.g. youtube.com/playlist?list=PL...) or raw playlist ID.
-          </Text>
+          {isWatchLaterError ? (
+            <WatchLaterRejectedState
+              onDismissPress={() => {
+                clearErrors();
+                setUrlOrId('');
+              }}
+            />
+          ) : (
+            <>
+              <Text style={styles.title}>Add Content Source</Text>
+              <Text style={styles.description}>
+                Paste a YouTube playlist URL (e.g. youtube.com/playlist?list=PL...) or raw playlist ID.
+              </Text>
 
-          <TextInput
-            style={styles.input}
-            placeholder="https://www.youtube.com/playlist?list=..."
-            placeholderTextColor={colors.inkMuted}
-            value={urlOrId}
-            onChangeText={(txt) => {
-              clearErrors();
-              setUrlOrId(txt);
-            }}
-            autoCapitalize="none"
-            autoCorrect={false}
-          />
+              <TextInput
+                style={styles.input}
+                placeholder="https://www.youtube.com/playlist?list=..."
+                placeholderTextColor={colors.inkMuted}
+                value={urlOrId}
+                onChangeText={(txt) => {
+                  clearErrors();
+                  setUrlOrId(txt);
+                }}
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
 
-          {addSourceError ? <Text style={styles.errorText}>{addSourceError}</Text> : null}
+              {addSourceError ? <Text style={styles.errorText}>{addSourceError}</Text> : null}
 
-          <View style={styles.buttonRow}>
-            <TouchableOpacity
-              onPress={handleClose}
-              style={[styles.button, styles.cancelButton]}
-              disabled={isAddingSource}
-            >
-              <Text style={styles.cancelText}>Cancel</Text>
-            </TouchableOpacity>
+              <View style={styles.buttonRow}>
+                <TouchableOpacity
+                  onPress={handleClose}
+                  style={[styles.button, styles.cancelButton]}
+                  disabled={isAddingSource}
+                >
+                  <Text style={styles.cancelText}>Cancel</Text>
+                </TouchableOpacity>
 
-            <TouchableOpacity
-              onPress={handleAdd}
-              style={[styles.button, styles.submitButton]}
-              disabled={isAddingSource || !urlOrId.trim()}
-            >
-              {isAddingSource ? (
-                <ActivityIndicator color={colors.void} size="small" />
-              ) : (
-                <Text style={styles.submitText}>Add Source</Text>
-              )}
-            </TouchableOpacity>
-          </View>
+                <TouchableOpacity
+                  onPress={handleAdd}
+                  style={[styles.button, styles.submitButton]}
+                  disabled={isAddingSource || !urlOrId.trim()}
+                >
+                  {isAddingSource ? (
+                    <ActivityIndicator color={colors.void} size="small" />
+                  ) : (
+                    <Text style={styles.submitText}>Add Source</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </>
+          )}
         </View>
       </View>
     </Modal>

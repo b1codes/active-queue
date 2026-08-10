@@ -9,33 +9,55 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { useRouter } from 'expo-router';
+import {
+  ActiveSessionBanner,
+  EmptyFeedState,
+  NoSourcesState,
+  OfflineBanner,
+  ProviderQuotaBanner,
+  SyncResumableCard,
+} from '../../src/core/components/states';
 import { colors, rounded, spacing, typography } from '../../src/core/theme';
 import { AddSourceModal } from '../../src/features/queue/components/AddSourceModal';
 import { FeedCard } from '../../src/features/queue/components/FeedCard';
 import { SyncProgressBar } from '../../src/features/queue/components/SyncProgressBar';
 import { useQueueStore } from '../../src/features/queue/queueStore';
+import { useSessionStore } from '../../src/features/sessions/sessionStore';
 
 export default function QueueScreen() {
+  const router = useRouter();
   const {
     feedItems,
     totalUnconsumed,
     isLoadingFeed,
     isRefreshingFeed,
     fetchFeed,
+    startResumableSync,
   } = useQueueStore();
+
+  const { currentSession, checkActiveSession } = useSessionStore();
 
   const [isAddModalVisible, setIsAddModalVisible] = useState(false);
   const [lastForegroundCheck, setLastForegroundCheck] = useState<number>(Date.now());
+  const [isOffline, setIsOffline] = useState(false);
+  const [isQuotaExceeded] = useState(false);
+  const [resumableSource, setResumableSource] = useState<{ id: string; title: string } | null>(null);
 
-  const handleInitialFetch = useCallback(() => {
-    fetchFeed(true);
-  }, [fetchFeed]);
+  const handleInitialFetch = useCallback(async () => {
+    try {
+      await fetchFeed(true);
+      await checkActiveSession();
+    } catch {
+      setIsOffline(true);
+    }
+  }, [fetchFeed, checkActiveSession]);
 
   useEffect(() => {
     handleInitialFetch();
   }, [handleInitialFetch]);
 
-  // Foreground listener with 6-hour auto-sync guardrail per SPEC §9.4 / Subtask 8
+  // Foreground listener with 6-hour auto-sync guardrail per SPEC §9.4
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (nextAppState) => {
       if (nextAppState === 'active') {
@@ -44,6 +66,7 @@ export default function QueueScreen() {
         if (now - lastForegroundCheck > SIX_HOURS_MS) {
           setLastForegroundCheck(now);
           fetchFeed(true);
+          checkActiveSession();
         }
       }
     });
@@ -51,7 +74,14 @@ export default function QueueScreen() {
     return () => {
       subscription.remove();
     };
-  }, [lastForegroundCheck, fetchFeed]);
+  }, [lastForegroundCheck, fetchFeed, checkActiveSession]);
+
+  const handleResumeSession = (sessionId: string) => {
+    router.push({
+      pathname: '/(app)/session/[id]',
+      params: { id: sessionId },
+    });
+  };
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -75,25 +105,42 @@ export default function QueueScreen() {
         </View>
       </View>
 
+      {/* Top Banner Notifications per SPEC §11.3 */}
+      {isOffline ? (
+        <OfflineBanner onRetryPress={() => { setIsOffline(false); fetchFeed(true); }} />
+      ) : null}
+
+      {isQuotaExceeded ? <ProviderQuotaBanner /> : null}
+
+      {currentSession ? (
+        <ActiveSessionBanner
+          sessionId={currentSession.id}
+          activityId={currentSession.activity_id}
+          durationSeconds={currentSession.duration_seconds}
+          onResumePress={handleResumeSession}
+        />
+      ) : null}
+
       <SyncProgressBar />
 
+      {resumableSource ? (
+        <SyncResumableCard
+          sourceTitle={resumableSource.title}
+          onFinishSyncPress={() => {
+            startResumableSync(resumableSource.id);
+            setResumableSource(null);
+          }}
+          onDismissPress={() => setResumableSource(null)}
+        />
+      ) : null}
+
+      {/* Main Feed Content or Designed Empty States */}
       {feedItems.length === 0 && isLoadingFeed ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator color={colors.heatCore} size="large" />
         </View>
       ) : feedItems.length === 0 ? (
-        <View style={styles.emptyContainer}>
-          <Text style={styles.emptyTitle}>Your queue is empty</Text>
-          <Text style={styles.emptySubtitle}>
-            Add a YouTube playlist URL to start building your workout queue.
-          </Text>
-          <TouchableOpacity
-            style={styles.emptyAddButton}
-            onPress={() => setIsAddModalVisible(true)}
-          >
-            <Text style={styles.emptyAddButtonText}>+ Add First Source</Text>
-          </TouchableOpacity>
-        </View>
+        <NoSourcesState onAddSourcePress={() => setIsAddModalVisible(true)} />
       ) : (
         <FlatList
           data={feedItems}
@@ -104,6 +151,12 @@ export default function QueueScreen() {
           onEndReached={() => fetchFeed(false)}
           onEndReachedThreshold={0.5}
           contentContainerStyle={styles.listContent}
+          ListEmptyComponent={
+            <EmptyFeedState
+              onSyncPress={() => fetchFeed(true)}
+              onAddSourcePress={() => setIsAddModalVisible(true)}
+            />
+          }
         />
       )}
 
@@ -171,33 +224,5 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flex: 1,
     justifyContent: 'center',
-  },
-  emptyContainer: {
-    alignItems: 'center',
-    flex: 1,
-    justifyContent: 'center',
-    paddingHorizontal: spacing.xl,
-  },
-  emptyTitle: {
-    ...typography.title,
-    color: colors.ink,
-    marginBottom: spacing.xs,
-  },
-  emptySubtitle: {
-    ...typography.body,
-    color: colors.inkSecondary,
-    marginBottom: spacing.lg,
-    textAlign: 'center',
-  },
-  emptyAddButton: {
-    backgroundColor: colors.heatCore,
-    borderRadius: rounded.sm,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-  },
-  emptyAddButtonText: {
-    ...typography.label,
-    color: colors.void,
-    fontWeight: 'bold',
   },
 });
