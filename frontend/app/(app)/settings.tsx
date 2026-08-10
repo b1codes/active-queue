@@ -43,10 +43,10 @@ export default function SettingsScreen() {
       <View style={styles.content}>
         {/* User Account Card */}
         <View style={styles.card}>
-          <Text style={styles.cardSectionTitle}>Account Profile</Text>
+          <Text style={styles.cardSectionTitle}>Account profile</Text>
 
           <View style={styles.infoRow}>
-            <Ionicons name="person-circle-outline" size={24} color={colors.heatCore} />
+            <Ionicons name="person-circle-outline" size={24} color={colors.ink} />
             <View style={styles.infoTextContainer}>
               <Text style={styles.infoLabel}>User ID (UID)</Text>
               <Text style={styles.infoValue} numberOfLines={1}>
@@ -60,7 +60,7 @@ export default function SettingsScreen() {
           <View style={styles.infoRow}>
             <Ionicons name="mail-outline" size={22} color={colors.inkSecondary} />
             <View style={styles.infoTextContainer}>
-              <Text style={styles.infoLabel}>Email</Text>
+              <Text style={styles.infoLabel}>Email address</Text>
               <Text style={styles.infoValue}>
                 {user?.email || 'N/A'}
               </Text>
@@ -70,20 +70,20 @@ export default function SettingsScreen() {
 
         {/* Local Dev & Emulator Shortcuts */}
         <View style={styles.card}>
-          <Text style={styles.cardSectionTitle}>Local Development & Testing</Text>
+          <Text style={styles.cardSectionTitle}>Local development & testing</Text>
 
           <TouchableOpacity
             style={styles.emulatorButton}
             onPress={handleEmulatorSignIn}
-            activeOpacity={0.8}
+            activeOpacity={0.85}
             accessible={true}
             accessibilityRole="button"
             accessibilityLabel="Re-authenticate as Emulator User"
-            accessibilityHint="Double tap to sign in with seeded primary test user ID (test-user-123)"
+            accessibilityHint="Double tap to sign in with primary test user ID (test-user-123)"
           >
-            <Ionicons name="flash-outline" size={20} color={colors.signalVerified} />
+            <Ionicons name="flash-outline" size={18} color={colors.signalVerified} />
             <Text style={styles.emulatorButtonText}>
-              Re-authenticate as Emulator User (test-user-123)
+              Re-authenticate as emulator user (test-user-123)
             </Text>
           </TouchableOpacity>
         </View>
@@ -92,14 +92,14 @@ export default function SettingsScreen() {
         <TouchableOpacity
           style={styles.signOutButton}
           onPress={handleSignOut}
-          activeOpacity={0.8}
+          activeOpacity={0.85}
           accessible={true}
           accessibilityRole="button"
-          accessibilityLabel="Sign Out"
+          accessibilityLabel="Sign out"
           accessibilityHint="Double tap to sign out of your account"
         >
-          <Ionicons name="log-out-outline" size={20} color={colors.heatCore} />
-          <Text style={styles.signOutButtonText}>Sign Out</Text>
+          <Ionicons name="log-out-outline" size={18} color={colors.inkSecondary} />
+          <Text style={styles.signOutButtonText}>Sign out</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -136,19 +136,18 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   card: {
-    backgroundColor: colors.substrate,
+    backgroundColor: colors.lensFlat,
     borderColor: colors.glassEdge,
     borderRadius: rounded.md,
     borderWidth: 1,
-    padding: spacing.md,
+    padding: spacing.lg,
   },
+  // Sentence Case Rule per DESIGN.md §3
   cardSectionTitle: {
-    ...typography.label,
-    color: colors.inkMuted,
-    fontSize: 12,
-    letterSpacing: 0.5,
+    ...typography.subtitle,
+    color: colors.ink,
+    fontSize: 16,
     marginBottom: spacing.md,
-    textTransform: 'uppercase',
   },
   infoRow: {
     alignItems: 'center',
@@ -175,40 +174,37 @@ const styles = StyleSheet.create({
   },
   emulatorButton: {
     alignItems: 'center',
-    backgroundColor: colors.strata,
+    backgroundColor: colors.lensFlatRaised,
     borderColor: colors.glassEdge,
-    borderRadius: rounded.sm,
+    borderRadius: rounded.md,
     borderWidth: 1,
     flexDirection: 'row',
     gap: spacing.sm,
     justifyContent: 'center',
-    minHeight: 48,
+    height: 52,
     paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
   },
   emulatorButtonText: {
-    ...typography.body,
+    ...typography.subtitle,
     color: colors.signalVerified,
     fontSize: 14,
-    fontWeight: '600',
   },
   signOutButton: {
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 59, 48, 0.1)',
-    borderColor: 'rgba(255, 59, 48, 0.3)',
-    borderRadius: rounded.sm,
+    backgroundColor: colors.strata,
+    borderColor: colors.glassEdge,
+    borderRadius: rounded.md,
     borderWidth: 1,
     flexDirection: 'row',
     gap: spacing.sm,
     justifyContent: 'center',
-    minHeight: 48,
+    height: 52,
     paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
   },
   signOutButtonText: {
-    ...typography.body,
-    color: colors.heatCore,
+    ...typography.subtitle,
+    color: colors.inkSecondary,
     fontSize: 15,
-    fontWeight: '600',
   },
 });
+

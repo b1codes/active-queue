@@ -5,7 +5,8 @@ import { StatusBar } from "expo-status-bar";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { Provider } from "react-redux";
 import { store } from "@/store";
-import { colors } from "@/core/theme";
+import { ChromaticPulse } from "@/core/components";
+import { colors, rounded } from "@/core/theme";
 import { useAuthStore } from "@/features/auth/authStore";
 
 function AppNavigation() {
@@ -36,11 +37,12 @@ function AppNavigation() {
     return (
       <SafeAreaProvider>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={colors.heatCore} />
+          <ChromaticPulse style={{ width: 140, height: 6, borderRadius: rounded.pill }} />
         </View>
       </SafeAreaProvider>
     );
   }
+
 
   return (
     <SafeAreaProvider>

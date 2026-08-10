@@ -1,79 +1,122 @@
-import { TextStyle } from 'react-native';
+import { Platform, TextStyle } from 'react-native';
+
+/**
+ * Font Families per DESIGN.md §3
+ * Geometric Sans (Montserrat) for titles/headlines + Humanist Sans (Open Sans) for body/tabular data.
+ */
+export const fontFamilies = {
+  montserratExtraBold: Platform.select({
+    ios: 'Montserrat-ExtraBold',
+    android: 'Montserrat_ExtraBold',
+    default: 'System',
+  }),
+  montserratBold: Platform.select({
+    ios: 'Montserrat-Bold',
+    android: 'Montserrat_Bold',
+    default: 'System',
+  }),
+  montserratSemiBold: Platform.select({
+    ios: 'Montserrat-SemiBold',
+    android: 'Montserrat_SemiBold',
+    default: 'System',
+  }),
+  openSansRegular: Platform.select({
+    ios: 'OpenSans-Regular',
+    android: 'OpenSans_Regular',
+    default: 'System',
+  }),
+  openSansMedium: Platform.select({
+    ios: 'OpenSans-Medium',
+    android: 'OpenSans_Medium',
+    default: 'System',
+  }),
+  openSansSemiBold: Platform.select({
+    ios: 'OpenSans-SemiBold',
+    android: 'OpenSans_SemiBold',
+    default: 'System',
+  }),
+  openSansBold: Platform.select({
+    ios: 'OpenSans-Bold',
+    android: 'OpenSans_Bold',
+    default: 'System',
+  }),
+} as const;
 
 /**
  * Typography Tokens per DESIGN.md §3
- * Montserrat (geometric headlines) + Open Sans (humanist body & tabular data)
+ * Precision-tuned for dark ground legibility (#0C0909) with optical contrast compensation.
  */
 export const typography: Record<string, TextStyle> = {
   display: {
-    fontFamily: 'System', // Montserrat-ExtraBold fallback
+    fontFamily: fontFamilies.montserratExtraBold,
     fontSize: 34,
     fontWeight: '800',
-    lineHeight: 38,
+    lineHeight: 40,
     letterSpacing: -0.5,
   },
   headline: {
-    fontFamily: 'System', // Montserrat-Bold fallback
+    fontFamily: fontFamilies.montserratBold,
     fontSize: 26,
     fontWeight: '700',
-    lineHeight: 30,
+    lineHeight: 32,
     letterSpacing: -0.35,
   },
   title: {
-    fontFamily: 'System', // Montserrat-Bold fallback
+    fontFamily: fontFamilies.montserratBold,
     fontSize: 20,
     fontWeight: '700',
-    lineHeight: 25,
+    lineHeight: 26,
     letterSpacing: -0.2,
   },
   subtitle: {
-    fontFamily: 'System', // Montserrat-SemiBold fallback
+    fontFamily: fontFamilies.montserratSemiBold,
     fontSize: 17,
     fontWeight: '600',
-    lineHeight: 22,
+    lineHeight: 23,
     letterSpacing: 0,
   },
   body: {
-    fontFamily: 'System', // OpenSans-Regular fallback
+    fontFamily: fontFamilies.openSansRegular,
     fontSize: 16,
     fontWeight: '400',
     lineHeight: 24,
-    letterSpacing: 0,
+    letterSpacing: 0.15,
   },
   bodySm: {
-    fontFamily: 'System', // OpenSans-Regular fallback
+    fontFamily: fontFamilies.openSansRegular,
     fontSize: 14,
     fontWeight: '400',
     lineHeight: 20,
-    letterSpacing: 0,
+    letterSpacing: 0.1,
   },
   label: {
-    fontFamily: 'System', // OpenSans-SemiBold fallback
+    fontFamily: fontFamilies.openSansSemiBold,
     fontSize: 13,
     fontWeight: '600',
-    lineHeight: 16,
+    lineHeight: 17,
     letterSpacing: 0.2,
   },
   caption: {
-    fontFamily: 'System', // OpenSans-Medium fallback
+    fontFamily: fontFamilies.openSansMedium,
     fontSize: 12,
     fontWeight: '500',
-    lineHeight: 15,
-    letterSpacing: 0.1,
+    lineHeight: 16,
+    letterSpacing: 0.15,
   },
   badge: {
-    fontFamily: 'System', // OpenSans-Bold fallback
+    fontFamily: fontFamilies.openSansBold,
     fontSize: 11,
     fontWeight: '700',
     lineHeight: 14,
     letterSpacing: 0.3,
   },
   duration: {
-    fontFamily: 'System', // OpenSans-SemiBold fallback with tabular nums
+    fontFamily: fontFamilies.openSansSemiBold,
     fontSize: 15,
     fontWeight: '600',
-    lineHeight: 18,
+    lineHeight: 19,
     letterSpacing: 0.3,
     fontVariant: ['tabular-nums'],
   },
 };
+

@@ -18,6 +18,8 @@ import {
   ProviderQuotaBanner,
   SyncResumableCard,
 } from '@/core/components/states';
+import { QueueSkeletonList } from '@/core/components';
+
 import { colors, rounded, spacing, typography } from '@/core/theme';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '@/features/auth/authStore';
@@ -91,11 +93,6 @@ export default function QueueScreen() {
     <FeedCard item={item} />
   ), []);
 
-  const getItemLayout = useCallback((_: any, index: number) => ({
-    length: 98,
-    offset: 98 * index,
-    index,
-  }), []);
 
   const formatCount = useCallback((count: number | null): string => {
     if (count === null || count === undefined) return '';
@@ -173,18 +170,17 @@ export default function QueueScreen() {
 
       {/* Main Feed Content or Designed Empty States */}
       {feedItems.length === 0 && isLoadingFeed ? (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator color={colors.heatCore} size="large" />
-        </View>
+        <QueueSkeletonList count={4} />
       ) : feedItems.length === 0 ? (
+
         <NoSourcesState onAddSourcePress={() => setIsAddModalVisible(true)} />
       ) : (
         <FlatList
           data={feedItems}
           keyExtractor={(item) => item.id || item.content_id}
           renderItem={renderFeedCard}
-          getItemLayout={getItemLayout}
           refreshing={isRefreshingFeed}
+
           onRefresh={() => fetchFeed(true)}
           onEndReached={() => fetchFeed(false)}
           onEndReachedThreshold={0.5}

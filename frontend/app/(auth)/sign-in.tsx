@@ -9,7 +9,8 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { colors, spacing, typography } from "@/core/theme";
+import { Ionicons } from "@expo/vector-icons";
+import { colors, rounded, spacing, typography } from "@/core/theme";
 import { useAuthStore } from "@/features/auth/authStore";
 
 export default function SignInScreen() {
@@ -36,37 +37,50 @@ export default function SignInScreen() {
       behavior={Platform.OS === "ios" ? "padding" : "height"}
     >
       <View style={styles.content}>
+        {/* Brand Identity Header */}
         <View style={styles.headerContainer}>
-          <Text style={styles.brandTitle} maxFontSizeMultiplier={1.5}>ActiveQueue</Text>
-          <Text style={styles.subtitle} maxFontSizeMultiplier={1.5}>Time-boxed activity & media orchestrator</Text>
+          <Text style={styles.brandTitle} maxFontSizeMultiplier={1.5}>
+            ActiveQueue
+          </Text>
+          <Text style={styles.subtitle} maxFontSizeMultiplier={1.5}>
+            Time-boxed activity & media orchestrator
+          </Text>
         </View>
 
+        {/* Actionable Accessible Error Banner */}
         {error ? (
           <View
             style={styles.errorBanner}
             accessible={true}
             accessibilityRole="alert"
+            accessibilityLiveRegion="polite"
             accessibilityLabel={`Authentication error: ${error}`}
           >
-            <Text style={styles.errorText}>{error}</Text>
+            <Ionicons name="alert-circle-outline" size={20} color={colors.ink} />
+            <Text style={styles.errorText}>
+              {error.includes("user-not-found") || error.includes("wrong-password") || error.includes("invalid-credential")
+                ? "Invalid email address or password. Please verify your details."
+                : error}
+            </Text>
           </View>
         ) : null}
 
+        {/* Credentials Form */}
         <View style={styles.form}>
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>Email</Text>
+            <Text style={styles.label}>Email address</Text>
             <TextInput
               style={styles.input}
               value={email}
               onChangeText={setEmail}
-              placeholder="user@example.com"
+              placeholder="name@example.com"
               placeholderTextColor={colors.inkMuted}
               keyboardType="email-address"
               autoCapitalize="none"
               autoCorrect={false}
               accessible={true}
-              accessibilityLabel="Email Address"
-              accessibilityHint="Enter your email address to sign in"
+              accessibilityLabel="Email address"
+              accessibilityHint="Enter your account email address"
             />
           </View>
 
@@ -85,26 +99,31 @@ export default function SignInScreen() {
             />
           </View>
 
+          {/* Commitment Action: Primary Button per Black Label Rule */}
           <TouchableOpacity
-            style={[styles.button, isLoading && styles.buttonDisabled]}
+            style={[
+              styles.button,
+              (isLoading || !email || !password) && styles.buttonDisabled,
+            ]}
             onPress={handleSignIn}
             disabled={isLoading || !email || !password}
-            activeOpacity={0.8}
+            activeOpacity={0.85}
             accessible={true}
             accessibilityRole="button"
-            accessibilityLabel="Sign In"
-            accessibilityHint="Double tap to sign in with email and password"
+            accessibilityLabel="Sign in"
+            accessibilityHint="Double tap to authenticate and access your queue"
           >
             {isLoading ? (
-              <ActivityIndicator color={colors.ink} />
+              <ActivityIndicator color={colors.void} size="small" />
             ) : (
-              <Text style={styles.buttonText}>Sign In</Text>
+              <Text style={styles.buttonText}>Sign in</Text>
             )}
           </TouchableOpacity>
 
+          {/* Development Shortcut Section */}
           <View style={styles.dividerContainer}>
             <View style={styles.dividerLine} />
-            <Text style={styles.dividerText}>EMULATOR DEV MODE</Text>
+            <Text style={styles.dividerText}>Development testing</Text>
             <View style={styles.dividerLine} />
           </View>
 
@@ -112,13 +131,14 @@ export default function SignInScreen() {
             style={styles.emulatorButton}
             onPress={handleEmulatorSignIn}
             disabled={isLoading}
-            activeOpacity={0.8}
+            activeOpacity={0.85}
             accessible={true}
             accessibilityRole="button"
-            accessibilityLabel="Quick Login with Emulator User"
-            accessibilityHint="Double tap to log in instantly using local Firebase Auth emulator"
+            accessibilityLabel="Quick sign in as emulator user"
+            accessibilityHint="Double tap to log in instantly using the local Firebase emulator"
           >
-            <Text style={styles.emulatorButtonText}>⚡ Quick Login with Emulator User</Text>
+            <Ionicons name="flash-outline" size={18} color={colors.signalVerified} />
+            <Text style={styles.emulatorButtonText}>Quick sign in (emulator)</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -134,6 +154,9 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     justifyContent: "center",
+    maxWidth: 440,
+    alignSelf: "center",
+    width: "100%",
     paddingHorizontal: spacing.xl,
   },
   headerContainer: {
@@ -143,27 +166,31 @@ const styles = StyleSheet.create({
   brandTitle: {
     ...typography.display,
     color: colors.ink,
-    fontSize: 36,
-    fontWeight: "700",
+    fontSize: 34,
+    lineHeight: 38,
     marginBottom: spacing.xs,
   },
   subtitle: {
     ...typography.body,
     color: colors.inkSecondary,
     textAlign: "center",
+    fontSize: 15,
   },
   errorBanner: {
-    backgroundColor: "rgba(255, 59, 48, 0.15)",
+    backgroundColor: colors.lensFlat,
     borderWidth: 1,
-    borderColor: "rgba(255, 59, 48, 0.4)",
-    borderRadius: 8,
+    borderColor: colors.ink,
+    borderRadius: rounded.sm,
     padding: spacing.md,
     marginBottom: spacing.lg,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
   },
   errorText: {
-    ...typography.caption,
-    color: colors.heatCore,
-    textAlign: "center",
+    ...typography.bodySm,
+    color: colors.ink,
+    flex: 1,
   },
   form: {
     gap: spacing.lg,
@@ -174,41 +201,40 @@ const styles = StyleSheet.create({
   label: {
     ...typography.label,
     color: colors.inkSecondary,
-    fontSize: 12,
+    fontSize: 13,
   },
   input: {
-    backgroundColor: colors.substrate,
+    backgroundColor: colors.lensFlat,
     borderWidth: 1,
     borderColor: colors.glassEdge,
-    borderRadius: 10,
-    minHeight: 48,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.md,
+    borderRadius: rounded.sm,
+    height: 52,
+    paddingHorizontal: spacing.lg,
     color: colors.ink,
-    fontSize: 16,
+    ...typography.body,
   },
+  // Primary Button: Heat Core fill with Void text (Black Label Rule per DESIGN.md §2)
   button: {
     backgroundColor: colors.heatCore,
-    borderRadius: 10,
-    minHeight: 48,
-    paddingVertical: spacing.md,
+    borderRadius: rounded.md,
+    height: 52,
     alignItems: "center",
     justifyContent: "center",
-    marginTop: spacing.sm,
+    marginTop: spacing.xs,
   },
   buttonDisabled: {
-    opacity: 0.6,
+    backgroundColor: colors.strata,
+    opacity: 0.7,
   },
   buttonText: {
-    ...typography.body,
-    color: colors.ink,
-    fontWeight: "600",
-    fontSize: 16,
+    ...typography.subtitle,
+    color: colors.void, // Black Label Rule: Void text on Heat Core fill
+    fontWeight: "700",
   },
   dividerContainer: {
     flexDirection: "row",
     alignItems: "center",
-    marginVertical: spacing.md,
+    marginVertical: spacing.sm,
     gap: spacing.sm,
   },
   dividerLine: {
@@ -217,25 +243,25 @@ const styles = StyleSheet.create({
     backgroundColor: colors.glassEdge,
   },
   dividerText: {
-    ...typography.caption,
+    ...typography.label,
     color: colors.inkMuted,
-    fontSize: 10,
-    fontWeight: "600",
+    fontSize: 12,
   },
   emulatorButton: {
-    backgroundColor: colors.strata,
+    backgroundColor: colors.lensFlatRaised,
     borderWidth: 1,
     borderColor: colors.glassEdge,
-    borderRadius: 10,
-    minHeight: 48,
-    paddingVertical: spacing.md,
+    borderRadius: rounded.md,
+    height: 52,
+    flexDirection: "row",
+    gap: spacing.xs,
     alignItems: "center",
     justifyContent: "center",
   },
   emulatorButtonText: {
-    ...typography.body,
+    ...typography.subtitle,
     color: colors.signalVerified,
-    fontWeight: "500",
-    fontSize: 14,
+    fontSize: 15,
   },
 });
+

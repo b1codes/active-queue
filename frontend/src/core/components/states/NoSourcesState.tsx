@@ -1,6 +1,8 @@
 import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { colors, rounded, spacing, typography } from '../../theme';
+
 
 interface NoSourcesStateProps {
   onAddSourcePress: () => void;
@@ -14,8 +16,9 @@ export const NoSourcesState: React.FC<NoSourcesStateProps> = ({ onAddSourcePress
       accessibilityLabel="No content sources added yet. Learn how to add a playlist."
     >
       <View style={styles.iconBadge}>
-        <Text style={styles.iconText}>📺</Text>
+        <Ionicons name="tv-outline" size={30} color={colors.inkFaint} />
       </View>
+
 
       <Text style={styles.title}>No Content Sources Added</Text>
       <Text style={styles.description}>

@@ -14,9 +14,29 @@ import { FeedItem } from '../types';
 
 interface FeedCardProps {
   item: FeedItem;
+  isMatched?: boolean;
 }
 
-export const FeedCard: React.FC<FeedCardProps> = memo(({ item }) => {
+/**
+ * Formats seconds into tabular duration string M:SS or H:MM:SS
+ * Per DESIGN.md §5 Tabular Duration Rule
+ */
+function formatTabularDuration(seconds: number, fallbackLabel?: string): string {
+  if (seconds && seconds > 0) {
+    const hrs = Math.floor(seconds / 3600);
+    const mins = Math.floor((seconds % 3600) / 60);
+    const secs = seconds % 60;
+    const mStr = hrs > 0 ? String(mins).padStart(2, '0') : String(mins);
+    const sStr = String(secs).padStart(2, '0');
+    return hrs > 0 ? `${hrs}:${mStr}:${sStr}` : `${mStr}:${sStr}`;
+  }
+  if (fallbackLabel && fallbackLabel.includes(':')) {
+    return fallbackLabel.trim();
+  }
+  return '--:--';
+}
+
+export const FeedCard: React.FC<FeedCardProps> = memo(({ item, isMatched = false }) => {
   const hideFeedItem = useQueueStore((state) => state.hideFeedItem);
 
   const handleHide = () => {
@@ -45,44 +65,55 @@ export const FeedCard: React.FC<FeedCardProps> = memo(({ item }) => {
   };
 
   const safeTitle = (item?.title || 'Untitled Content').trim();
-  const safeProvider = (item?.provider || 'Unknown').toUpperCase().trim();
-  const safeDuration = item?.duration_label || '--:--';
+  const rawProvider = (item?.provider || 'Source').trim();
+  const safeProvider = rawProvider.charAt(0).toUpperCase() + rawProvider.slice(1).toLowerCase();
+  const formattedDuration = formatTabularDuration(item?.duration_seconds, item?.duration_label);
 
   return (
     <View style={styles.cardContainer}>
-      <View style={styles.card}>
+      <View style={[styles.card, isMatched && styles.cardMatched]}>
         <TouchableOpacity
           style={styles.cardMainTouchable}
           onLongPress={showOptions}
-          activeOpacity={0.9}
+          activeOpacity={0.85}
           accessible={true}
           accessibilityRole="button"
-          accessibilityLabel={`${safeTitle}, duration ${safeDuration}, provider ${safeProvider}`}
+          accessibilityLabel={`${safeTitle}, duration ${formattedDuration}, from ${safeProvider}${isMatched ? ', duration matched' : ''}`}
           accessibilityHint="Double tap to view, long press for options"
         >
+          {/* Thumbnail with 16:9 Aspect Ratio & Refractive Edge */}
           {item?.thumbnail_url ? (
-            <Image source={{ uri: item.thumbnail_url }} style={styles.thumbnail} resizeMode="cover" />
+            <View style={styles.thumbnailWrapper}>
+              <Image source={{ uri: item.thumbnail_url }} style={styles.thumbnail} resizeMode="cover" />
+            </View>
           ) : (
-            <View style={[styles.thumbnail, styles.thumbnailPlaceholder]}>
-              <Text style={styles.placeholderText} numberOfLines={1}>{safeProvider}</Text>
+            <View style={[styles.thumbnailWrapper, styles.thumbnailPlaceholder]}>
+              <Ionicons name="film-outline" size={22} color={colors.inkFaint} />
             </View>
           )}
 
+          {/* Card Content Column */}
           <View style={styles.content}>
-            <View style={styles.badgeRow}>
-              <View style={styles.badge}>
-                <Text style={styles.badgeText} numberOfLines={1} ellipsizeMode="tail">{safeProvider}</Text>
-              </View>
-
-              <Text style={styles.durationText}>{safeDuration}</Text>
-            </View>
-
             <Text style={styles.title} numberOfLines={2} ellipsizeMode="tail">
               {safeTitle}
             </Text>
+
+            <View style={styles.metaRow}>
+              <Text style={styles.providerText} numberOfLines={1}>
+                {safeProvider}
+              </Text>
+
+              {/* Signature Duration Pill per DESIGN.md §5 */}
+              <View style={[styles.durationPill, isMatched ? styles.durationPillMatched : styles.durationPillRest]}>
+                <Text style={[styles.durationText, isMatched ? styles.durationTextMatched : styles.durationTextRest]}>
+                  {formattedDuration}
+                </Text>
+              </View>
+            </View>
           </View>
         </TouchableOpacity>
 
+        {/* Options Overflow Action Button */}
         <TouchableOpacity
           style={styles.moreButton}
           onPress={showOptions}
@@ -92,7 +123,7 @@ export const FeedCard: React.FC<FeedCardProps> = memo(({ item }) => {
           accessibilityLabel={`Options for ${safeTitle}`}
           accessibilityHint="Open menu to hide from queue"
         >
-          <Ionicons name="ellipsis-vertical" size={18} color={colors.inkSecondary} />
+          <Ionicons name="ellipsis-vertical" size={18} color={colors.inkFaint} />
         </TouchableOpacity>
       </View>
     </View>
@@ -110,55 +141,92 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   card: {
-    backgroundColor: colors.substrate,
+    // One Lens Rule: lensFlat composite ground over Void
+    backgroundColor: colors.lensFlat,
     borderColor: colors.glassEdge,
     borderRadius: rounded.md,
     borderWidth: 1,
     flexDirection: 'row',
     overflow: 'hidden',
     position: 'relative',
+    padding: spacing.sm,
+  },
+  cardMatched: {
+    borderColor: 'rgba(255, 59, 48, 0.4)',
   },
   cardMainTouchable: {
     flex: 1,
     flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+  },
+  thumbnailWrapper: {
+    width: 104,
+    height: 58.5, // 16:9 ratio
+    borderRadius: rounded.xs,
+    overflow: 'hidden',
+    backgroundColor: colors.strata,
+    borderWidth: 1,
+    borderColor: colors.glassEdge,
   },
   thumbnail: {
-    height: 90,
-    width: 120,
+    width: '100%',
+    height: '100%',
   },
   thumbnailPlaceholder: {
     alignItems: 'center',
-    backgroundColor: colors.strata,
     justifyContent: 'center',
-  },
-  placeholderText: {
-    ...typography.label,
-    color: colors.inkMuted,
   },
   content: {
     flex: 1,
     justifyContent: 'space-between',
-    padding: spacing.sm,
-    paddingRight: 48,
+    paddingRight: spacing.xl,
   },
-  badgeRow: {
+  title: {
+    ...typography.subtitle,
+    color: colors.ink,
+    fontSize: 15,
+    lineHeight: 20,
+  },
+  metaRow: {
     alignItems: 'center',
     flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: spacing.xs,
     gap: spacing.xs,
   },
-  badge: {
-    backgroundColor: colors.heatCore,
-    borderRadius: rounded.xs,
-    paddingHorizontal: spacing.xs,
-    paddingVertical: 2,
+  providerText: {
+    ...typography.bodySm,
+    color: colors.inkMuted,
+    fontSize: 13,
+    flex: 1,
   },
-  badgeText: {
-    ...typography.badge,
-    color: colors.void,
+  // Signature Duration Pill per DESIGN.md §5
+  durationPill: {
+    height: 24,
+    borderRadius: rounded.pill,
+    paddingHorizontal: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  durationPillRest: {
+    backgroundColor: colors.strata,
+  },
+  durationPillMatched: {
+    backgroundColor: colors.heatCore,
   },
   durationText: {
     ...typography.duration,
-    color: colors.signalVerified,
+    fontSize: 13,
+    lineHeight: 16,
+  },
+  durationTextRest: {
+    color: colors.ink,
+  },
+  // Black Label Rule: Void ink on Heat Core fill per DESIGN.md §2
+  durationTextMatched: {
+    color: colors.void,
+    fontWeight: '700',
   },
   moreButton: {
     alignItems: 'center',
@@ -166,12 +234,8 @@ const styles = StyleSheet.create({
     minHeight: 44,
     minWidth: 44,
     position: 'absolute',
-    right: 4,
-    top: 4,
-  },
-  title: {
-    ...typography.body,
-    color: colors.ink,
-    marginTop: spacing.xs,
+    right: spacing.xs,
+    top: spacing.xs,
   },
 });
+
