@@ -9,6 +9,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from structlog.contextvars import bind_contextvars, clear_contextvars
 
 from app.core.config import settings
+from app.core.errors import AppError
 
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable
@@ -54,6 +55,8 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
 
         try:
             response: Response = await call_next(request)
+        except AppError:
+            raise
         except Exception:
             logger.exception("request_unhandled_exception")
             raise

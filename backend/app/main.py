@@ -49,9 +49,9 @@ app.add_exception_handler(RequestValidationError, validation_error_handler)  # t
 app.add_exception_handler(HTTPException, http_exception_handler)  # type: ignore[arg-type]
 
 # Middleware (outermost first — logging wraps ratelimit wraps error handling)
-app.add_middleware(RequestLoggingMiddleware)
-app.add_middleware(RateLimitMiddleware)
 app.add_middleware(ErrorHandlingMiddleware)
+app.add_middleware(RateLimitMiddleware)
+app.add_middleware(RequestLoggingMiddleware)
 
 # Health check at root (unauthenticated, no /api/v1 prefix)
 app.include_router(health_router)
