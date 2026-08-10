@@ -22,7 +22,7 @@ VALID_TIME_BLOCK_DURATIONS = {900, 1200, 1800, 2700, 3600, 4500, 5400}
 
 
 class SessionService:
-    """Business logic for workout time-boxing sessions per SPEC §4.4, §7.1, & §9.5-9.6.
+    """Business logic for workout time-boxing sessions per SPEC §4.4, §7.1, §7.2, & §9.5-9.6.
 
     Enforces business rules:
     - Content duration is READ FROM content_cache, NEVER from request body.
@@ -32,6 +32,9 @@ class SessionService:
     - Single transaction session completion (updates session, feed_item.consumed, and user.consumed_content).
     - Idempotent completion (completing completed session returns 200).
     - Completing pending session returns SESSION_NOT_STARTED (409).
+    - Lazy abandonment evaluation on read (now > created_at + duration_seconds + 24h).
+    - Explicit abandonment endpoint (POST /sessions/{id}/abandon).
+    - GET /sessions/active endpoint.
     - Reject external_workout_url & healthkit_uuid with 501 FEATURE_NOT_AVAILABLE until v1.1.
     - Cross-user session access returns 404 (SESSION_NOT_FOUND), never 403.
     """
@@ -46,6 +49,10 @@ class SessionService:
         self._activity_service = activity_service or ActivityService()
         self._content_repo = content_repo
 
+    async def get_active_session(self, user_id: str) -> Session | None:
+        """Fetch current non-terminal active session for user_id with lazy abandonment evaluation per SPEC §7.2."""
+        return await self._session_repo.get_active_user_session(user_id)
+
     async def create_session(
         self,
         user_id: str,
@@ -58,7 +65,7 @@ class SessionService:
         # Step 1: Validate activity existence
         activity = self._activity_service.get_activity(activity_id)
 
-        # Step 2: Single active session guardrail
+        # Step 2: Single active session guardrail (evaluates lazy abandonment on read)
         existing_active = await self._session_repo.get_active_user_session(user_id)
         if existing_active:
             raise ConflictError(
@@ -190,6 +197,15 @@ class SessionService:
 
         now = datetime.now(UTC)
         return await self._session_repo.complete_session_transaction(
+            session_id=session_id,
+            user_id=user_id,
+            now=now,
+        )
+
+    async def abandon_session(self, user_id: str, session_id: str) -> Session:
+        """Explicitly abandon a workout session per SPEC §7.1 & §9.5."""
+        now = datetime.now(UTC)
+        return await self._session_repo.abandon_session(
             session_id=session_id,
             user_id=user_id,
             now=now,

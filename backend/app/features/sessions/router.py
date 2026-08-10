@@ -31,6 +31,23 @@ def get_session_service(db: AsyncClient = Depends(get_db)) -> SessionService:
     return SessionService(session_repo, activity_service, content_repo)
 
 
+@router.get(
+    "/active",
+    status_code=status.HTTP_200_OK,
+    response_model=None,
+    summary="Get user active session",
+    description="Fetch current non-terminal active session for authenticated user with lazy abandonment evaluation per SPEC §7.2.",
+)
+async def get_active_session(
+    current_user: AuthenticatedUser = Depends(get_current_user),
+    service: SessionService = Depends(get_session_service),
+) -> SuccessEnvelope[dict[str, Any] | None]:
+    """GET /api/v1/sessions/active endpoint."""
+    session = await service.get_active_session(current_user.uid)
+    data = SessionSchema.from_domain(session).model_dump() if session else None
+    return success_response(data)
+
+
 @router.post(
     "",
     status_code=status.HTTP_201_CREATED,
@@ -96,5 +113,25 @@ async def complete_session(
         session_id=session_id,
         external_workout_url=ext_url,
         healthkit_uuid=hk_uuid,
+    )
+    return success_response(SessionSchema.from_domain(session).model_dump())
+
+
+@router.post(
+    "/{session_id}/abandon",
+    status_code=status.HTTP_200_OK,
+    response_model=None,
+    summary="Abandon a workout session",
+    description="Explicitly abandon a workout session per SPEC §7.1 & §9.5.",
+)
+async def abandon_session(
+    session_id: str,
+    current_user: AuthenticatedUser = Depends(get_current_user),
+    service: SessionService = Depends(get_session_service),
+) -> SuccessEnvelope[dict[str, Any]]:
+    """POST /api/v1/sessions/{session_id}/abandon endpoint."""
+    session = await service.abandon_session(
+        user_id=current_user.uid,
+        session_id=session_id,
     )
     return success_response(SessionSchema.from_domain(session).model_dump())

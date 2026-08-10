@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING, Any
 
 import structlog
@@ -14,9 +14,12 @@ if TYPE_CHECKING:
 
 logger = structlog.get_logger(__name__)
 
+# 24 hours in seconds per SPEC §7.2
+ABANDONMENT_GRACE_PERIOD_SECONDS = 86400
+
 
 class SessionRepository:
-    """Firestore repository for sessions collection per SPEC §4.4 & §7.1."""
+    """Firestore repository for sessions collection per SPEC §4.4, §7.1, & §7.2."""
 
     def __init__(self, client: AsyncClient) -> None:
         self._client = client
@@ -28,17 +31,50 @@ class SessionRepository:
         logger.info("session_created", session_id=session.id, user_id=session.user_id)
         return session
 
-    async def get_session(self, session_id: str) -> Session | None:
-        """Fetch a session document by ID."""
+    async def get_session(self, session_id: str, now: datetime | None = None) -> Session | None:
+        """Fetch a session document by ID with lazy abandonment check per SPEC §7.2."""
+        if now is None:
+            now = datetime.now(UTC)
+
         doc_ref = self._client.collection("sessions").document(session_id)
         snapshot = await doc_ref.get()
         if not snapshot.exists:
             return None
-        data = snapshot.to_dict() or {}
-        return Session.from_firestore(data)
 
-    async def get_active_user_session(self, user_id: str) -> Session | None:
-        """Fetch active non-terminal session ('pending' or 'in_progress') for user_id."""
+        data = snapshot.to_dict() or {}
+        session = Session.from_firestore(data)
+
+        # Lazy abandonment evaluation per SPEC §7.2
+        if session.status in ("pending", "in_progress"):
+            cutoff = session.created_at + timedelta(
+                seconds=session.duration_seconds + ABANDONMENT_GRACE_PERIOD_SECONDS
+            )
+            if now > cutoff:
+                logger.info(
+                    "lazy_abandonment_triggered",
+                    session_id=session.id,
+                    user_id=session.user_id,
+                )
+                await doc_ref.update(
+                    {
+                        "status": "abandoned",
+                        "abandoned_at": now,
+                        "updated_at": now,
+                    }
+                )
+                session.status = "abandoned"
+                session.abandoned_at = now
+                session.updated_at = now
+
+        return session
+
+    async def get_active_user_session(
+        self, user_id: str, now: datetime | None = None
+    ) -> Session | None:
+        """Fetch active non-terminal session ('pending' or 'in_progress') for user_id with lazy abandonment evaluation per SPEC §7.2."""
+        if now is None:
+            now = datetime.now(UTC)
+
         query = (
             self._client.collection("sessions")
             .where(field_path="user_id", op_string="==", value=user_id)
@@ -48,7 +84,34 @@ class SessionRepository:
         snapshots = await query.get()
         if not snapshots:
             return None
-        return Session.from_firestore(snapshots[0].to_dict() or {})
+
+        data = snapshots[0].to_dict() or {}
+        session = Session.from_firestore(data)
+
+        # Lazy abandonment evaluation: now > created_at + duration_seconds + 24h per SPEC §7.2
+        cutoff = session.created_at + timedelta(
+            seconds=session.duration_seconds + ABANDONMENT_GRACE_PERIOD_SECONDS
+        )
+        if now > cutoff:
+            logger.info(
+                "lazy_abandonment_swept_active_session",
+                session_id=session.id,
+                user_id=user_id,
+            )
+            doc_ref = self._client.collection("sessions").document(session.id)
+            await doc_ref.update(
+                {
+                    "status": "abandoned",
+                    "abandoned_at": now,
+                    "updated_at": now,
+                }
+            )
+            session.status = "abandoned"
+            session.abandoned_at = now
+            session.updated_at = now
+            return None  # Session is now abandoned, so no active session exists
+
+        return session
 
     async def update_session(self, session_id: str, updates: dict[str, Any]) -> None:
         """Update fields on a session document."""
@@ -129,4 +192,49 @@ class SessionRepository:
         session.updated_at = now
 
         logger.info("session_completed_transactionally", session_id=session_id, user_id=user_id)
+        return session
+
+    async def abandon_session(self, session_id: str, user_id: str, now: datetime) -> Session:
+        """Explicitly mark session as abandoned per SPEC §7.1 & §9.5."""
+        doc_ref = self._client.collection("sessions").document(session_id)
+        snapshot = await doc_ref.get()
+
+        if not snapshot.exists:
+            raise NotFoundError(
+                code="SESSION_NOT_FOUND",
+                message=f"Session '{session_id}' not found",
+            )
+
+        data = snapshot.to_dict() or {}
+        session = Session.from_firestore(data)
+
+        if session.user_id != user_id:
+            raise NotFoundError(
+                code="SESSION_NOT_FOUND",
+                message=f"Session '{session_id}' not found",
+            )
+
+        if session.status == "abandoned":
+            # Idempotent: abandoning an already abandoned session returns 200 with unchanged session
+            logger.info("session_abandon_idempotent", session_id=session_id, user_id=user_id)
+            return session
+
+        if session.status == "completed":
+            raise ConflictError(
+                code="SESSION_ALREADY_TERMINAL",
+                message="Completed session cannot be abandoned",
+            )
+
+        updates = {
+            "status": "abandoned",
+            "abandoned_at": now,
+            "updated_at": now,
+        }
+        await doc_ref.update(updates)
+
+        session.status = "abandoned"
+        session.abandoned_at = now
+        session.updated_at = now
+
+        logger.info("session_explicitly_abandoned", session_id=session_id, user_id=user_id)
         return session
