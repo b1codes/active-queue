@@ -17,13 +17,13 @@ import {
   OfflineBanner,
   ProviderQuotaBanner,
   SyncResumableCard,
-} from '../../src/core/components/states';
-import { colors, rounded, spacing, typography } from '../../src/core/theme';
-import { AddSourceModal } from '../../src/features/queue/components/AddSourceModal';
-import { FeedCard } from '../../src/features/queue/components/FeedCard';
-import { SyncProgressBar } from '../../src/features/queue/components/SyncProgressBar';
-import { useQueueStore } from '../../src/features/queue/queueStore';
-import { useSessionStore } from '../../src/features/sessions/sessionStore';
+} from '@/core/components/states';
+import { colors, rounded, spacing, typography } from '@/core/theme';
+import { AddSourceModal } from '@/features/queue/components/AddSourceModal';
+import { FeedCard } from '@/features/queue/components/FeedCard';
+import { SyncProgressBar } from '@/features/queue/components/SyncProgressBar';
+import { useQueueStore } from '@/features/queue/queueStore';
+import { useSessionStore } from '@/features/sessions/sessionStore';
 
 export default function QueueScreen() {
   const router = useRouter();
@@ -87,7 +87,7 @@ export default function QueueScreen() {
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.header}>
         <View style={styles.headerLeft}>
-          <Text style={styles.headerTitle}>Active Queue</Text>
+          <Text style={styles.headerTitle} maxFontSizeMultiplier={1.5}>Active Queue</Text>
           {totalUnconsumed !== null ? (
             <View style={styles.countBadge}>
               <Text style={styles.countBadgeText}>{totalUnconsumed}</Text>
@@ -99,6 +99,10 @@ export default function QueueScreen() {
           <TouchableOpacity
             style={styles.addButton}
             onPress={() => setIsAddModalVisible(true)}
+            accessible={true}
+            accessibilityRole="button"
+            accessibilityLabel="Add Source"
+            accessibilityHint="Open modal to add a new YouTube playlist URL or custom source"
           >
             <Text style={styles.addButtonText}>+ Add Source</Text>
           </TouchableOpacity>
@@ -210,6 +214,8 @@ const styles = StyleSheet.create({
     borderColor: colors.glassEdge,
     borderRadius: rounded.sm,
     borderWidth: 1,
+    justifyContent: 'center',
+    minHeight: 44,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.xs,
   },
