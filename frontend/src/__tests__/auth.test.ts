@@ -1,4 +1,4 @@
-import { apiClient, ApiError } from "@/features/auth/apiClient";
+import { apiClient, ApiError } from "@/core/api/apiClient";
 import { useAuthStore } from "@/features/auth/authStore";
 
 // Mock fetch globally
@@ -78,7 +78,44 @@ describe("apiClient", () => {
     expect(data).toEqual({ user: { uid: "u1" } });
   });
 
-  it("throws ApiError when response is not ok", async () => {
+  it("prevents infinite loops by retrying EXACTLY ONCE on repeated 401 AUTH_TOKEN_EXPIRED", async () => {
+    const mockGetIdToken = jest.fn().mockResolvedValue("fresh-refreshed-token-456");
+    useAuthStore.setState({
+      user: { getIdToken: mockGetIdToken } as unknown as import("firebase/auth").User,
+      idToken: "expired-token-123",
+      isAuthenticated: true,
+      isLoading: false,
+      error: null,
+    });
+
+    // First call returns 401 AUTH_TOKEN_EXPIRED
+    globalFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 401,
+      json: async () => ({
+        status: "error",
+        data: null,
+        error: { code: "AUTH_TOKEN_EXPIRED", message: "Token expired" },
+      }),
+    });
+
+    // Second call (retry) ALSO returns 401 AUTH_TOKEN_EXPIRED
+    globalFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 401,
+      json: async () => ({
+        status: "error",
+        data: null,
+        error: { code: "AUTH_TOKEN_EXPIRED", message: "Token still expired" },
+      }),
+    });
+
+    await expect(apiClient("/api/v1/users/me")).rejects.toThrow(ApiError);
+    // Verified exactly 2 calls (initial + 1 retry, no infinite loop)
+    expect(globalFetch).toHaveBeenCalledTimes(2);
+  });
+
+  it("throws ApiError mapping SPEC §9.7 error codes when response is error", async () => {
     globalFetch.mockResolvedValueOnce({
       ok: false,
       status: 403,
@@ -89,6 +126,15 @@ describe("apiClient", () => {
       }),
     });
 
-    await expect(apiClient("/api/v1/users/me")).rejects.toThrow(ApiError);
+    try {
+      await apiClient("/api/v1/users/me");
+      fail("Expected ApiError");
+    } catch (err: unknown) {
+      expect(err).toBeInstanceOf(ApiError);
+      const apiErr = err as ApiError;
+      expect(apiErr.code).toBe("ACCOUNT_DISABLED");
+      expect(apiErr.status).toBe(403);
+      expect(apiErr.message).toBe("Account disabled");
+    }
   });
 });
