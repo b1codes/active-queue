@@ -1,5 +1,6 @@
 import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { colors, rounded, spacing, typography } from '../../theme';
 
 interface EmptyFeedStateProps {
@@ -17,41 +18,43 @@ export const EmptyFeedState: React.FC<EmptyFeedStateProps> = ({
       accessible={true}
       accessibilityLabel="You are all caught up. No unconsumed feed items available."
     >
-      <View style={styles.iconBadge}>
-        <Text style={styles.iconText}>🎉</Text>
-      </View>
+      <View style={styles.cardWrapper}>
+        <View style={styles.iconBadge}>
+          <Ionicons name="sparkles-outline" size={30} color={colors.heatCore} />
+        </View>
 
-      <Text style={styles.title}>You're All Caught Up!</Text>
-      <Text style={styles.subtitle}>
-        All content items in your sources have been completed or marked consumed.
-      </Text>
+        <Text style={styles.title}>You're All Caught Up!</Text>
+        <Text style={styles.subtitle}>
+          All content items in your sources have been completed or marked consumed.
+        </Text>
 
-      <View style={styles.buttonRow}>
-        {onSyncPress ? (
-          <TouchableOpacity
-            style={styles.primaryButton}
-            onPress={onSyncPress}
-            activeOpacity={0.8}
-            accessible={true}
-            accessibilityRole="button"
-            accessibilityLabel="Sync sources now"
-          >
-            <Text style={styles.primaryButtonText}>Sync Sources Now</Text>
-          </TouchableOpacity>
-        ) : null}
+        <View style={styles.buttonRow}>
+          {onSyncPress ? (
+            <TouchableOpacity
+              style={styles.primaryButton}
+              onPress={onSyncPress}
+              activeOpacity={0.8}
+              accessible={true}
+              accessibilityRole="button"
+              accessibilityLabel="Sync sources now"
+            >
+              <Text style={styles.primaryButtonText}>Sync Sources Now</Text>
+            </TouchableOpacity>
+          ) : null}
 
-        {onAddSourcePress ? (
-          <TouchableOpacity
-            style={styles.secondaryButton}
-            onPress={onAddSourcePress}
-            activeOpacity={0.8}
-            accessible={true}
-            accessibilityRole="button"
-            accessibilityLabel="Add another content source"
-          >
-            <Text style={styles.secondaryButtonText}>+ Add Source</Text>
-          </TouchableOpacity>
-        ) : null}
+          {onAddSourcePress ? (
+            <TouchableOpacity
+              style={styles.secondaryButton}
+              onPress={onAddSourcePress}
+              activeOpacity={0.8}
+              accessible={true}
+              accessibilityRole="button"
+              accessibilityLabel="Add another content source"
+            >
+              <Text style={styles.secondaryButtonText}>+ Add Source</Text>
+            </TouchableOpacity>
+          ) : null}
+        </View>
       </View>
     </View>
   );
@@ -66,6 +69,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.xl,
     paddingVertical: spacing.xxl,
   },
+  cardWrapper: {
+    alignItems: 'center',
+    maxWidth: 480,
+    width: '100%',
+  },
   iconBadge: {
     alignItems: 'center',
     backgroundColor: colors.substrate,
@@ -76,9 +84,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginBottom: spacing.md,
     width: 64,
-  },
-  iconText: {
-    fontSize: 32,
   },
   title: {
     ...typography.title,

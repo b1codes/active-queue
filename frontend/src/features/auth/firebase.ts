@@ -1,5 +1,5 @@
 import { initializeApp, getApps, getApp } from "firebase/app";
-import { initializeAuth, getAuth, getReactNativePersistence, connectAuthEmulator } from "firebase/auth";
+import { initializeAuth, getAuth, connectAuthEmulator } from "firebase/auth";
 
 const firebaseConfig = {
   apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY || "fake-api-key",
@@ -12,9 +12,14 @@ const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
 export const auth = (() => {
   try {
     const AsyncStorage = require("@react-native-async-storage/async-storage").default;
-    return initializeAuth(app, {
-      persistence: getReactNativePersistence(AsyncStorage),
-    });
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const { getReactNativePersistence } = require("firebase/auth");
+    if (typeof getReactNativePersistence === "function") {
+      return initializeAuth(app, {
+        persistence: getReactNativePersistence(AsyncStorage),
+      });
+    }
+    return getAuth(app);
   } catch {
     return getAuth(app);
   }

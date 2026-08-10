@@ -54,6 +54,20 @@ export const typography: Record<string, TextStyle> = {
     lineHeight: 16,
     letterSpacing: 0.2,
   },
+  caption: {
+    fontFamily: 'System', // OpenSans-Medium fallback
+    fontSize: 12,
+    fontWeight: '500',
+    lineHeight: 15,
+    letterSpacing: 0.1,
+  },
+  badge: {
+    fontFamily: 'System', // OpenSans-Bold fallback
+    fontSize: 11,
+    fontWeight: '700',
+    lineHeight: 14,
+    letterSpacing: 0.3,
+  },
   duration: {
     fontFamily: 'System', // OpenSans-SemiBold fallback with tabular nums
     fontSize: 15,

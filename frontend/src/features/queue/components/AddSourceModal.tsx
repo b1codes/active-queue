@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
 import {
   ActivityIndicator,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   StyleSheet,
   Text,
   TextInput,
@@ -46,7 +48,10 @@ export const AddSourceModal: React.FC<AddSourceModalProps> = ({ visible, onClose
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={handleClose}>
-      <View style={styles.overlay}>
+      <KeyboardAvoidingView
+        style={styles.overlay}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
         <View style={styles.modalContent}>
           {isWatchLaterError ? (
             <WatchLaterRejectedState
@@ -82,6 +87,9 @@ export const AddSourceModal: React.FC<AddSourceModalProps> = ({ visible, onClose
                   onPress={handleClose}
                   style={[styles.button, styles.cancelButton]}
                   disabled={isAddingSource}
+                  accessible={true}
+                  accessibilityRole="button"
+                  accessibilityLabel="Cancel adding content source"
                 >
                   <Text style={styles.cancelText}>Cancel</Text>
                 </TouchableOpacity>
@@ -90,6 +98,9 @@ export const AddSourceModal: React.FC<AddSourceModalProps> = ({ visible, onClose
                   onPress={handleAdd}
                   style={[styles.button, styles.submitButton]}
                   disabled={isAddingSource || !urlOrId.trim()}
+                  accessible={true}
+                  accessibilityRole="button"
+                  accessibilityLabel="Add source"
                 >
                   {isAddingSource ? (
                     <ActivityIndicator color={colors.void} size="small" />
@@ -101,7 +112,7 @@ export const AddSourceModal: React.FC<AddSourceModalProps> = ({ visible, onClose
             </>
           )}
         </View>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 };
@@ -119,6 +130,7 @@ const styles = StyleSheet.create({
     borderColor: colors.glassEdge,
     borderRadius: rounded.md,
     borderWidth: 1,
+    maxWidth: 520,
     padding: spacing.lg,
     width: '100%',
   },
@@ -139,6 +151,7 @@ const styles = StyleSheet.create({
     borderRadius: rounded.sm,
     borderWidth: 1,
     color: colors.ink,
+    minHeight: 48,
     padding: spacing.md,
   },
   errorText: {
@@ -148,17 +161,20 @@ const styles = StyleSheet.create({
   },
   buttonRow: {
     flexDirection: 'row',
+    gap: spacing.sm,
     justifyContent: 'flex-end',
     marginTop: spacing.lg,
   },
   button: {
+    alignItems: 'center',
     borderRadius: rounded.sm,
+    justifyContent: 'center',
+    minHeight: 44,
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.sm,
   },
   cancelButton: {
     backgroundColor: 'transparent',
-    marginRight: spacing.sm,
   },
   cancelText: {
     ...typography.label,

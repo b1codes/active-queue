@@ -16,42 +16,63 @@ export const SyncProgressBar: React.FC = () => {
   const progressPercent = Math.round(progressRatio * 100);
 
   return (
-    <View style={styles.container}>
-      <View style={styles.headerRow}>
-        <Text style={styles.titleText}>
-          {isSyncing ? 'Syncing Content Source...' : 'Sync Status'}
-        </Text>
-        {isSyncing && (
-          <TouchableOpacity onPress={cancelSync} style={styles.cancelButton}>
-            <Text style={styles.cancelText}>Cancel</Text>
-          </TouchableOpacity>
+    <View style={styles.outerWrapper}>
+      <View
+        style={styles.container}
+        accessible={true}
+        accessibilityLabel={
+          error
+            ? `Sync error: ${error}`
+            : `Syncing content: ${itemsSyncedTotal} of estimated ${estimatedTotal || 1000} items synced (${progressPercent} percent)`
+        }
+      >
+        <View style={styles.headerRow}>
+          <Text style={styles.titleText}>
+            {isSyncing ? 'Syncing Content Source...' : 'Sync Status'}
+          </Text>
+          {isSyncing && (
+            <TouchableOpacity
+              onPress={cancelSync}
+              style={styles.cancelButton}
+              accessible={true}
+              accessibilityRole="button"
+              accessibilityLabel="Cancel content sync"
+            >
+              <Text style={styles.cancelText}>Cancel</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+
+        {error ? (
+          <Text style={styles.errorText}>{error}</Text>
+        ) : (
+          <>
+            <Text style={styles.progressText}>
+              {itemsSyncedTotal} of ~{estimatedTotal ? estimatedTotal : '1,000+'} items synced
+            </Text>
+
+            <View style={styles.trackBackground}>
+              <View style={[styles.trackFill, { width: `${progressPercent}%` }]} />
+            </View>
+          </>
         )}
       </View>
-
-      {error ? (
-        <Text style={styles.errorText}>{error}</Text>
-      ) : (
-        <>
-          <Text style={styles.progressText}>
-            {itemsSyncedTotal} of ~{estimatedTotal ? estimatedTotal : '1,000+'} items synced
-          </Text>
-
-          <View style={styles.trackBackground}>
-            <View style={[styles.trackFill, { width: `${progressPercent}%` }]} />
-          </View>
-        </>
-      )}
     </View>
   );
 };
 
 const styles = StyleSheet.create({
+  outerWrapper: {
+    alignSelf: 'center',
+    maxWidth: 680,
+    paddingHorizontal: spacing.lg,
+    width: '100%',
+  },
   container: {
     backgroundColor: colors.substrate,
     borderColor: colors.glassEdge,
     borderRadius: rounded.md,
     borderWidth: 1,
-    marginHorizontal: spacing.lg,
     marginVertical: spacing.sm,
     padding: spacing.md,
   },
@@ -66,8 +87,11 @@ const styles = StyleSheet.create({
     color: colors.ink,
   },
   cancelButton: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 44,
+    minWidth: 44,
     paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
   },
   cancelText: {
     ...typography.label,

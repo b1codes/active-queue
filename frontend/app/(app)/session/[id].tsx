@@ -9,6 +9,8 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { colors, rounded, spacing, typography } from '@/core/theme';
 import { launchTrackerApp } from '@/features/sessions/deepLinks';
@@ -16,6 +18,7 @@ import { useSessionStore } from '@/features/sessions/sessionStore';
 
 export default function SessionHandoffScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
 
   const {
     currentSession,
@@ -79,154 +82,172 @@ export default function SessionHandoffScreen() {
   };
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
-      <View style={styles.header}>
-        <Text style={styles.title} maxFontSizeMultiplier={1.5}>Workout Handoff</Text>
-        <Text style={styles.subtitle} maxFontSizeMultiplier={1.5}>
-          Guided 3-step setup for your active workout session
-        </Text>
-      </View>
-
-      {currentSession && (
-        <View
-          style={styles.badgeCard}
-          accessible={true}
-          accessibilityLabel={`Selected activity: ${currentSession.activity_id}, duration: ${formatDurationLabel(currentSession.duration_seconds)}`}
-        >
-          <Text style={styles.badgeText}>
-            {currentSession.activity_id.toUpperCase()} • {formatDurationLabel(currentSession.duration_seconds)}
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={[
+        styles.contentContainer,
+        { paddingTop: Math.max(insets.top, spacing.xl), paddingBottom: Math.max(insets.bottom, spacing.xl) },
+      ]}
+    >
+      <View style={styles.cardWrapper}>
+        <View style={styles.header}>
+          <Text style={styles.title}>Workout Handoff</Text>
+          <Text style={styles.subtitle}>
+            Guided 3-step setup for your active workout session
           </Text>
         </View>
-      )}
 
-      {/* Step 1 Card: Tracker Handoff */}
-      <View
-        style={[styles.stepCard, currentStep === 1 && styles.activeStepCard]}
-        accessible={true}
-        accessibilityLabel={`Step 1 of 3: Start Activity Tracker. ${currentStep > 1 ? 'Completed or skipped' : 'Active step'}`}
-      >
-        <View style={styles.stepHeader}>
-          <Text style={styles.stepNumber}>1</Text>
-          <Text style={styles.stepTitle}>Start Activity Tracker</Text>
-        </View>
-        <Text style={styles.stepDescription}>
-          Open your fitness app or Apple Watch to record physical metrics. (Skippable)
-        </Text>
-
-        {trackerError && <Text style={styles.errorText}>{trackerError}</Text>}
-
-        {currentStep === 1 && (
-          <View style={styles.buttonRow}>
-            <TouchableOpacity
-              style={styles.primaryButton}
-              onPress={handleLaunchTracker}
-              activeOpacity={0.8}
-              accessible={true}
-              accessibilityRole="button"
-              accessibilityLabel="Open Tracker App"
-              accessibilityHint="Launches your selected workout tracking app or displays guide"
-            >
-              <Text style={styles.buttonText}>Open Tracker</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.secondaryButton}
-              onPress={skipTrackerStep}
-              activeOpacity={0.8}
-              accessible={true}
-              accessibilityRole="button"
-              accessibilityLabel="Skip Tracker Step"
-              accessibilityHint="Proceed directly to launching media"
-            >
-              <Text style={styles.secondaryButtonText}>Skip Step</Text>
-            </TouchableOpacity>
-          </View>
-        )}
-        {currentStep > 1 && <Text style={styles.completedBadge}>✓ Completed / Skipped</Text>}
-      </View>
-
-      {/* Step 2 Card: Media Launch & Server Start */}
-      <View
-        style={[styles.stepCard, currentStep === 2 && styles.activeStepCard]}
-        accessible={true}
-        accessibilityLabel={`Step 2 of 3: Launch Media and Start Session. ${currentStep > 2 ? 'Session Started' : currentStep === 2 ? 'Active step' : 'Pending'}`}
-      >
-        <View style={styles.stepHeader}>
-          <Text style={styles.stepNumber}>2</Text>
-          <Text style={styles.stepTitle}>Launch Media & Start Session</Text>
-        </View>
-        <Text style={styles.stepDescription}>
-          Launch media playback and record session start on server.
-        </Text>
-
-        {mediaError && (
-          <View style={styles.errorContainer}>
-            <Text style={styles.errorText}>{mediaError}</Text>
-            <TouchableOpacity
-              style={styles.retryButton}
-              onPress={handleLaunchMedia}
-              accessible={true}
-              accessibilityRole="button"
-              accessibilityLabel="Retry media launch"
-            >
-              <Text style={styles.retryButtonText}>Retry</Text>
-            </TouchableOpacity>
-          </View>
-        )}
-
-        {currentStep === 2 && (
-          <TouchableOpacity
-            style={[styles.primaryButton, isLoading && styles.disabledButton]}
-            onPress={handleLaunchMedia}
-            disabled={isLoading}
-            activeOpacity={0.8}
+        {currentSession && (
+          <View
+            style={styles.badgeCard}
             accessible={true}
-            accessibilityRole="button"
-            accessibilityLabel="Launch Media and Start Workout Session"
-            accessibilityHint="Launches target media player app and starts session timestamp on server"
+            accessibilityLabel={`Selected activity: ${currentSession.activity_id}, duration: ${formatDurationLabel(currentSession.duration_seconds)}`}
           >
-            {isLoading ? (
-              <ActivityIndicator color="#FFFFFF" />
-            ) : (
-              <Text style={styles.buttonText}>Launch Media & Start Session</Text>
-            )}
-          </TouchableOpacity>
+            <Text style={styles.badgeText}>
+              {currentSession.activity_id.toUpperCase()} • {formatDurationLabel(currentSession.duration_seconds)}
+            </Text>
+          </View>
         )}
-        {currentStep > 2 && <Text style={styles.completedBadge}>✓ Session Started</Text>}
-      </View>
 
-      {/* Step 3 Card: Session Target End Time */}
-      <View
-        style={[styles.stepCard, currentStep === 3 && styles.activeStepCard]}
-        accessible={true}
-        accessibilityLabel={`Step 3 of 3: Session In Progress. ${currentStep === 3 ? `Target end time is ${formatTargetEndTime()}` : 'Pending step 2 completion'}`}
-      >
-        <View style={styles.stepHeader}>
-          <Text style={styles.stepNumber}>3</Text>
-          <Text style={styles.stepTitle}>Session In Progress</Text>
+        {/* Step 1 Card: Tracker Handoff */}
+        <View
+          style={[styles.stepCard, currentStep === 1 && styles.activeStepCard]}
+          accessible={true}
+          accessibilityLabel={`Step 1 of 3: Start Activity Tracker. ${currentStep > 1 ? 'Completed or skipped' : 'Active step'}`}
+        >
+          <View style={styles.stepHeader}>
+            <Text style={styles.stepNumber}>1</Text>
+            <Text style={styles.stepTitle}>Start Activity Tracker</Text>
+          </View>
+          <Text style={styles.stepDescription}>
+            Open your fitness app or Apple Watch to record physical metrics. (Skippable)
+          </Text>
+
+          {trackerError && <Text style={styles.errorText}>{trackerError}</Text>}
+
+          {currentStep === 1 && (
+            <View style={styles.buttonRow}>
+              <TouchableOpacity
+                style={styles.primaryButton}
+                onPress={handleLaunchTracker}
+                activeOpacity={0.8}
+                accessible={true}
+                accessibilityRole="button"
+                accessibilityLabel="Open Tracker App"
+                accessibilityHint="Launches your selected workout tracking app or displays guide"
+              >
+                <Text style={styles.buttonText}>Open Tracker</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.secondaryButton}
+                onPress={skipTrackerStep}
+                activeOpacity={0.8}
+                accessible={true}
+                accessibilityRole="button"
+                accessibilityLabel="Skip Tracker Step"
+                accessibilityHint="Proceed directly to launching media"
+              >
+                <Text style={styles.secondaryButtonText}>Skip Step</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+          {currentStep > 1 && (
+            <View style={styles.completedBadgeRow}>
+              <Ionicons name="checkmark-circle" size={16} color={colors.signalVerified} />
+              <Text style={styles.completedBadge}>Completed / Skipped</Text>
+            </View>
+          )}
         </View>
 
-        {currentStep === 3 ? (
-          <View style={styles.targetTimeContainer}>
-            <Text style={styles.targetTimeLabel}>Workout Target End Time</Text>
-            <Text style={styles.targetTimeValue}>{formatTargetEndTime()}</Text>
-            <Text style={styles.infoText}>
-              ActiveQueue handoff is complete. You can now minimize the app and enjoy your workout.
-            </Text>
+        {/* Step 2 Card: Media Launch & Server Start */}
+        <View
+          style={[styles.stepCard, currentStep === 2 && styles.activeStepCard]}
+          accessible={true}
+          accessibilityLabel={`Step 2 of 3: Launch Media and Start Session. ${currentStep > 2 ? 'Session Started' : currentStep === 2 ? 'Active step' : 'Pending'}`}
+        >
+          <View style={styles.stepHeader}>
+            <Text style={styles.stepNumber}>2</Text>
+            <Text style={styles.stepTitle}>Launch Media & Start Session</Text>
+          </View>
+          <Text style={styles.stepDescription}>
+            Launch media playback and record session start on server.
+          </Text>
+
+          {mediaError && (
+            <View style={styles.errorContainer}>
+              <Text style={styles.errorText}>{mediaError}</Text>
+              <TouchableOpacity
+                style={styles.retryButton}
+                onPress={handleLaunchMedia}
+                accessible={true}
+                accessibilityRole="button"
+                accessibilityLabel="Retry media launch"
+              >
+                <Text style={styles.retryButtonText}>Retry</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
+          {currentStep === 2 && (
             <TouchableOpacity
-              style={styles.doneButton}
-              onPress={() => router.replace('/(app)')}
+              style={[styles.primaryButton, isLoading && styles.disabledButton]}
+              onPress={handleLaunchMedia}
+              disabled={isLoading}
               activeOpacity={0.8}
               accessible={true}
               accessibilityRole="button"
-              accessibilityLabel="Return to Queue Screen"
+              accessibilityLabel="Launch Media and Start Workout Session"
+              accessibilityHint="Launches target media player app and starts session timestamp on server"
             >
-              <Text style={styles.buttonText}>Return to Queue</Text>
+              {isLoading ? (
+                <ActivityIndicator color={colors.void} />
+              ) : (
+                <Text style={styles.buttonText}>Launch Media & Start Session</Text>
+              )}
             </TouchableOpacity>
+          )}
+          {currentStep > 2 && (
+            <View style={styles.completedBadgeRow}>
+              <Ionicons name="checkmark-circle" size={16} color={colors.signalVerified} />
+              <Text style={styles.completedBadge}>Session Started</Text>
+            </View>
+          )}
+        </View>
+
+        {/* Step 3 Card: Session Target End Time */}
+        <View
+          style={[styles.stepCard, currentStep === 3 && styles.activeStepCard]}
+          accessible={true}
+          accessibilityLabel={`Step 3 of 3: Session In Progress. ${currentStep === 3 ? `Target end time is ${formatTargetEndTime()}` : 'Pending step 2 completion'}`}
+        >
+          <View style={styles.stepHeader}>
+            <Text style={styles.stepNumber}>3</Text>
+            <Text style={styles.stepTitle}>Session In Progress</Text>
           </View>
-        ) : (
-          <Text style={styles.pendingText}>Pending media launch in Step 2...</Text>
-        )}
+
+          {currentStep === 3 ? (
+            <View style={styles.targetTimeContainer}>
+              <Text style={styles.targetTimeLabel}>Workout Target End Time</Text>
+              <Text style={styles.targetTimeValue}>{formatTargetEndTime()}</Text>
+              <Text style={styles.infoText}>
+                ActiveQueue handoff is complete. You can now minimize the app and enjoy your workout.
+              </Text>
+              <TouchableOpacity
+                style={styles.doneButton}
+                onPress={() => router.replace('/(app)')}
+                activeOpacity={0.8}
+                accessible={true}
+                accessibilityRole="button"
+                accessibilityLabel="Return to Queue Screen"
+              >
+                <Text style={styles.buttonText}>Return to Queue</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <Text style={styles.pendingText}>Pending media launch in Step 2...</Text>
+          )}
+        </View>
       </View>
     </ScrollView>
   );
@@ -239,7 +260,11 @@ const styles = StyleSheet.create({
   },
   contentContainer: {
     padding: spacing.lg,
-    paddingTop: spacing.xl,
+  },
+  cardWrapper: {
+    alignSelf: 'center',
+    maxWidth: 680,
+    width: '100%',
   },
   header: {
     marginBottom: spacing.lg,
@@ -331,10 +356,15 @@ const styles = StyleSheet.create({
   disabledButton: {
     opacity: 0.6,
   },
+  completedBadgeRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 6,
+    marginTop: spacing.xs,
+  },
   completedBadge: {
     color: colors.signalVerified,
     fontWeight: '600',
-    marginTop: spacing.xs,
   },
   errorContainer: {
     marginBottom: spacing.md,
@@ -347,8 +377,8 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
     backgroundColor: colors.heatCore,
     borderRadius: rounded.sm,
-    minHeight: 44,
     justifyContent: 'center',
+    minHeight: 44,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.xs,
   },

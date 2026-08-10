@@ -1,5 +1,6 @@
-import React from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { AccessibilityInfo, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { colors, rounded, spacing, typography } from '../../theme';
 
 interface ActiveSessionBannerProps {
@@ -15,37 +16,64 @@ export const ActiveSessionBanner: React.FC<ActiveSessionBannerProps> = ({
   durationSeconds,
   onResumePress,
 }) => {
-  const durationLabel = durationSeconds
-    ? `${Math.round(durationSeconds / 60)}m`
-    : '';
+  const [reduceMotion, setReduceMotion] = useState(false);
+
+  useEffect(() => {
+    let isMounted = true;
+    AccessibilityInfo.isReduceMotionEnabled().then((enabled) => {
+      if (isMounted) setReduceMotion(enabled);
+    });
+
+    const subscription = AccessibilityInfo.addEventListener('reduceMotionChanged', (enabled) => {
+      if (isMounted) setReduceMotion(enabled);
+    });
+
+    return () => {
+      isMounted = false;
+      subscription.remove();
+    };
+  }, []);
+
+  const safeDuration = durationSeconds && durationSeconds > 0 ? Math.round(durationSeconds / 60) : 0;
+  const durationLabel = safeDuration > 0 ? `${safeDuration}m` : '';
+  const safeActivityLabel = (activityId || 'Workout').toUpperCase().trim();
 
   return (
-    <TouchableOpacity
-      style={styles.banner}
-      onPress={() => onResumePress(sessionId)}
-      activeOpacity={0.85}
-      accessible={true}
-      accessibilityRole="button"
-      accessibilityLabel={`Active workout session in progress for ${activityId} ${durationLabel}. Tap to resume session.`}
-    >
-      <View style={styles.leftRow}>
-        <View style={styles.pulsingDot} />
-        <View style={styles.textContainer}>
-          <Text style={styles.title}>Workout Session In Progress</Text>
-          <Text style={styles.subtitle}>
-            {activityId.toUpperCase()} {durationLabel ? `• ${durationLabel}` : ''}
-          </Text>
+    <View style={styles.outerWrapper}>
+      <TouchableOpacity
+        style={styles.banner}
+        onPress={() => onResumePress(sessionId)}
+        activeOpacity={0.85}
+        accessible={true}
+        accessibilityRole="button"
+        accessibilityLabel={`Active workout session in progress for ${safeActivityLabel} ${durationLabel}. Tap to resume session.`}
+      >
+        <View style={styles.leftRow}>
+          <View style={[styles.pulsingDot, reduceMotion && styles.staticDot]} />
+          <View style={styles.textContainer}>
+            <Text style={styles.title} numberOfLines={1}>Workout Session In Progress</Text>
+            <Text style={styles.subtitle} numberOfLines={1}>
+              {safeActivityLabel} {durationLabel ? `• ${durationLabel}` : ''}
+            </Text>
+          </View>
         </View>
-      </View>
 
-      <View style={styles.resumeBadge}>
-        <Text style={styles.resumeText}>Resume →</Text>
-      </View>
-    </TouchableOpacity>
+        <View style={styles.resumeBadge}>
+          <Text style={styles.resumeText}>Resume</Text>
+          <Ionicons name="arrow-forward" size={12} color={colors.void} style={styles.arrowIcon} />
+        </View>
+      </TouchableOpacity>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
+  outerWrapper: {
+    alignSelf: 'center',
+    maxWidth: 680,
+    paddingHorizontal: spacing.lg,
+    width: '100%',
+  },
   banner: {
     alignItems: 'center',
     backgroundColor: colors.substrate,
@@ -54,7 +82,6 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginHorizontal: spacing.lg,
     marginVertical: spacing.sm,
     padding: spacing.md,
   },
@@ -69,6 +96,9 @@ const styles = StyleSheet.create({
     height: 10,
     marginRight: spacing.sm,
     width: 10,
+  },
+  staticDot: {
+    opacity: 0.9,
   },
   textContainer: {
     flex: 1,
@@ -85,8 +115,10 @@ const styles = StyleSheet.create({
     fontSize: 12,
   },
   resumeBadge: {
+    alignItems: 'center',
     backgroundColor: colors.signalVerified,
     borderRadius: rounded.xs,
+    flexDirection: 'row',
     marginLeft: spacing.sm,
     paddingHorizontal: spacing.sm,
     paddingVertical: spacing.xs,
@@ -95,5 +127,8 @@ const styles = StyleSheet.create({
     color: colors.void,
     fontSize: 12,
     fontWeight: 'bold',
+  },
+  arrowIcon: {
+    marginLeft: 3,
   },
 });
