@@ -83,7 +83,6 @@ source = ["app"]
 omit = [
     "app/main.py",
     "app/features/activities/*",
-    "app/features/content/*",
     "app/features/sessions/*",
 ]
 

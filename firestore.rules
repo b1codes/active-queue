@@ -1,0 +1,10 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // All direct client access is denied per SPEC §4.9.
+    // The mobile client interacts with Firestore exclusively via the FastAPI backend using Admin SDK.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
