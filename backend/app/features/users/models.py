@@ -7,8 +7,12 @@ from pydantic import BaseModel, Field
 
 
 class UserPreferences(BaseModel):
-    """User preferences stored inside users/{uid}.preferences document field."""
+    """User preferences stored inside users/{uid}.preferences document field per SPEC §4.2."""
 
+    preferred_activity_types: list[str] = Field(default_factory=list)
+    preferred_tracker_app: str | None = None
+    default_time_block_seconds: int = 2700  # 45 minutes default per SPEC §4.2
+    hide_completed: bool = False
     dark_mode: bool = True
     sync_enabled: bool = True
     notifications_enabled: bool = True
@@ -24,6 +28,7 @@ class User(BaseModel):
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     preferences: UserPreferences = Field(default_factory=UserPreferences)
+    consumed_content_ids: list[str] = Field(default_factory=list)
 
     def to_firestore(self) -> dict[str, Any]:
         """Convert model to Firestore document dict."""
@@ -35,6 +40,7 @@ class User(BaseModel):
             "created_at": self.created_at,
             "updated_at": self.updated_at,
             "preferences": self.preferences.model_dump(),
+            "consumed_content_ids": self.consumed_content_ids,
         }
 
     @classmethod
@@ -48,6 +54,7 @@ class User(BaseModel):
             created_at=data.get("created_at") or datetime.now(UTC),
             updated_at=data.get("updated_at") or datetime.now(UTC),
             preferences=UserPreferences(**(data.get("preferences") or {})),
+            consumed_content_ids=data.get("consumed_content_ids") or [],
         )
 
 

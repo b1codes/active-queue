@@ -9,7 +9,7 @@ from app.core.security import AuthenticatedUser
 from app.features.users.models import User, UserAuthorization
 from app.features.users.repository import UserRepository
 from app.features.users.schemas import (
-    UpdateProfileRequest,
+    UpdatePreferencesRequest,
     UserAuthorizationSchema,
     UserSchema,
 )
@@ -64,8 +64,12 @@ def test_user_schemas_from_domain() -> None:
     assert auth_schema.uid == "u1"
     assert auth_schema.role == "user"
 
-    update_req = UpdateProfileRequest(display_name="Updated Name")
-    assert update_req.display_name == "Updated Name"
+    update_req = UpdatePreferencesRequest(
+        preferred_tracker_app="strava",
+        default_time_block_seconds=3600,
+    )
+    assert update_req.preferred_tracker_app == "strava"
+    assert update_req.default_time_block_seconds == 3600
 
 
 @pytest.mark.asyncio
@@ -240,6 +244,31 @@ async def test_ensure_user_provisioned_disabled_account_raises_authorization_err
 
     assert exc_info.value.code == "ACCOUNT_DISABLED"
     assert exc_info.value.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_user_repository_is_consumed_and_mark_consumed() -> None:
+    """UserRepository.is_consumed and mark_consumed manage consumed_content_ids."""
+    mock_client = MagicMock()
+    mock_doc = MagicMock()
+    mock_doc.update = AsyncMock()
+
+    u = User(uid="u1", email="a@b.com", display_name="Test", consumed_content_ids=["vid_100"])
+    snap = MagicMock()
+    snap.exists = True
+    snap.to_dict.return_value = u.to_firestore()
+    mock_doc.get = AsyncMock(return_value=snap)
+
+    mock_collection = MagicMock()
+    mock_collection.document.return_value = mock_doc
+    mock_client.collection.return_value = mock_collection
+
+    repo = UserRepository(mock_client)
+    assert await repo.is_consumed("u1", "vid_100") is True
+    assert await repo.is_consumed("u1", "vid_200") is False
+
+    await repo.mark_consumed("u1", "vid_200")
+    assert mock_doc.update.called
 
 
 @pytest.mark.asyncio

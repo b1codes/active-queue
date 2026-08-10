@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
 import structlog
@@ -10,6 +11,7 @@ from app.features.users.models import User, UserAuthorization
 if TYPE_CHECKING:
     from app.core.security import AuthenticatedUser
     from app.features.users.repository import UserRepository
+    from app.features.users.schemas import UpdatePreferencesRequest
 
 logger = structlog.get_logger(__name__)
 
@@ -76,3 +78,28 @@ class UserService:
                 message=f"User {uid} not found",
             )
         return user
+
+    async def update_user_preferences(self, uid: str, req: UpdatePreferencesRequest) -> User:
+        """Update user preferences in users/{uid}.preferences document field per SPEC §4.2."""
+        user = await self.get_user_profile(uid)
+        pref_dict = user.preferences.model_dump()
+
+        update_fields = req.model_dump(exclude_unset=True)
+        for key, val in update_fields.items():
+            if val is not None:
+                pref_dict[key] = val
+
+        updated_user = await self._repo.update_user(
+            uid=uid,
+            updates={
+                "preferences": pref_dict,
+                "updated_at": datetime.now(UTC),
+            },
+        )
+        if updated_user is None:
+            raise NotFoundError(
+                code="USER_NOT_FOUND",
+                message=f"User {uid} not found",
+            )
+        logger.info("user_preferences_updated", uid=uid)
+        return updated_user

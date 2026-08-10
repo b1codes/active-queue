@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 import structlog
+from google.cloud.firestore import ArrayUnion
 
 from app.features.users.cache import auth_cache
 from app.features.users.models import User, UserAuthorization
@@ -96,3 +97,23 @@ class UserRepository:
         updated_snap = await doc_ref.get()
         data = updated_snap.to_dict() or {}
         return User.from_firestore(data)
+
+    async def is_consumed(self, uid: str, content_id: str) -> bool:
+        """Check if content_id is in user's consumed_content_ids list per SPEC §4.2.
+
+        Wrapped in this abstraction so the eventual subcollection migration (at 5,000 entries)
+        touches only this repository file.
+        """
+        user = await self.get_user(uid)
+        if user is None:
+            return False
+        return content_id in user.consumed_content_ids
+
+    async def mark_consumed(self, uid: str, content_id: str) -> None:
+        """Atomically append content_id to user's consumed_content_ids array per SPEC §4.2.
+
+        Wrapped in this abstraction so the eventual subcollection migration touches only this file.
+        """
+        doc_ref = self._client.collection("users").document(uid)
+        await doc_ref.update({"consumed_content_ids": ArrayUnion([content_id])})
+        logger.info("content_marked_consumed", uid=uid, content_id=content_id)

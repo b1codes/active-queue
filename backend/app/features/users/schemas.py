@@ -51,9 +51,20 @@ class UserSchema(BaseModel):
         )
 
 
-class UpdateProfileRequest(BaseModel):
-    """Request schema for updating user profile."""
+class UserMeData(BaseModel):
+    """Payload for GET /api/v1/users/me endpoint."""
 
-    display_name: str | None = Field(None, min_length=1, max_length=100)
-    photo_url: str | None = None
-    preferences: UserPreferences | None = None
+    user: UserSchema
+    authorization: UserAuthorizationSchema
+
+
+class UpdatePreferencesRequest(BaseModel):
+    """Request schema for PATCH /api/v1/users/me/preferences per SPEC §4.2."""
+
+    preferred_activity_types: list[str] | None = None
+    preferred_tracker_app: str | None = None
+    default_time_block_seconds: int | None = Field(None, ge=300, le=86400)
+    hide_completed: bool | None = None
+    dark_mode: bool | None = None
+    sync_enabled: bool | None = None
+    notifications_enabled: bool | None = None
