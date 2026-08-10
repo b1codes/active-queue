@@ -1,15 +1,15 @@
 import React, { useState } from "react";
 import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  StyleSheet,
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
-import { colors, typography, spacing } from "@/core/theme";
+import { colors, spacing, typography } from "@/core/theme";
 import { useAuthStore } from "@/features/auth/authStore";
 
 export default function SignInScreen() {
@@ -37,12 +37,17 @@ export default function SignInScreen() {
     >
       <View style={styles.content}>
         <View style={styles.headerContainer}>
-          <Text style={styles.brandTitle}>ActiveQueue</Text>
-          <Text style={styles.subtitle}>Time-boxed activity & media orchestrator</Text>
+          <Text style={styles.brandTitle} maxFontSizeMultiplier={1.5}>ActiveQueue</Text>
+          <Text style={styles.subtitle} maxFontSizeMultiplier={1.5}>Time-boxed activity & media orchestrator</Text>
         </View>
 
         {error ? (
-          <View style={styles.errorBanner}>
+          <View
+            style={styles.errorBanner}
+            accessible={true}
+            accessibilityRole="alert"
+            accessibilityLabel={`Authentication error: ${error}`}
+          >
             <Text style={styles.errorText}>{error}</Text>
           </View>
         ) : null}
@@ -59,6 +64,9 @@ export default function SignInScreen() {
               keyboardType="email-address"
               autoCapitalize="none"
               autoCorrect={false}
+              accessible={true}
+              accessibilityLabel="Email Address"
+              accessibilityHint="Enter your email address to sign in"
             />
           </View>
 
@@ -71,14 +79,21 @@ export default function SignInScreen() {
               placeholder="••••••••"
               placeholderTextColor={colors.inkMuted}
               secureTextEntry
+              accessible={true}
+              accessibilityLabel="Password"
+              accessibilityHint="Enter your account password"
             />
           </View>
 
           <TouchableOpacity
             style={[styles.button, isLoading && styles.buttonDisabled]}
             onPress={handleSignIn}
-            disabled={isLoading}
+            disabled={isLoading || !email || !password}
             activeOpacity={0.8}
+            accessible={true}
+            accessibilityRole="button"
+            accessibilityLabel="Sign In"
+            accessibilityHint="Double tap to sign in with email and password"
           >
             {isLoading ? (
               <ActivityIndicator color={colors.ink} />
@@ -98,6 +113,10 @@ export default function SignInScreen() {
             onPress={handleEmulatorSignIn}
             disabled={isLoading}
             activeOpacity={0.8}
+            accessible={true}
+            accessibilityRole="button"
+            accessibilityLabel="Quick Login with Emulator User"
+            accessibilityHint="Double tap to log in instantly using local Firebase Auth emulator"
           >
             <Text style={styles.emulatorButtonText}>⚡ Quick Login with Emulator User</Text>
           </TouchableOpacity>
@@ -162,6 +181,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.glassEdge,
     borderRadius: 10,
+    minHeight: 48,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.md,
     color: colors.ink,
@@ -170,6 +190,7 @@ const styles = StyleSheet.create({
   button: {
     backgroundColor: colors.heatCore,
     borderRadius: 10,
+    minHeight: 48,
     paddingVertical: spacing.md,
     alignItems: "center",
     justifyContent: "center",
@@ -206,8 +227,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.glassEdge,
     borderRadius: 10,
+    minHeight: 48,
     paddingVertical: spacing.md,
     alignItems: "center",
+    justifyContent: "center",
   },
   emulatorButtonText: {
     ...typography.body,

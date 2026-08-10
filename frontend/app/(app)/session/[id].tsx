@@ -81,14 +81,18 @@ export default function SessionHandoffScreen() {
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
       <View style={styles.header}>
-        <Text style={styles.title}>Workout Handoff</Text>
-        <Text style={styles.subtitle}>
+        <Text style={styles.title} maxFontSizeMultiplier={1.5}>Workout Handoff</Text>
+        <Text style={styles.subtitle} maxFontSizeMultiplier={1.5}>
           Guided 3-step setup for your active workout session
         </Text>
       </View>
 
       {currentSession && (
-        <View style={styles.badgeCard}>
+        <View
+          style={styles.badgeCard}
+          accessible={true}
+          accessibilityLabel={`Selected activity: ${currentSession.activity_id}, duration: ${formatDurationLabel(currentSession.duration_seconds)}`}
+        >
           <Text style={styles.badgeText}>
             {currentSession.activity_id.toUpperCase()} • {formatDurationLabel(currentSession.duration_seconds)}
           </Text>
@@ -96,7 +100,11 @@ export default function SessionHandoffScreen() {
       )}
 
       {/* Step 1 Card: Tracker Handoff */}
-      <View style={[styles.stepCard, currentStep === 1 && styles.activeStepCard]}>
+      <View
+        style={[styles.stepCard, currentStep === 1 && styles.activeStepCard]}
+        accessible={true}
+        accessibilityLabel={`Step 1 of 3: Start Activity Tracker. ${currentStep > 1 ? 'Completed or skipped' : 'Active step'}`}
+      >
         <View style={styles.stepHeader}>
           <Text style={styles.stepNumber}>1</Text>
           <Text style={styles.stepTitle}>Start Activity Tracker</Text>
@@ -113,6 +121,10 @@ export default function SessionHandoffScreen() {
               style={styles.primaryButton}
               onPress={handleLaunchTracker}
               activeOpacity={0.8}
+              accessible={true}
+              accessibilityRole="button"
+              accessibilityLabel="Open Tracker App"
+              accessibilityHint="Launches your selected workout tracking app or displays guide"
             >
               <Text style={styles.buttonText}>Open Tracker</Text>
             </TouchableOpacity>
@@ -121,6 +133,10 @@ export default function SessionHandoffScreen() {
               style={styles.secondaryButton}
               onPress={skipTrackerStep}
               activeOpacity={0.8}
+              accessible={true}
+              accessibilityRole="button"
+              accessibilityLabel="Skip Tracker Step"
+              accessibilityHint="Proceed directly to launching media"
             >
               <Text style={styles.secondaryButtonText}>Skip Step</Text>
             </TouchableOpacity>
@@ -130,7 +146,11 @@ export default function SessionHandoffScreen() {
       </View>
 
       {/* Step 2 Card: Media Launch & Server Start */}
-      <View style={[styles.stepCard, currentStep === 2 && styles.activeStepCard]}>
+      <View
+        style={[styles.stepCard, currentStep === 2 && styles.activeStepCard]}
+        accessible={true}
+        accessibilityLabel={`Step 2 of 3: Launch Media and Start Session. ${currentStep > 2 ? 'Session Started' : currentStep === 2 ? 'Active step' : 'Pending'}`}
+      >
         <View style={styles.stepHeader}>
           <Text style={styles.stepNumber}>2</Text>
           <Text style={styles.stepTitle}>Launch Media & Start Session</Text>
@@ -142,7 +162,13 @@ export default function SessionHandoffScreen() {
         {mediaError && (
           <View style={styles.errorContainer}>
             <Text style={styles.errorText}>{mediaError}</Text>
-            <TouchableOpacity style={styles.retryButton} onPress={handleLaunchMedia}>
+            <TouchableOpacity
+              style={styles.retryButton}
+              onPress={handleLaunchMedia}
+              accessible={true}
+              accessibilityRole="button"
+              accessibilityLabel="Retry media launch"
+            >
               <Text style={styles.retryButtonText}>Retry</Text>
             </TouchableOpacity>
           </View>
@@ -154,6 +180,10 @@ export default function SessionHandoffScreen() {
             onPress={handleLaunchMedia}
             disabled={isLoading}
             activeOpacity={0.8}
+            accessible={true}
+            accessibilityRole="button"
+            accessibilityLabel="Launch Media and Start Workout Session"
+            accessibilityHint="Launches target media player app and starts session timestamp on server"
           >
             {isLoading ? (
               <ActivityIndicator color="#FFFFFF" />
@@ -166,7 +196,11 @@ export default function SessionHandoffScreen() {
       </View>
 
       {/* Step 3 Card: Session Target End Time */}
-      <View style={[styles.stepCard, currentStep === 3 && styles.activeStepCard]}>
+      <View
+        style={[styles.stepCard, currentStep === 3 && styles.activeStepCard]}
+        accessible={true}
+        accessibilityLabel={`Step 3 of 3: Session In Progress. ${currentStep === 3 ? `Target end time is ${formatTargetEndTime()}` : 'Pending step 2 completion'}`}
+      >
         <View style={styles.stepHeader}>
           <Text style={styles.stepNumber}>3</Text>
           <Text style={styles.stepTitle}>Session In Progress</Text>
@@ -183,6 +217,9 @@ export default function SessionHandoffScreen() {
               style={styles.doneButton}
               onPress={() => router.replace('/(app)')}
               activeOpacity={0.8}
+              accessible={true}
+              accessibilityRole="button"
+              accessibilityLabel="Return to Queue Screen"
             >
               <Text style={styles.buttonText}>Return to Queue</Text>
             </TouchableOpacity>
@@ -268,6 +305,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.heatCore,
     borderRadius: rounded.sm,
     justifyContent: 'center',
+    minHeight: 48,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
   },
@@ -282,6 +320,7 @@ const styles = StyleSheet.create({
     borderRadius: rounded.sm,
     borderWidth: 1,
     justifyContent: 'center',
+    minHeight: 48,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
   },
@@ -308,7 +347,9 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
     backgroundColor: colors.heatCore,
     borderRadius: rounded.sm,
-    paddingHorizontal: spacing.sm,
+    minHeight: 44,
+    justifyContent: 'center',
+    paddingHorizontal: spacing.md,
     paddingVertical: spacing.xs,
   },
   retryButtonText: {
@@ -336,10 +377,14 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   doneButton: {
+    alignItems: 'center',
     backgroundColor: colors.heatCore,
     borderRadius: rounded.sm,
+    justifyContent: 'center',
+    minHeight: 48,
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.sm,
+    width: '100%',
   },
   pendingText: {
     ...typography.body,
