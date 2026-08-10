@@ -58,7 +58,7 @@
       "name": "Frontend: Expo Start",
       "type": "node",
       "request": "launch",
-      "program": "${workspaceFolder}/frontend/node_modules/expo/bin/cli.js",
+      "program": "${workspaceFolder}/frontend/node_modules/expo/bin/cli",
       "args": [
         "start"
       ],
