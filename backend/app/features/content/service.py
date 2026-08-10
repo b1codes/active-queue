@@ -33,7 +33,7 @@ SYSTEM_PLAYLIST_IDS = ("WL", "LL", "HL")
 
 
 class ContentService:
-    """Business logic for content sources, ingestion, and matching per SPEC §5.2, §5.3, §8.2, §9.1, §9.2, §9.3, §9.4, & §9.6.
+    """Business logic for content sources, ingestion, and matching per SPEC §5.2, §5.3, §8.2, §8.3, §9.1, §9.2, §9.3, §9.4, & §9.6.
 
     Enforces business rules:
     - Max 5 sources per user (SOURCE_LIMIT_REACHED).
@@ -45,6 +45,7 @@ class ContentService:
     - Preflight change detection using itemCount and 7-day full walk force interval.
     - Stalled sync expiration (1 hour timeout).
     - Sync start throttling (15 mins), never throttling continuation chunks.
+    - Provider quota degradation (PROVIDER_QUOTA_EXCEEDED): sets status='quota_paused', retains cursor, feed remains 100% accessible.
     - Cursor-based feed pagination with server duration_label formatting.
     - total_unconsumed count aggregation on first page only (cursor is None).
     - Content-first activity matching with distinct rejection reasons (duration_out_of_range & no_matching_activity).
@@ -148,7 +149,7 @@ class ContentService:
         return saved_source
 
     async def sync_source_chunk(self, user_id: str, source_id: str) -> SyncResponse:
-        """Process one chunk (<= 5 pages / ~250 items) of resumable sync per SPEC §5.2 & §9.4."""
+        """Process one chunk (<= 5 pages / ~250 items) of resumable sync per SPEC §5.2, §8.3, & §9.4."""
         source = await self._source_repo.get_source(source_id)
         if not source or source.user_id != user_id:
             raise NotFoundError(
@@ -190,9 +191,24 @@ class ContentService:
 
             try:
                 meta = await provider_impl.get_playlist_metadata(source.external_source_id)
-            except (NotFoundError, ProviderError) as err:
-                source.status = "error"
-                source.error_message = str(err)
+            except ProviderError as err:
+                if err.code == "PROVIDER_QUOTA_EXCEEDED":
+                    logger.warning("provider_quota_exceeded_metadata", source_id=source_id)
+                    await self._source_repo.update_source(
+                        source.id,
+                        {
+                            "status": "quota_paused",
+                            "error_message": "YouTube API quota limit reached. Sync will resume when quota resets.",
+                            "updated_at": now,
+                        },
+                    )
+                else:
+                    await self._source_repo.update_source(
+                        source.id,
+                        {"status": "error", "error_message": str(err), "updated_at": now},
+                    )
+                raise
+            except NotFoundError as err:
                 await self._source_repo.update_source(
                     source.id,
                     {"status": "error", "error_message": str(err), "updated_at": now},
@@ -242,6 +258,30 @@ class ContentService:
                     page_token=current_token,
                     max_results=50,
                 )
+            except ProviderError as err:
+                if err.code == "PROVIDER_QUOTA_EXCEEDED":
+                    logger.warning(
+                        "provider_quota_exceeded_degraded",
+                        source_id=source_id,
+                        next_page_token=current_token,
+                    )
+                    # Quota exhaustion degrades sync gracefully per SPEC §8.3:
+                    # Retains next_page_token cursor intact and sets status to quota_paused
+                    await self._source_repo.update_source(
+                        source.id,
+                        {
+                            "status": "quota_paused",
+                            "error_message": "YouTube API quota limit reached. Sync will resume when quota resets.",
+                            "updated_at": now,
+                        },
+                    )
+                    raise
+                logger.error("sync_fetch_error", source_id=source_id, error=str(err))
+                await self._source_repo.update_source(
+                    source.id,
+                    {"status": "error", "error_message": str(err), "updated_at": now},
+                )
+                raise
             except Exception as err:
                 logger.error("sync_fetch_error", source_id=source_id, error=str(err))
                 await self._source_repo.update_source(
