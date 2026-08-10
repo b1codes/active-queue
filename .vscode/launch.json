@@ -60,7 +60,8 @@
       "request": "launch",
       "program": "${workspaceFolder}/frontend/node_modules/expo/bin/cli",
       "args": [
-        "start"
+        "start",
+        "--localhost"
       ],
       "cwd": "${workspaceFolder}/frontend",
       "console": "integratedTerminal"
