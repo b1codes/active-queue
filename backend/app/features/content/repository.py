@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Any
 
 import structlog
 from google.cloud.firestore import ArrayUnion
+from google.cloud.firestore_v1 import FieldFilter
 
 from app.core.errors import NotFoundError
 from app.features.content.models import ContentCacheItem, FeedItem, Source
@@ -158,8 +159,8 @@ class ContentRepository:
         """Compute total unconsumed feed items count using Firestore count() aggregation per SPEC §9.2."""
         query = (
             self._client.collection("feed_items")
-            .where(field_path="user_id", op_string="==", value=user_id)
-            .where(field_path="consumed", op_string="==", value=False)
+            .where(filter=FieldFilter("user_id", "==", user_id))
+            .where(filter=FieldFilter("consumed", "==", False))
         )
         count_query = query.count()
         results = await count_query.get()  # type: ignore[call-arg]
@@ -178,8 +179,8 @@ class ContentRepository:
         """Fetch paginated unconsumed feed items for user_id using cursor-based pagination."""
         query = (
             self._client.collection("feed_items")
-            .where(field_path="user_id", op_string="==", value=user_id)
-            .where(field_path="consumed", op_string="==", value=False)
+            .where(filter=FieldFilter("user_id", "==", user_id))
+            .where(filter=FieldFilter("consumed", "==", False))
             .order_by("published_at", direction="DESCENDING")
         )
 

@@ -87,10 +87,14 @@ def map_house_fields(
     return event_dict
 
 
-def configure_logging(debug: bool = False, log_level: str = "INFO") -> None:
-    """Configures structlog and standard library logging with JSONRenderer.
+def configure_logging(debug: bool = False, log_level: str = "INFO", env: str = "local") -> None:
+    """Configures structlog and standard library logging.
 
-    Outputs structured JSON to stdout with house fields and redaction processor.
+    Uses ConsoleRenderer (colored, human-readable) for local env.
+    Uses JSONRenderer for all other envs (dev, staging, prod).
+
+    Avoids double-encoding by using wrap_for_formatter / remove_processors_meta
+    per the recommended structlog + stdlib integration pattern.
     """
     level = logging.DEBUG if debug else getattr(logging, log_level.upper(), logging.INFO)
 
@@ -105,13 +109,22 @@ def configure_logging(debug: bool = False, log_level: str = "INFO") -> None:
         redact_sensitive_keys,
     ]
 
-    if debug:
-        renderer: structlog.types.Processor = structlog.dev.ConsoleRenderer()
-    else:
-        renderer = structlog.processors.JSONRenderer()
+    # ConsoleRenderer for local dev (pretty + colored); JSONRenderer elsewhere
+    use_console = debug or env == "local"
+    renderer: structlog.types.Processor = (
+        structlog.dev.ConsoleRenderer(colors=True)
+        if use_console
+        else structlog.processors.JSONRenderer()
+    )
 
+    # Use wrap_for_formatter so the renderer runs ONCE inside ProcessorFormatter.
+    # Without this, structlog renders to JSON, that JSON string becomes the stdlib
+    # LogRecord message, and ProcessorFormatter renders it again → double encoding.
     structlog.configure(
-        processors=[*shared_processors, renderer],
+        processors=[
+            *shared_processors,
+            structlog.stdlib.ProcessorFormatter.wrap_for_formatter,
+        ],
         logger_factory=structlog.stdlib.LoggerFactory(),
         wrapper_class=structlog.stdlib.BoundLogger,
         cache_logger_on_first_use=True,
@@ -119,7 +132,11 @@ def configure_logging(debug: bool = False, log_level: str = "INFO") -> None:
 
     formatter = structlog.stdlib.ProcessorFormatter(
         foreign_pre_chain=shared_processors,
-        processors=[renderer],
+        processors=[
+            # Strips internal structlog meta fields (_record, _from_structlog, etc.)
+            structlog.stdlib.ProcessorFormatter.remove_processors_meta,
+            renderer,
+        ],
     )
 
     handler = logging.StreamHandler(sys.stdout)
@@ -132,3 +149,4 @@ def configure_logging(debug: bool = False, log_level: str = "INFO") -> None:
     # Quiet external noisy loggers
     logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
     logging.getLogger("google.cloud").setLevel(logging.WARNING)
+    logging.getLogger("py.warnings").setLevel(logging.ERROR)

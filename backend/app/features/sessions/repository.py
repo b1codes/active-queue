@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Any
 
 import structlog
 from google.cloud.firestore import ArrayUnion
+from google.cloud.firestore_v1 import FieldFilter
 
 from app.core.errors import ConflictError, NotFoundError
 from app.features.sessions.models import Session
@@ -98,8 +99,8 @@ class SessionRepository:
 
         query = (
             self._client.collection("sessions")
-            .where(field_path="user_id", op_string="==", value=user_id)
-            .where(field_path="status", op_string="in", value=["pending", "in_progress"])
+            .where(filter=FieldFilter("user_id", "==", user_id))
+            .where(filter=FieldFilter("status", "in", ["pending", "in_progress"]))
             .limit(1)
         )
         snapshots = await query.get()
