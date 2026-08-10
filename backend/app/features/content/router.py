@@ -68,7 +68,7 @@ async def sync_source_chunk(
     return success_response(sync_resp.model_dump())
 
 
-# Feed endpoint
+# Feed endpoints
 @router.get(
     "/content/feed",
     status_code=status.HTTP_200_OK,
@@ -93,6 +93,23 @@ async def get_user_feed(
         max_duration=max_duration,
     )
     return success_response(feed_resp.model_dump())
+
+
+@router.post(
+    "/content/feed/{content_id}/hide",
+    status_code=status.HTTP_200_OK,
+    response_model=None,
+    summary="Manually hide feed item",
+    description="Mark feed item as consumed and update user consumed_content for media consumed outside a workout per SPEC §9.1 & §9.2.",
+)
+async def hide_feed_item(
+    content_id: str,
+    current_user: AuthenticatedUser = Depends(get_current_user),
+    service: ContentService = Depends(get_content_service),
+) -> SuccessEnvelope[dict[str, Any]]:
+    """POST /api/v1/content/feed/{content_id}/hide endpoint."""
+    res = await service.hide_feed_item(current_user.uid, content_id)
+    return success_response(res)
 
 
 # Content Matching endpoint

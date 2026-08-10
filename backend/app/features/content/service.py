@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import re
 from datetime import UTC, datetime
+from typing import Any
 
 import structlog
 
@@ -32,7 +33,7 @@ SYSTEM_PLAYLIST_IDS = ("WL", "LL", "HL")
 
 
 class ContentService:
-    """Business logic for content sources, ingestion, and matching per SPEC §5.2, §5.3, §8.2, §9.2, §9.3, §9.4, & §9.6.
+    """Business logic for content sources, ingestion, and matching per SPEC §5.2, §5.3, §8.2, §9.1, §9.2, §9.3, §9.4, & §9.6.
 
     Enforces business rules:
     - Max 5 sources per user (SOURCE_LIMIT_REACHED).
@@ -48,6 +49,7 @@ class ContentService:
     - total_unconsumed count aggregation on first page only (cursor is None).
     - Content-first activity matching with distinct rejection reasons (duration_out_of_range & no_matching_activity).
     - Time-first matching with asymmetric primary [B, B+300] and fallback [B-120, B) windows.
+    - Manual hide endpoint for feed items consumed outside a workout.
     """
 
     def __init__(
@@ -392,6 +394,16 @@ class ContentService:
             next_cursor=next_cursor,
             total_unconsumed=total_unconsumed,
         )
+
+    async def hide_feed_item(self, user_id: str, content_id: str) -> dict[str, Any]:
+        """Manually hide feed item per SPEC §9.1 & §9.2."""
+        if not self._content_repo:
+            raise NotFoundError(
+                code="CONTENT_NOT_FOUND",
+                message=f"Feed item '{content_id}' not found",
+            )
+        await self._content_repo.hide_feed_item(user_id, content_id)
+        return {"content_id": content_id, "hidden": True}
 
     async def match_content(self, content_id: str) -> ContentMatchResponse:
         """Match content duration against activity catalog with distinct rejection reasons per SPEC §5.2 & §9.6."""

@@ -16,6 +16,7 @@ interface QueueState {
   addSource: (urlOrId: string) => Promise<Source | null>;
   startResumableSync: (sourceId: string, itemEstimate?: number | null) => Promise<void>;
   cancelSync: () => void;
+  hideFeedItem: (contentId: string) => Promise<void>;
   clearErrors: () => void;
 }
 
@@ -172,6 +173,24 @@ export const useQueueStore = create<QueueState>((set, get) => ({
     set((state) => ({
       syncProgress: { ...state.syncProgress, isCancelled: true },
     }));
+  },
+
+  hideFeedItem: async (contentId: string) => {
+    // Optimistic update per SPEC §9.1 & §9.2
+    set((state) => ({
+      feedItems: state.feedItems.filter((item) => item.content_id !== contentId),
+      totalUnconsumed:
+        state.totalUnconsumed !== null ? Math.max(0, state.totalUnconsumed - 1) : null,
+    }));
+
+    try {
+      await apiClient(`/api/v1/content/feed/${encodeURIComponent(contentId)}/hide`, {
+        method: 'POST',
+      });
+    } catch {
+      // Re-sync feed on error
+      get().fetchFeed(true);
+    }
   },
 
   clearErrors: () => {

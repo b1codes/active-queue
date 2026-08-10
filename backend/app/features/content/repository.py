@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import base64
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
 import structlog
+from google.cloud.firestore import ArrayUnion
 
+from app.core.errors import NotFoundError
 from app.features.content.models import ContentCacheItem, FeedItem, Source
 
 if TYPE_CHECKING:
@@ -222,6 +224,30 @@ class ContentRepository:
         )
         snapshots = await query.get()
         return [FeedItem.from_firestore(snap.to_dict() or {}) for snap in snapshots]
+
+    async def hide_feed_item(self, user_id: str, content_id: str) -> None:
+        """Manually hide feed item by setting consumed = True and adding content_id to user consumed_content per SPEC §9.1 & §9.2."""
+        feed_doc_id = f"{user_id}_{content_id}"
+        feed_ref = self._client.collection("feed_items").document(feed_doc_id)
+        user_ref = self._client.collection("users").document(user_id)
+
+        feed_snap = await feed_ref.get()
+        if not feed_snap.exists:
+            raise NotFoundError(
+                code="CONTENT_NOT_FOUND",
+                message=f"Feed item '{content_id}' not found",
+            )
+
+        now = datetime.now(UTC)
+        batch = self._client.batch()
+        batch.update(feed_ref, {"consumed": True, "updated_at": now})
+        batch.update(
+            user_ref,
+            {"consumed_content": ArrayUnion([content_id]), "updated_at": now},
+        )
+
+        await batch.commit()
+        logger.info("feed_item_manually_hidden", user_id=user_id, content_id=content_id)
 
     async def mark_feed_item_consumed(self, user_id: str, content_id: str) -> None:
         """Mark feed item as consumed by setting consumed = True."""

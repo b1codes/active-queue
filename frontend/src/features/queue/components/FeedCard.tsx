@@ -1,6 +1,14 @@
 import React from 'react';
-import { Image, StyleSheet, Text, View } from 'react-native';
+import {
+  Alert,
+  Image,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import { colors, rounded, spacing, typography } from '../../../core/theme';
+import { useQueueStore } from '../queueStore';
 import { FeedItem } from '../types';
 
 interface FeedCardProps {
@@ -8,8 +16,46 @@ interface FeedCardProps {
 }
 
 export const FeedCard: React.FC<FeedCardProps> = ({ item }) => {
+  const hideFeedItem = useQueueStore((state) => state.hideFeedItem);
+
+  const handleHide = () => {
+    hideFeedItem(item.content_id);
+  };
+
+  const showOptions = () => {
+    Alert.alert(
+      item.title,
+      'Select an action for this queued content:',
+      [
+        {
+          text: 'Hide from Queue',
+          style: 'destructive',
+          onPress: handleHide,
+        },
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+      ],
+      { cancelable: true }
+    );
+  };
+
   return (
-    <View style={styles.card}>
+    <TouchableOpacity
+      style={styles.card}
+      onLongPress={showOptions}
+      activeOpacity={0.9}
+      accessible={true}
+      accessibilityLabel={`${item.title}, duration ${item.duration_label}, provider ${item.provider}`}
+      accessibilityHint="Double tap to view, long press to open options to hide from queue"
+      accessibilityActions={[{ name: 'hide', label: 'Hide from queue' }]}
+      onAccessibilityAction={(event) => {
+        if (event.nativeEvent.actionName === 'hide') {
+          handleHide();
+        }
+      }}
+    >
       {item.thumbnail_url ? (
         <Image source={{ uri: item.thumbnail_url }} style={styles.thumbnail} resizeMode="cover" />
       ) : (
@@ -23,14 +69,25 @@ export const FeedCard: React.FC<FeedCardProps> = ({ item }) => {
           <View style={styles.badge}>
             <Text style={styles.badgeText}>{item.provider.toUpperCase()}</Text>
           </View>
-          <Text style={styles.durationText}>{item.duration_label}</Text>
+
+          <View style={styles.headerRightRow}>
+            <Text style={styles.durationText}>{item.duration_label}</Text>
+            <TouchableOpacity
+              style={styles.moreButton}
+              onPress={showOptions}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              accessibilityLabel="Content options"
+            >
+              <Text style={styles.moreButtonText}>⋮</Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
         <Text style={styles.title} numberOfLines={2}>
           {item.title}
         </Text>
       </View>
-    </View>
+    </TouchableOpacity>
   );
 };
 
@@ -68,6 +125,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
   },
+  headerRightRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: spacing.xs,
+  },
   badge: {
     backgroundColor: colors.heatCore,
     borderRadius: rounded.xs,
@@ -82,6 +144,14 @@ const styles = StyleSheet.create({
   durationText: {
     ...typography.duration,
     color: colors.signalVerified,
+  },
+  moreButton: {
+    paddingHorizontal: spacing.xs,
+  },
+  moreButtonText: {
+    color: colors.inkSecondary,
+    fontSize: 16,
+    fontWeight: 'bold',
   },
   title: {
     ...typography.body,
