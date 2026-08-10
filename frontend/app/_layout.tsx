@@ -3,10 +3,12 @@ import { View, ActivityIndicator, StyleSheet } from "react-native";
 import { Stack, useRouter, useSegments } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { SafeAreaProvider } from "react-native-safe-area-context";
+import { Provider } from "react-redux";
+import { store } from "@/store";
 import { colors } from "@/core/theme";
 import { useAuthStore } from "@/features/auth/authStore";
 
-export default function RootLayout() {
+function AppNavigation() {
   const { initAuth, isAuthenticated, isLoading } = useAuthStore();
   const segments = useSegments();
   const router = useRouter();
@@ -53,6 +55,14 @@ export default function RootLayout() {
         <Stack.Screen name="(app)" options={{ headerShown: false }} />
       </Stack>
     </SafeAreaProvider>
+  );
+}
+
+export default function RootLayout() {
+  return (
+    <Provider store={store}>
+      <AppNavigation />
+    </Provider>
   );
 }
 

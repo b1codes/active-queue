@@ -1,18 +1,20 @@
-import { create } from 'zustand';
+import { store } from '@/store';
+import { useAppSelector } from '@/store/hooks';
 import { createSession, startSession, getActiveSession, Session, CreateSessionInput } from './sessionApi';
 import { launchTrackerApp } from './deepLinks';
+import {
+  setSessionState,
+  setSessionFromServer as setSessionFromServerAction,
+  skipTrackerStep as skipTrackerStepAction,
+  advanceStep as advanceStepAction,
+  clearSession as clearSessionAction,
+  SessionState,
+  ChecklistStep,
+} from './sessionSlice';
 
-export type ChecklistStep = 1 | 2 | 3;
+export type { ChecklistStep };
 
-interface SessionStoreState {
-  currentSession: Session | null;
-  currentStep: ChecklistStep;
-  isLoading: boolean;
-  error: string | null;
-  trackerError: string | null;
-  mediaError: string | null;
-
-  // Actions
+export interface SessionStoreActions {
   createNewSession: (input: CreateSessionInput) => Promise<Session | null>;
   startCurrentSession: (trackerId: string, externalId?: string) => Promise<boolean>;
   skipTrackerStep: () => void;
@@ -22,115 +24,129 @@ interface SessionStoreState {
   clearSession: () => void;
 }
 
-export const useSessionStore = create<SessionStoreState>((set, get) => ({
-  currentSession: null,
-  currentStep: 1,
-  isLoading: false,
-  error: null,
-  trackerError: null,
-  mediaError: null,
+export function setSessionFromServer(session: Session): void {
+  store.dispatch(setSessionFromServerAction(session));
+}
 
-  setSessionFromServer: (session: Session) => {
-    // Derive step from server state per SPEC §6.2
-    let derivedStep: ChecklistStep = 1;
-    if (session.status === 'in_progress' || session.checklist_completed) {
-      derivedStep = 3;
+export async function checkActiveSession(): Promise<Session | null> {
+  try {
+    const activeSession = await getActiveSession();
+    if (activeSession) {
+      setSessionFromServer(activeSession);
+    } else {
+      store.dispatch(setSessionState({ currentSession: null }));
     }
+    return activeSession;
+  } catch {
+    return null;
+  }
+}
 
-    set({
-      currentSession: session,
-      currentStep: derivedStep,
-      error: null,
-    });
-  },
-
-  checkActiveSession: async () => {
-    try {
-      const activeSession = await getActiveSession();
-      if (activeSession) {
-        get().setSessionFromServer(activeSession);
-      } else {
-        set({ currentSession: null });
-      }
-      return activeSession;
-    } catch {
-      return null;
-    }
-  },
-
-  createNewSession: async (input: CreateSessionInput) => {
-    set({ isLoading: true, error: null });
-    try {
-      const session = await createSession(input);
-      set({
+export async function createNewSession(input: CreateSessionInput): Promise<Session | null> {
+  store.dispatch(setSessionState({ isLoading: true, error: null }));
+  try {
+    const session = await createSession(input);
+    store.dispatch(
+      setSessionState({
         currentSession: session,
         currentStep: 1,
         isLoading: false,
         error: null,
-      });
-      return session;
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Failed to create session';
-      set({ isLoading: false, error: msg });
-      return null;
-    }
-  },
+      })
+    );
+    return session;
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : 'Failed to create session';
+    store.dispatch(setSessionState({ isLoading: false, error: msg }));
+    return null;
+  }
+}
 
-  skipTrackerStep: () => {
-    set({ currentStep: 2, trackerError: null });
-  },
+export function skipTrackerStep(): void {
+  store.dispatch(skipTrackerStepAction());
+}
 
-  advanceStep: () => {
-    const { currentStep } = get();
-    if (currentStep < 3) {
-      set({ currentStep: (currentStep + 1) as ChecklistStep });
-    }
-  },
+export function advanceStep(): void {
+  store.dispatch(advanceStepAction());
+}
 
-  startCurrentSession: async (mediaProvider: string, externalId?: string) => {
-    const { currentSession } = get();
-    if (!currentSession) return false;
+export async function startCurrentSession(
+  mediaProvider: string,
+  externalId?: string
+): Promise<boolean> {
+  const { currentSession } = store.getState().session;
+  if (!currentSession) return false;
 
-    set({ isLoading: true, mediaError: null });
+  store.dispatch(setSessionState({ isLoading: true, mediaError: null }));
 
-    try {
-      // 1. Call server POST /sessions/{id}/start per SPEC §6.2 & §9.5
-      const updatedSession = await startSession(currentSession.id);
+  try {
+    // 1. Call server POST /sessions/{id}/start per SPEC §6.2 & §9.5
+    const updatedSession = await startSession(currentSession.id);
 
-      // 2. Launch media app via deepLinks utility
-      const launchRes = await launchTrackerApp(mediaProvider, externalId);
+    // 2. Launch media app via deepLinks utility
+    const launchRes = await launchTrackerApp(mediaProvider, externalId);
 
-      if (!launchRes.success) {
-        // Do NOT transition session state on launch failure per subtask instruction
-        set({
+    if (!launchRes.success) {
+      // Do NOT transition session state on launch failure per subtask instruction
+      store.dispatch(
+        setSessionState({
           isLoading: false,
           mediaError: launchRes.error || 'Failed to launch media app. Please open manually.',
-        });
-        return false;
-      }
+        })
+      );
+      return false;
+    }
 
-      set({
+    store.dispatch(
+      setSessionState({
         currentSession: updatedSession,
         currentStep: 3,
         isLoading: false,
         mediaError: null,
-      });
-      return true;
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Failed to start session';
-      set({ isLoading: false, mediaError: msg });
-      return false;
-    }
-  },
+      })
+    );
+    return true;
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : 'Failed to start session';
+    store.dispatch(setSessionState({ isLoading: false, mediaError: msg }));
+    return false;
+  }
+}
 
-  clearSession: () => {
-    set({
-      currentSession: null,
-      currentStep: 1,
-      isLoading: false,
-      error: null,
-      trackerError: null,
-      mediaError: null,
-    });
-  },
-}));
+export function clearSession(): void {
+  store.dispatch(clearSessionAction());
+}
+
+const actions: SessionStoreActions = {
+  createNewSession,
+  startCurrentSession,
+  skipTrackerStep,
+  advanceStep,
+  setSessionFromServer,
+  checkActiveSession,
+  clearSession,
+};
+
+export function useSessionStore<T = SessionState & SessionStoreActions>(
+  selector?: (state: SessionState & SessionStoreActions) => T
+): T {
+  const sessionState = useAppSelector((state) => state.session);
+  const combined = { ...sessionState, ...actions };
+
+  if (selector) {
+    return selector(combined as SessionState & SessionStoreActions);
+  }
+
+  return combined as unknown as T;
+}
+
+useSessionStore.getState = (): SessionState & SessionStoreActions => {
+  return {
+    ...store.getState().session,
+    ...actions,
+  };
+};
+
+useSessionStore.setState = (partialState: Partial<SessionState>): void => {
+  store.dispatch(setSessionState(partialState));
+};
