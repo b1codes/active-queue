@@ -33,7 +33,7 @@ services:
       --export-on-exit /workspace/.firebase-data
     ports:
       - "9099:9099"   # Firebase Auth emulator
-      - "8081:8081"   # Firestore emulator
+      - "9090:9090"   # Firestore emulator
       - "4000:4000"   # Emulator Suite UI → http://localhost:4000
     healthcheck:
       test: ["CMD", "curl", "-sf", "http://localhost:4000"]

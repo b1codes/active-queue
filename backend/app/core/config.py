@@ -13,7 +13,7 @@ class Settings(BaseSettings):
 
     env: Literal["local", "dev", "staging", "prod"] = "local"
     gcp_project_id: str = "activequeue-local"
-    firestore_emulator_host: str | None = "localhost:8081"
+    firestore_emulator_host: str | None = "localhost:9090"
     firebase_auth_emulator_host: str | None = "localhost:9099"
     content_provider: Literal["fixture", "youtube"] = "fixture"
     youtube_api_key: str | None = None

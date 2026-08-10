@@ -10,11 +10,11 @@ def test_settings_default_local_env() -> None:
     """Settings default to local environment with emulator hosts set."""
     s = Settings(
         env="local",
-        firestore_emulator_host="localhost:8081",
+        firestore_emulator_host="localhost:9090",
         firebase_auth_emulator_host="localhost:9099",
     )
     assert s.env == "local"
-    assert s.firestore_emulator_host == "localhost:8081"
+    assert s.firestore_emulator_host == "localhost:9090"
     assert s.firebase_auth_emulator_host == "localhost:9099"
     assert s.gcp_project_id == "activequeue-local"
 
@@ -26,7 +26,7 @@ def test_settings_prod_disallows_firestore_emulator() -> None:
     ):
         Settings(
             env="prod",
-            firestore_emulator_host="localhost:8081",
+            firestore_emulator_host="localhost:9090",
             firebase_auth_emulator_host=None,
         )
 

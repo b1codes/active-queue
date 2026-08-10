@@ -25,13 +25,13 @@ async def test_init_firestore_sets_emulator_env_vars(
     """init_firestore wires emulator host environment variables and initializes client."""
     s = Settings(
         env="local",
-        firestore_emulator_host="localhost:8081",
+        firestore_emulator_host="localhost:9090",
         firebase_auth_emulator_host="localhost:9099",
     )
 
     try:
         await init_firestore(s)
-        assert os.environ.get("FIRESTORE_EMULATOR_HOST") == "localhost:8081"
+        assert os.environ.get("FIRESTORE_EMULATOR_HOST") == "localhost:9090"
         assert os.environ.get("FIREBASE_AUTH_EMULATOR_HOST") == "localhost:9099"
         client = get_firestore_client()
         assert client is not None
