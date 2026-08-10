@@ -13,6 +13,7 @@ if TYPE_CHECKING:
 
 
 def get_db() -> Generator[AsyncClient, None, None]:
+    """FastAPI dependency yielding Firestore AsyncClient."""
     yield get_firestore_client()
 
 

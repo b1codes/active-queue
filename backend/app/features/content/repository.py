@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import structlog
 
-from app.features.content.models import ContentCacheItem, FeedItem
+from app.features.content.models import ContentCacheItem, FeedItem, Source
 
 if TYPE_CHECKING:
     from google.cloud.firestore import AsyncClient
@@ -12,12 +12,69 @@ if TYPE_CHECKING:
 logger = structlog.get_logger(__name__)
 
 
-class ContentRepository:
-    """Firestore repository for content_cache and feed_items collections per SPEC §4.6 & §4.7.
+class SourceRepository:
+    """Firestore repository for sources collection per SPEC §4.5."""
 
-    - content_cache/{contentId} is shared across all users (immutable metadata per item).
-    - feed_items/{userId}_{contentId} uses deterministic composite doc IDs for sync idempotency.
-    """
+    def __init__(self, client: AsyncClient) -> None:
+        self._client = client
+
+    async def create_source(self, source: Source) -> Source:
+        """Create a source document in sources collection."""
+        doc_ref = self._client.collection("sources").document(source.id)
+        await doc_ref.set(source.to_firestore())
+        logger.info("source_created", source_id=source.id, user_id=source.user_id)
+        return source
+
+    async def get_source(self, source_id: str) -> Source | None:
+        """Fetch a source by document ID."""
+        doc_ref = self._client.collection("sources").document(source_id)
+        snapshot = await doc_ref.get()
+        if not snapshot.exists:
+            return None
+        data = snapshot.to_dict() or {}
+        return Source.from_firestore(data)
+
+    async def get_user_sources(self, user_id: str) -> list[Source]:
+        """Fetch all active/syncing sources for a user."""
+        query = (
+            self._client.collection("sources")
+            .where(field_path="user_id", op_string="==", value=user_id)
+            .order_by("updated_at", direction="DESCENDING")
+        )
+        snapshots = await query.get()
+        return [Source.from_firestore(snap.to_dict() or {}) for snap in snapshots]
+
+    async def get_user_source_by_external_id(
+        self, user_id: str, provider: str, external_source_id: str
+    ) -> Source | None:
+        """Check if user has already added a source by provider + external_source_id."""
+        query = (
+            self._client.collection("sources")
+            .where(field_path="user_id", op_string="==", value=user_id)
+            .where(field_path="provider", op_string="==", value=provider)
+            .where(field_path="external_source_id", op_string="==", value=external_source_id)
+            .limit(1)
+        )
+        snapshots = await query.get()
+        if not snapshots:
+            return None
+        return Source.from_firestore(snapshots[0].to_dict() or {})
+
+    async def update_source(self, source_id: str, updates: dict[str, Any]) -> None:
+        """Update fields on a source document."""
+        doc_ref = self._client.collection("sources").document(source_id)
+        await doc_ref.update(updates)
+        logger.info("source_updated", source_id=source_id, fields=list(updates.keys()))
+
+    async def delete_source(self, source_id: str) -> None:
+        """Delete a source document from sources collection."""
+        doc_ref = self._client.collection("sources").document(source_id)
+        await doc_ref.delete()
+        logger.info("source_deleted", source_id=source_id)
+
+
+class ContentRepository:
+    """Firestore repository for content_cache and feed_items collections per SPEC §4.6 & §4.7."""
 
     def __init__(self, client: AsyncClient) -> None:
         self._client = client
@@ -37,7 +94,6 @@ class ContentRepository:
             return {}
 
         results: dict[str, ContentCacheItem] = {}
-        # Firestore getAll / doc refs
         refs = [self._client.collection("content_cache").document(cid) for cid in content_ids]
         async for snap in self._client.get_all(refs):
             if snap.exists:
@@ -52,7 +108,6 @@ class ContentRepository:
         if not items:
             return
 
-        # Split into chunks of 450 to stay well under Firestore's 500 write limit
         chunk_size = 450
         for i in range(0, len(items), chunk_size):
             chunk = items[i : i + chunk_size]
@@ -91,10 +146,7 @@ class ContentRepository:
         min_duration: int | None = None,
         max_duration: int | None = None,
     ) -> list[FeedItem]:
-        """Fetch unconsumed feed items for user_id with optional duration filtering.
-
-        Uses composite index: (user_id ASC, consumed ASC, published_at DESC).
-        """
+        """Fetch unconsumed feed items for user_id with optional duration filtering."""
         query = (
             self._client.collection("feed_items")
             .where(field_path="user_id", op_string="==", value=user_id)
@@ -109,7 +161,6 @@ class ContentRepository:
             data = snap.to_dict() or {}
             item = FeedItem.from_firestore(data)
 
-            # Apply in-memory duration filters if specified
             if min_duration is not None and item.duration_seconds < min_duration:
                 continue
             if max_duration is not None and item.duration_seconds > max_duration:

@@ -6,6 +6,64 @@ from typing import Any
 from pydantic import BaseModel, Field
 
 
+class Source(BaseModel):
+    """Domain model for sources/{sourceId} Firestore document shape per SPEC §4.5 & §9.3."""
+
+    id: str  # "{user_id}_{provider}_{external_source_id}"
+    user_id: str
+    provider: str  # "youtube" | "fixture"
+    external_source_id: str
+    title: str
+    description: str | None = None
+    item_count: int | None = None
+    thumbnail_url: str | None = None
+    status: str = "active"  # "active" | "syncing" | "error" | "disabled"
+    last_sync_at: datetime | None = None
+    next_page_token: str | None = None
+    error_message: str | None = None
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+
+    def to_firestore(self) -> dict[str, Any]:
+        """Convert model to Firestore document dict."""
+        return {
+            "id": self.id,
+            "user_id": self.user_id,
+            "provider": self.provider,
+            "external_source_id": self.external_source_id,
+            "title": self.title,
+            "description": self.description,
+            "item_count": self.item_count,
+            "thumbnail_url": self.thumbnail_url,
+            "status": self.status,
+            "last_sync_at": self.last_sync_at,
+            "next_page_token": self.next_page_token,
+            "error_message": self.error_message,
+            "created_at": self.created_at,
+            "updated_at": self.updated_at,
+        }
+
+    @classmethod
+    def from_firestore(cls, data: dict[str, Any]) -> Source:
+        """Construct model from Firestore document dict."""
+        return cls(
+            id=data.get("id", ""),
+            user_id=data.get("user_id", ""),
+            provider=data.get("provider", "fixture"),
+            external_source_id=data.get("external_source_id", ""),
+            title=data.get("title", ""),
+            description=data.get("description"),
+            item_count=data.get("item_count"),
+            thumbnail_url=data.get("thumbnail_url"),
+            status=data.get("status", "active"),
+            last_sync_at=data.get("last_sync_at"),
+            next_page_token=data.get("next_page_token"),
+            error_message=data.get("error_message"),
+            created_at=data.get("created_at") or datetime.now(UTC),
+            updated_at=data.get("updated_at") or datetime.now(UTC),
+        )
+
+
 class ContentCacheItem(BaseModel):
     """Shared content cache document model for content_cache/{contentId} per SPEC §4.6.
 

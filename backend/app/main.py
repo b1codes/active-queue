@@ -11,6 +11,7 @@ from app.core.config import settings
 from app.core.firestore import close_firestore, init_firestore
 from app.core.logging import configure_logging
 from app.core.security import init_firebase_admin
+from app.features.content.router import router as content_router
 from app.features.health.router import router as health_router
 from app.features.users.router import router as users_router
 from app.middleware.errors import (
@@ -53,6 +54,6 @@ app.include_router(health_router)
 
 # Feature routers under /api/v1
 app.include_router(users_router, prefix="/api/v1")
-# app.include_router(content_router, prefix="/api/v1")
+app.include_router(content_router, prefix="/api/v1")
 # app.include_router(sessions_router, prefix="/api/v1")
 # app.include_router(activities_router, prefix="/api/v1")
