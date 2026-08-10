@@ -38,6 +38,12 @@ variable "content_provider" {
   default     = "youtube"
 }
 
+variable "custom_auth_domain" {
+  type        = string
+  description = "Shared custom auth domain for Sign in with Apple and Google per house standard 007 §2"
+  default     = "auth.activequeue.app"
+}
+
 variable "google_oauth_client_id" {
   type        = string
   description = "Environment-specific Google OAuth Client ID"

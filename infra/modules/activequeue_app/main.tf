@@ -129,7 +129,7 @@ resource "google_cloud_run_v2_service" "api_service" {
   }
 }
 
-# Identity Platform Configuration per SPEC §10.5
+# Identity Platform Configuration per SPEC §10.5 & house standard 007 §2
 resource "google_identity_platform_config" "ic_config" {
   project = var.gcp_project_id
 
@@ -144,6 +144,7 @@ resource "google_identity_platform_config" "ic_config" {
 
   authorized_domains = [
     "localhost",
+    var.custom_auth_domain,
     "activequeue.app",
     "${var.gcp_project_id}.firebaseapp.com",
   ]
