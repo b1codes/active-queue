@@ -35,6 +35,22 @@ def get_content_service(db: AsyncClient = Depends(get_db)) -> ContentService:
 
 
 # Sources endpoints
+@router.get(
+    "/sources",
+    status_code=status.HTTP_200_OK,
+    response_model=None,
+    summary="List content sources",
+    description="Fetch all content sources registered by authenticated user per SPEC §9.1 & §9.3.",
+)
+async def get_user_sources(
+    current_user: AuthenticatedUser = Depends(get_current_user),
+    service: ContentService = Depends(get_content_service),
+) -> SuccessEnvelope[dict[str, Any]]:
+    """GET /api/v1/sources list endpoint."""
+    sources_resp = await service.get_user_sources(current_user.uid)
+    return success_response(sources_resp.model_dump())
+
+
 @router.post(
     "/sources",
     status_code=status.HTTP_201_CREATED,
@@ -50,6 +66,24 @@ async def create_source(
     """Add content source endpoint."""
     source = await service.add_source(current_user.uid, body.url_or_id)
     return success_response(SourceSchema.from_domain(source).model_dump())
+
+
+@router.delete(
+    "/sources/{source_id}",
+    status_code=status.HTTP_200_OK,
+    response_model=None,
+    summary="Remove a content source",
+    description="Remove a content source for authenticated user per SPEC §9.1.",
+)
+async def delete_source(
+    source_id: str = Path(..., min_length=1, max_length=200, pattern=r"^[a-zA-Z0-9_\-\.:/]+$"),
+    current_user: AuthenticatedUser = Depends(get_current_user),
+    service: ContentService = Depends(get_content_service),
+) -> SuccessEnvelope[dict[str, Any]]:
+    """DELETE /api/v1/sources/{source_id} endpoint."""
+    res = await service.delete_source(current_user.uid, source_id)
+    return success_response(res)
+
 
 
 @router.post(

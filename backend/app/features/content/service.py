@@ -148,7 +148,25 @@ class ContentService:
         )
         return saved_source
 
+    async def get_user_sources(self, user_id: str) -> SourceListResponse:
+        """Fetch all content sources for user_id with multi-user isolation per SPEC §9.1."""
+        sources = await self._source_repo.get_user_sources(user_id)
+        items = [SourceSchema.from_domain(s) for s in sources]
+        return SourceListResponse(items=items)
+
+    async def delete_source(self, user_id: str, source_id: str) -> dict[str, Any]:
+        """Delete a content source for user_id per SPEC §9.1 with multi-user isolation."""
+        source = await self._source_repo.get_source(source_id)
+        if not source or source.user_id != user_id:
+            raise NotFoundError(
+                code="SOURCE_NOT_FOUND",
+                message=f"Source '{source_id}' not found",
+            )
+        await self._source_repo.delete_source(source_id)
+        return {"source_id": source_id, "deleted": True}
+
     async def sync_source_chunk(self, user_id: str, source_id: str) -> SyncResponse:
+
         """Process one chunk (<= 5 pages / ~250 items) of resumable sync per SPEC §5.2, §8.3, & §9.4."""
         source = await self._source_repo.get_source(source_id)
         if not source or source.user_id != user_id:

@@ -46,8 +46,10 @@ class SessionRepository:
         logger.info("session_created", session_id=session.id, user_id=session.user_id)
         return session
 
-    async def get_session(self, session_id: str, now: datetime | None = None) -> Session | None:
-        """Fetch a session document by ID with lazy abandonment check per SPEC §7.2."""
+    async def get_session(
+        self, session_id: str, user_id: str | None = None, now: datetime | None = None
+    ) -> Session | None:
+        """Fetch a session document by ID with multi-user user_id validation and lazy abandonment check per SPEC §7.2."""
         if now is None:
             now = datetime.now(UTC)
 
@@ -58,6 +60,10 @@ class SessionRepository:
 
         data = snapshot.to_dict() or {}
         session = Session.from_firestore(data)
+
+        if user_id is not None and session.user_id != user_id:
+            return None
+
 
         # Lazy abandonment evaluation per SPEC §7.2
         if session.status in ("pending", "in_progress"):
