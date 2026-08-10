@@ -11,7 +11,7 @@ YELLOW  := \033[33m
 RESET   := \033[0m
 
 .PHONY: help install install-backend install-frontend \
-        dev-backend dev-frontend dev-web \
+        dev dev-backend dev-frontend dev-web \
         test test-backend test-frontend \
         lint lint-backend lint-frontend \
         typecheck typecheck-backend typecheck-frontend \
@@ -27,6 +27,7 @@ help:
 	@echo "  $(GREEN)install-backend$(RESET)   Install backend dependencies via uv"
 	@echo "  $(GREEN)install-frontend$(RESET)  Install frontend dependencies via pnpm"
 	@echo ""
+	@echo "  $(GREEN)dev$(RESET)               Start full stack (FastAPI backend + Expo frontend)"
 	@echo "  $(GREEN)dev-backend$(RESET)       Start FastAPI backend server on port 8080"
 	@echo "  $(GREEN)dev-frontend$(RESET)      Start Expo frontend Metro server"
 	@echo "  $(GREEN)dev-web$(RESET)           Start Expo frontend Web server"
@@ -67,15 +68,23 @@ install-frontend:
 # DEVELOPMENT SERVERS
 # ==============================================================================
 
+## dev: Run FastAPI backend and Expo frontend concurrently
+dev:
+	@echo "$(BLUE)Starting FastAPI backend (port 8080) & Expo frontend (--localhost)...$(RESET)"
+	@trap 'kill 0' INT TERM EXIT; \
+	(cd backend && uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8080) & \
+	(cd frontend && pnpm start -- --localhost) & \
+	wait
+
 ## dev-backend: Run FastAPI backend with Uvicorn auto-reload
 dev-backend:
 	@echo "$(BLUE)Starting FastAPI backend server on http://localhost:8080...$(RESET)"
 	cd backend && uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8080
 
-## dev-frontend: Run Expo frontend Metro server
+## dev-frontend: Run Expo frontend Metro server in localhost mode
 dev-frontend:
-	@echo "$(BLUE)Starting Expo frontend server...$(RESET)"
-	cd frontend && pnpm start
+	@echo "$(BLUE)Starting Expo frontend server (--localhost)...$(RESET)"
+	cd frontend && pnpm start -- --localhost
 
 ## dev-web: Run Expo frontend Web server
 dev-web:
