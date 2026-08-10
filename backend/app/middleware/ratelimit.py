@@ -31,9 +31,9 @@ LIMIT_HEAVY = settings.rate_limit_heavy  # 30 req/min default on heavy/write end
 # Role limit multipliers per user tier
 ROLE_LIMIT_MULTIPLIERS: dict[str, float] = {
     "anonymous": 0.5,  # Unauthenticated IP requests (30 general, 5 sync, 15 heavy)
-    "user": 1.0,       # Standard authenticated user (60 general, 10 sync, 30 heavy)
-    "premium": 2.0,    # Premium tier user (120 general, 20 sync, 60 heavy)
-    "admin": 3.0,      # Admin tier user (180 general, 30 sync, 90 heavy)
+    "user": 1.0,  # Standard authenticated user (60 general, 10 sync, 30 heavy)
+    "premium": 2.0,  # Premium tier user (120 general, 20 sync, 60 heavy)
+    "admin": 3.0,  # Admin tier user (180 general, 30 sync, 90 heavy)
 }
 
 
@@ -43,7 +43,9 @@ def _get_endpoint_category(method: str, path: str) -> str:
         return "health"
     if method == "POST" and path.endswith("/sync"):
         return "sync"
-    if (method in ("POST", "PUT", "DELETE") and ("/sources" in path or "/sessions" in path)) or path.endswith("/match"):
+    if (
+        method in ("POST", "PUT", "DELETE") and ("/sources" in path or "/sessions" in path)
+    ) or path.endswith("/match"):
         return "heavy"
     return "general"
 
@@ -69,7 +71,9 @@ def _extract_identity(request: Request) -> tuple[str, str]:
                     payload_bytes = base64.urlsafe_b64decode(payload_b64)
                     claims = json.loads(payload_bytes)
                     if isinstance(claims, dict):
-                        extracted_uid = claims.get("uid") or claims.get("user_id") or claims.get("sub")
+                        extracted_uid = (
+                            claims.get("uid") or claims.get("user_id") or claims.get("sub")
+                        )
                         if extracted_uid and isinstance(extracted_uid, str):
                             uid = extracted_uid
                         if not role and claims.get("role") and isinstance(claims.get("role"), str):
@@ -136,7 +140,11 @@ class FixedWindowRateLimiter:
             base_limit = (
                 settings.rate_limit_sync
                 if category == "sync"
-                else (settings.rate_limit_heavy if category == "heavy" else settings.rate_limit_general)
+                else (
+                    settings.rate_limit_heavy
+                    if category == "heavy"
+                    else settings.rate_limit_general
+                )
             )
             multiplier = ROLE_LIMIT_MULTIPLIERS.get(role, 1.0)
             limit = max(1, int(base_limit * multiplier))
@@ -172,7 +180,6 @@ class FixedWindowRateLimiter:
         self._last_cleanup = time.time()
 
 
-
 # Singleton limiter instance
 _limiter = FixedWindowRateLimiter()
 
@@ -200,7 +207,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
             return await call_next(request)
 
         identifier, role = _extract_identity(request)
-        is_sync_endpoint = (category == "sync")
+        is_sync_endpoint = category == "sync"
 
         allowed, limit, remaining, reset_seconds = _limiter.check_and_increment(
             identifier=identifier,

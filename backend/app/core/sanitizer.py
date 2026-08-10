@@ -48,7 +48,6 @@ def sanitize_text(text: str | None, max_length: int | None = None) -> str | None
     return cleaned.strip()
 
 
-
 def sanitize_url(url: str | None, max_length: int = 2048) -> str | None:
     """Validate and sanitize URL input. Only http and https schemes are permitted."""
     if url is None:
@@ -112,4 +111,3 @@ def sanitize_string_list(
                 break
 
     return result
-

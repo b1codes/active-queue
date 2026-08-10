@@ -25,7 +25,10 @@ class CreateSessionRequest(BaseModel):
         None, max_length=200, description="Namespaced content ID if matched from content"
     )
     target_duration_seconds: int | None = Field(
-        None, ge=300, le=86400, description="Target duration in seconds for bare time-first sessions"
+        None,
+        ge=300,
+        le=86400,
+        description="Target duration in seconds for bare time-first sessions",
     )
 
     @field_validator("activity_id")
@@ -68,7 +71,6 @@ class CompleteSessionRequest(BaseModel):
         if v is None:
             return None
         return sanitize_identifier(v, max_length=100)
-
 
 
 class SessionSchema(BaseModel):

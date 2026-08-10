@@ -65,7 +65,6 @@ class SessionRepository:
         if user_id is not None and session.user_id != user_id:
             return None
 
-
         # Lazy abandonment evaluation per SPEC §7.2
         if session.status in ("pending", "in_progress"):
             cutoff = session.created_at + timedelta(

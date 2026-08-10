@@ -61,7 +61,6 @@ async def test_update_preferences_out_of_range_time_block_returns_400(
 async def test_create_session_invalid_activity_id_returns_400(
     mock_firestore_client: MagicMock,
 ) -> None:
-
     """POST /api/v1/sessions with control chars in activity_id returns 400."""
     mock_decoded = {"uid": "test_user_val_3", "email": "test@example.com"}
 

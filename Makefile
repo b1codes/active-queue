@@ -13,6 +13,7 @@ RESET   := \033[0m
 .PHONY: help install install-backend install-frontend \
         local dev dev-backend dev-frontend dev-web dev-emulators \
         docker-up docker-down docker-build emulators emulators-stop \
+        seed-db seed \
         test test-backend test-frontend \
         lint lint-backend lint-frontend \
         typecheck typecheck-backend typecheck-frontend \
@@ -39,6 +40,8 @@ help:
 	@echo "  $(GREEN)docker-build$(RESET)      Rebuild Docker images for local services"
 	@echo "  $(GREEN)emulators$(RESET)         Alias for docker-up"
 	@echo "  $(GREEN)emulators-stop$(RESET)    Alias for docker-down"
+	@echo "  $(GREEN)seed-db$(RESET)         Seed local Firestore and Auth emulators with mock test data"
+	@echo "  $(GREEN)seed$(RESET)            Alias for seed-db"
 	@echo ""
 	@echo "  $(GREEN)test$(RESET)              Run all unit tests (backend + frontend)"
 	@echo "  $(GREEN)test-backend$(RESET)      Run pytest suite with coverage in backend"
@@ -140,6 +143,18 @@ dev-emulators: local
 dev-web:
 	@echo "$(BLUE)Starting Expo Web frontend server...$(RESET)"
 	cd frontend && pnpm web
+
+# ==============================================================================
+# DATABASE SEEDING
+# ==============================================================================
+
+## seed-db: Seed local Firestore and Auth emulators with test data
+seed-db:
+	@echo "$(BLUE)Seeding local database with test data...$(RESET)"
+	cd backend && uv run python -m app.cli.seed
+
+## seed: Alias for seed-db
+seed: seed-db
 
 # ==============================================================================
 # TESTING

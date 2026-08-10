@@ -83,4 +83,3 @@ class UpdatePreferencesRequest(BaseModel):
         if v is None:
             return None
         return sanitize_text(v, max_length=50) or None
-

@@ -79,17 +79,23 @@ def test_rate_limiter_role_multipliers() -> None:
     now = 1000.0
 
     # Anonymous IP (general limit 30)
-    allowed, limit, _, _ = limiter.check_and_increment("ip:1.2.3.4", role="anonymous", category="general", now=now)
+    allowed, limit, _, _ = limiter.check_and_increment(
+        "ip:1.2.3.4", role="anonymous", category="general", now=now
+    )
     assert allowed is True
     assert limit == 30
 
     # Premium user (general limit 120)
-    allowed, limit, _, _ = limiter.check_and_increment("uid:prem_1", role="premium", category="general", now=now)
+    allowed, limit, _, _ = limiter.check_and_increment(
+        "uid:prem_1", role="premium", category="general", now=now
+    )
     assert allowed is True
     assert limit == 120
 
     # Admin user (general limit 180)
-    allowed, limit, _, _ = limiter.check_and_increment("uid:admin_1", role="admin", category="general", now=now)
+    allowed, limit, _, _ = limiter.check_and_increment(
+        "uid:admin_1", role="admin", category="general", now=now
+    )
     assert allowed is True
     assert limit == 180
 
@@ -101,12 +107,15 @@ def test_rate_limiter_heavy_endpoint_category() -> None:
 
     # Standard user on heavy category (30 limit)
     for _ in range(30):
-        allowed, limit, _, _ = limiter.check_and_increment("uid:heavy_user", role="user", category="heavy", now=now)
+        allowed, limit, _, _ = limiter.check_and_increment(
+            "uid:heavy_user", role="user", category="heavy", now=now
+        )
         assert allowed is True
         assert limit == 30
 
-    allowed, limit, remaining, _ = limiter.check_and_increment("uid:heavy_user", role="user", category="heavy", now=now)
+    allowed, limit, remaining, _ = limiter.check_and_increment(
+        "uid:heavy_user", role="user", category="heavy", now=now
+    )
     assert allowed is False
     assert limit == 30
     assert remaining == 0
-

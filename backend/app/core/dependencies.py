@@ -29,4 +29,3 @@ class PaginationParams(BaseModel):
         if v is None:
             return None
         return sanitize_identifier(v, max_length=200)
-

@@ -48,4 +48,3 @@ def reset_rate_limiter() -> None:
     from app.middleware.ratelimit import _limiter
 
     _limiter.reset()
-

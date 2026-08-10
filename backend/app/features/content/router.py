@@ -4,7 +4,6 @@ from typing import TYPE_CHECKING, Any
 
 from fastapi import APIRouter, Depends, Path, Query, status
 
-
 from app.core.dependencies import get_db
 from app.core.envelopes import SuccessEnvelope, success_response
 from app.core.security import AuthenticatedUser, get_current_user
@@ -83,7 +82,6 @@ async def delete_source(
     """DELETE /api/v1/sources/{source_id} endpoint."""
     res = await service.delete_source(current_user.uid, source_id)
     return success_response(res)
-
 
 
 @router.post(

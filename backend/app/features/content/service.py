@@ -19,6 +19,8 @@ from app.features.content.schemas import (
     ContentMatchResponse,
     FeedItemSchema,
     FeedResponse,
+    SourceListResponse,
+    SourceSchema,
     SyncResponse,
     TimeMatchResponse,
     format_duration_label,
@@ -166,7 +168,6 @@ class ContentService:
         return {"source_id": source_id, "deleted": True}
 
     async def sync_source_chunk(self, user_id: str, source_id: str) -> SyncResponse:
-
         """Process one chunk (<= 5 pages / ~250 items) of resumable sync per SPEC §5.2, §8.3, & §9.4."""
         source = await self._source_repo.get_source(source_id)
         if not source or source.user_id != user_id:

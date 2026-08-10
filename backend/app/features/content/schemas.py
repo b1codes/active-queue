@@ -10,7 +10,6 @@ from app.features.activities.schemas import ActivitySchema
 from app.features.content.models import Source
 
 
-
 def format_duration_label(duration_seconds: int) -> str:
     """Format duration in seconds into human-readable label per SPEC §9.2.
 
@@ -148,7 +147,6 @@ class ContentMatchRequest(BaseModel):
         if not sanitized:
             raise ValueError("content_id must not be empty or contain invalid characters")
         return sanitized
-
 
 
 class ContentMatchResponse(BaseModel):

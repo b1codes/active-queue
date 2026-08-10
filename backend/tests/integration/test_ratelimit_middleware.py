@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 from httpx import ASGITransport, AsyncClient
@@ -40,7 +40,6 @@ async def test_health_endpoint_bypasses_rate_limit(mock_firestore_client: MagicM
     assert "X-RateLimit-Limit" not in resp.headers
 
 
-
 @pytest.mark.asyncio
 async def test_rate_limit_exceeded_returns_429() -> None:
     """Exceeding request limit returns HTTP 429, RATE_LIMITED envelope, and Retry-After header."""
@@ -66,4 +65,3 @@ async def test_rate_limit_exceeded_returns_429() -> None:
             assert json_body["status"] == "error"
             assert json_body["error"]["code"] == "RATE_LIMITED"
             assert "Rate limit of 60 requests per minute exceeded" in json_body["error"]["message"]
-

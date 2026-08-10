@@ -8,7 +8,6 @@ from pydantic import BaseModel, field_validator
 from app.core.errors import ValidationError
 from app.core.sanitizer import sanitize_text, sanitize_url
 
-
 # Provider name <-> prefix mapping per SPEC §4.1
 PROVIDER_PREFIXES: dict[str, str] = {
     "youtube": "yt",

@@ -19,6 +19,8 @@ import {
   SyncResumableCard,
 } from '@/core/components/states';
 import { colors, rounded, spacing, typography } from '@/core/theme';
+import { Ionicons } from '@expo/vector-icons';
+import { useAuthStore } from '@/features/auth/authStore';
 import { AddSourceModal } from '@/features/queue/components/AddSourceModal';
 import { FeedCard } from '@/features/queue/components/FeedCard';
 import { SyncProgressBar } from '@/features/queue/components/SyncProgressBar';
@@ -28,6 +30,7 @@ import { useSessionStore } from '@/features/sessions/sessionStore';
 export default function QueueScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { signOut } = useAuthStore();
 
   const feedItems = useQueueStore((state) => state.feedItems);
   const totalUnconsumed = useQueueStore((state) => state.totalUnconsumed);
@@ -123,6 +126,17 @@ export default function QueueScreen() {
               accessibilityHint="Open modal to add a new YouTube playlist URL or custom source"
             >
               <Text style={styles.addButtonText}>+ Add Source</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.iconButton}
+              onPress={() => signOut()}
+              accessible={true}
+              accessibilityRole="button"
+              accessibilityLabel="Sign Out"
+              accessibilityHint="Sign out of current account"
+            >
+              <Ionicons name="log-out-outline" size={20} color={colors.inkSecondary} />
             </TouchableOpacity>
           </View>
         </View>
@@ -236,7 +250,9 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   headerRight: {
+    alignItems: 'center',
     flexDirection: 'row',
+    gap: spacing.xs,
   },
   addButton: {
     alignItems: 'center',
@@ -248,6 +264,16 @@ const styles = StyleSheet.create({
     minHeight: 44,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.xs,
+  },
+  iconButton: {
+    alignItems: 'center',
+    backgroundColor: colors.substrate,
+    borderColor: colors.glassEdge,
+    borderRadius: rounded.sm,
+    borderWidth: 1,
+    justifyContent: 'center',
+    minHeight: 44,
+    minWidth: 44,
   },
   addButtonText: {
     ...typography.label,

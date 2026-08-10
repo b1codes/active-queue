@@ -25,7 +25,10 @@ def test_sanitize_text_max_length() -> None:
 
 def test_sanitize_url_valid() -> None:
     """sanitize_url allows valid http and https URLs."""
-    assert sanitize_url("https://www.youtube.com/playlist?list=PL123") == "https://www.youtube.com/playlist?list=PL123"
+    assert (
+        sanitize_url("https://www.youtube.com/playlist?list=PL123")
+        == "https://www.youtube.com/playlist?list=PL123"
+    )
     assert sanitize_url("http://example.com/feed") == "http://example.com/feed"
 
 

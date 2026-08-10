@@ -67,6 +67,11 @@ export async function signInWithEmulator(
 ): Promise<void> {
   store.dispatch(setAuthState({ isLoading: true, error: null }));
   try {
+    await firebaseSignOut(auth);
+  } catch {
+    // Ignore sign-out error if no session active
+  }
+  try {
     await signInWithEmailAndPassword(auth, email, password);
   } catch {
     try {
