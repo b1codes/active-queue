@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import structlog
 
@@ -10,7 +10,8 @@ from app.core.envelopes import ErrorDetail
 from app.core.errors import AppError, ConflictError, NotFoundError, ValidationError
 from app.features.activities.service import ActivityService
 from app.features.sessions.models import MatchMode, Session
-from app.features.sessions.repository import SessionRepository
+from app.features.sessions.repository import SessionRepository, decode_session_cursor
+from app.features.sessions.schemas import SessionListResponse, SessionSchema
 
 if TYPE_CHECKING:
     from app.features.content.repository import ContentRepository
@@ -35,6 +36,8 @@ class SessionService:
     - Lazy abandonment evaluation on read (now > created_at + duration_seconds + 24h).
     - Explicit abandonment endpoint (POST /sessions/{id}/abandon).
     - GET /sessions/active endpoint.
+    - GET /sessions history list endpoint with cursor pagination.
+    - DELETE /sessions/{id} hard delete discard endpoint (Decision #6) for pending sessions only.
     - Reject external_workout_url & healthkit_uuid with 501 FEATURE_NOT_AVAILABLE until v1.1.
     - Cross-user session access returns 404 (SESSION_NOT_FOUND), never 403.
     """
@@ -52,6 +55,25 @@ class SessionService:
     async def get_active_session(self, user_id: str) -> Session | None:
         """Fetch current non-terminal active session for user_id with lazy abandonment evaluation per SPEC §7.2."""
         return await self._session_repo.get_active_user_session(user_id)
+
+    async def get_user_sessions(
+        self,
+        user_id: str,
+        limit: int = 20,
+        cursor: str | None = None,
+        status_filter: str | None = None,
+    ) -> SessionListResponse:
+        """Fetch paginated workout session history for user_id per SPEC §9.5."""
+        cursor_dt = decode_session_cursor(cursor) if cursor else None
+        sessions, next_cursor = await self._session_repo.get_user_sessions_page(
+            user_id=user_id,
+            limit=limit,
+            cursor_dt=cursor_dt,
+            status_filter=status_filter,
+        )
+
+        items = [SessionSchema.from_domain(s) for s in sessions]
+        return SessionListResponse(items=items, next_cursor=next_cursor)
 
     async def create_session(
         self,
@@ -210,3 +232,8 @@ class SessionService:
             user_id=user_id,
             now=now,
         )
+
+    async def discard_session(self, user_id: str, session_id: str) -> dict[str, Any]:
+        """Hard delete a pending session per Decision #6 & SPEC §9.5."""
+        await self._session_repo.discard_session(session_id, user_id)
+        return {"session_id": session_id, "discarded": True}

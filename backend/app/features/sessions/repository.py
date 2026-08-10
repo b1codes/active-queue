@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING, Any
 
@@ -18,8 +19,22 @@ logger = structlog.get_logger(__name__)
 ABANDONMENT_GRACE_PERIOD_SECONDS = 86400
 
 
+def encode_session_cursor(dt: datetime) -> str:
+    """Encode datetime cursor for session pagination."""
+    return base64.urlsafe_b64encode(dt.isoformat().encode("utf-8")).decode("utf-8")
+
+
+def decode_session_cursor(cursor_str: str) -> datetime | None:
+    """Decode session datetime cursor."""
+    try:
+        raw_str = base64.urlsafe_b64decode(cursor_str.encode("utf-8")).decode("utf-8")
+        return datetime.fromisoformat(raw_str)
+    except Exception:
+        return None
+
+
 class SessionRepository:
-    """Firestore repository for sessions collection per SPEC §4.4, §7.1, & §7.2."""
+    """Firestore repository for sessions collection per SPEC §4.4, §7.1, §7.2, & §9.5."""
 
     def __init__(self, client: AsyncClient) -> None:
         self._client = client
@@ -112,6 +127,41 @@ class SessionRepository:
             return None  # Session is now abandoned, so no active session exists
 
         return session
+
+    async def get_user_sessions_page(
+        self,
+        user_id: str,
+        limit: int = 20,
+        cursor_dt: datetime | None = None,
+        status_filter: str | None = None,
+    ) -> tuple[list[Session], str | None]:
+        """Fetch paginated session history for user_id per SPEC §9.5."""
+        query = self._client.collection("sessions").where(
+            field_path="user_id", op_string="==", value=user_id
+        )
+
+        if status_filter:
+            query = query.where(field_path="status", op_string="==", value=status_filter)
+
+        query = query.order_by("created_at", direction="DESCENDING")
+
+        if cursor_dt is not None:
+            query = query.start_after({"created_at": cursor_dt})
+
+        query = query.limit(limit + 1)
+        snapshots = await query.get()
+
+        results: list[Session] = []
+        for snap in snapshots[:limit]:
+            data = snap.to_dict() or {}
+            results.append(Session.from_firestore(data))
+
+        next_cursor: str | None = None
+        if len(snapshots) > limit and results:
+            last_item = results[-1]
+            next_cursor = encode_session_cursor(last_item.created_at)
+
+        return results, next_cursor
 
     async def update_session(self, session_id: str, updates: dict[str, Any]) -> None:
         """Update fields on a session document."""
@@ -238,3 +288,39 @@ class SessionRepository:
 
         logger.info("session_explicitly_abandoned", session_id=session_id, user_id=user_id)
         return session
+
+    async def discard_session(self, session_id: str, user_id: str) -> None:
+        """Hard delete a pending session from Firestore collection per Decision #6 & SPEC §9.5."""
+        doc_ref = self._client.collection("sessions").document(session_id)
+        snapshot = await doc_ref.get()
+
+        if not snapshot.exists:
+            raise NotFoundError(
+                code="SESSION_NOT_FOUND",
+                message=f"Session '{session_id}' not found",
+            )
+
+        data = snapshot.to_dict() or {}
+        session = Session.from_firestore(data)
+
+        if session.user_id != user_id:
+            raise NotFoundError(
+                code="SESSION_NOT_FOUND",
+                message=f"Session '{session_id}' not found",
+            )
+
+        if session.status == "in_progress":
+            raise ConflictError(
+                code="SESSION_ALREADY_STARTED",
+                message="Cannot discard a session that is already in progress. Use abandon instead.",
+            )
+
+        if session.status in ("completed", "abandoned"):
+            raise ConflictError(
+                code="SESSION_ALREADY_TERMINAL",
+                message=f"Cannot discard a terminal ({session.status}) session.",
+            )
+
+        # Hard delete per decision #6
+        await doc_ref.delete()
+        logger.info("session_hard_deleted_discard", session_id=session_id, user_id=user_id)

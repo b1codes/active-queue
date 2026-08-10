@@ -69,3 +69,10 @@ class SessionSchema(BaseModel):
             created_at=session.created_at,
             updated_at=session.updated_at,
         )
+
+
+class SessionListResponse(BaseModel):
+    """Response payload for GET /sessions list per SPEC §9.5."""
+
+    items: list[SessionSchema]
+    next_cursor: str | None = None

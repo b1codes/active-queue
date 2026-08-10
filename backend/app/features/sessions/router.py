@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Query, status
 
 from app.core.dependencies import get_db
 from app.core.envelopes import SuccessEnvelope, success_response
@@ -13,6 +13,7 @@ from app.features.sessions.repository import SessionRepository
 from app.features.sessions.schemas import (
     CompleteSessionRequest,
     CreateSessionRequest,
+    SessionListResponse,
     SessionSchema,
 )
 from app.features.sessions.service import SessionService
@@ -29,6 +30,30 @@ def get_session_service(db: AsyncClient = Depends(get_db)) -> SessionService:
     content_repo = ContentRepository(db)
     activity_service = ActivityService()
     return SessionService(session_repo, activity_service, content_repo)
+
+
+@router.get(
+    "",
+    status_code=status.HTTP_200_OK,
+    response_model=None,
+    summary="Get user workout sessions history",
+    description="Fetch paginated workout session history for authenticated user per SPEC §9.5.",
+)
+async def get_user_sessions(
+    limit: int = Query(20, ge=1, le=100),
+    cursor: str | None = Query(None),
+    status_filter: str | None = Query(None, alias="status"),
+    current_user: AuthenticatedUser = Depends(get_current_user),
+    service: SessionService = Depends(get_session_service),
+) -> SuccessEnvelope[dict[str, Any]]:
+    """GET /api/v1/sessions history list endpoint."""
+    list_resp: SessionListResponse = await service.get_user_sessions(
+        user_id=current_user.uid,
+        limit=limit,
+        cursor=cursor,
+        status_filter=status_filter,
+    )
+    return success_response(list_resp.model_dump())
 
 
 @router.get(
@@ -135,3 +160,23 @@ async def abandon_session(
         session_id=session_id,
     )
     return success_response(SessionSchema.from_domain(session).model_dump())
+
+
+@router.delete(
+    "/{session_id}",
+    status_code=status.HTTP_200_OK,
+    response_model=None,
+    summary="Discard a created session",
+    description="Hard delete a pending session per Decision #6 & SPEC §9.5.",
+)
+async def discard_session(
+    session_id: str,
+    current_user: AuthenticatedUser = Depends(get_current_user),
+    service: SessionService = Depends(get_session_service),
+) -> SuccessEnvelope[dict[str, Any]]:
+    """DELETE /api/v1/sessions/{session_id} discard endpoint."""
+    res = await service.discard_session(
+        user_id=current_user.uid,
+        session_id=session_id,
+    )
+    return success_response(res)
