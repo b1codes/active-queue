@@ -1,0 +1,48 @@
+# ==============================================================================
+# ActiveQueue Local Infrastructure
+# ==============================================================================
+# Usage:
+#   make infra-up    — start all local services
+#   make infra-down  — stop and remove containers
+#
+# As the app grows, add new services here:
+#   - Cloud SQL (Postgres) → postgres:16
+#   - Redis → redis:7
+#   - AlloyDB Omni → google/alloydbomni (when available)
+# ==============================================================================
+
+services:
+  # ---------------------------------------------------------------------------
+  # Firebase Auth + Firestore Emulators
+  # ---------------------------------------------------------------------------
+  firebase-emulators:
+    build:
+      context: ./docker/firebase
+      dockerfile: Dockerfile
+    volumes:
+      # Config files (read-only)
+      - ./firebase.json:/workspace/firebase.json:ro
+      - ./firestore.rules:/workspace/firestore.rules:ro
+      - ./firestore.indexes.json:/workspace/firestore.indexes.json:ro
+      # Named volume so emulator data persists across restarts
+      - firebase-data:/workspace/.firebase-data
+    command: >
+      firebase emulators:start
+      --project activequeue-local
+      --only auth,firestore
+      --export-on-exit /workspace/.firebase-data
+      --import /workspace/.firebase-data
+    ports:
+      - "9099:9099"   # Firebase Auth emulator
+      - "8080:8080"   # Firestore emulator
+      - "4000:4000"   # Emulator Suite UI → http://localhost:4000
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:4000"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+volumes:
+  firebase-data:
+    driver: local

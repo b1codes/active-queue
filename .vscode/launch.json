@@ -60,8 +60,32 @@
       "request": "launch",
       "program": "${workspaceFolder}/frontend/node_modules/expo/bin/cli",
       "args": [
-        "start",
-        "--localhost"
+        "start"
+      ],
+      "cwd": "${workspaceFolder}/frontend",
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "Firebase: Emulators (Docker)",
+      "type": "node",
+      "request": "launch",
+      "runtimeExecutable": "docker",
+      "runtimeArgs": [
+        "compose",
+        "up",
+        "firebase-emulators"
+      ],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "skipFiles": ["<node_internals>/**"]
+    },
+    {
+      "name": "Frontend: Expo Run iOS",
+      "type": "node",
+      "request": "launch",
+      "program": "${workspaceFolder}/frontend/node_modules/expo/bin/cli",
+      "args": [
+        "run:ios"
       ],
       "cwd": "${workspaceFolder}/frontend",
       "console": "integratedTerminal"
@@ -92,7 +116,22 @@
   ],
   "compounds": [
     {
-      "name": "Full Stack: FastAPI Backend + Expo Frontend",
+      "name": "Local: Full Stack + Emulators",
+      "configurations": [
+        "Firebase: Emulators (Docker)",
+        "Backend: FastAPI Server",
+        "Frontend: Expo Run iOS"
+      ]
+    },
+    {
+      "name": "Full Stack: FastAPI Backend + Expo Run iOS",
+      "configurations": [
+        "Backend: FastAPI Server",
+        "Frontend: Expo Run iOS"
+      ]
+    },
+    {
+      "name": "Full Stack: FastAPI Backend + Expo Start",
       "configurations": [
         "Backend: FastAPI Server",
         "Frontend: Expo Start"

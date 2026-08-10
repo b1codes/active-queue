@@ -11,7 +11,8 @@ YELLOW  := \033[33m
 RESET   := \033[0m
 
 .PHONY: help install install-backend install-frontend \
-        dev dev-backend dev-frontend dev-web \
+        local dev dev-backend dev-frontend dev-web dev-emulators \
+        docker-up docker-down docker-build emulators emulators-stop \
         test test-backend test-frontend \
         lint lint-backend lint-frontend \
         typecheck typecheck-backend typecheck-frontend \
@@ -27,10 +28,17 @@ help:
 	@echo "  $(GREEN)install-backend$(RESET)   Install backend dependencies via uv"
 	@echo "  $(GREEN)install-frontend$(RESET)  Install frontend dependencies via pnpm"
 	@echo ""
-	@echo "  $(GREEN)dev$(RESET)               Start full stack (FastAPI backend + Expo frontend)"
+	@echo "  $(GREEN)local$(RESET)             Start everything: emulators (Docker) + backend + frontend"
+	@echo "  $(GREEN)dev$(RESET)               Start full stack without emulators (FastAPI + Expo)"
 	@echo "  $(GREEN)dev-backend$(RESET)       Start FastAPI backend server on port 8080"
 	@echo "  $(GREEN)dev-frontend$(RESET)      Start Expo frontend Metro server"
 	@echo "  $(GREEN)dev-web$(RESET)           Start Expo frontend Web server"
+	@echo ""
+	@echo "  $(GREEN)docker-up$(RESET)         Start local Docker services (Firebase emulators)"
+	@echo "  $(GREEN)docker-down$(RESET)       Stop and remove all local Docker containers"
+	@echo "  $(GREEN)docker-build$(RESET)      Rebuild Docker images for local services"
+	@echo "  $(GREEN)emulators$(RESET)         Alias for docker-up"
+	@echo "  $(GREEN)emulators-stop$(RESET)    Alias for docker-down"
 	@echo ""
 	@echo "  $(GREEN)test$(RESET)              Run all unit tests (backend + frontend)"
 	@echo "  $(GREEN)test-backend$(RESET)      Run pytest suite with coverage in backend"
@@ -68,12 +76,27 @@ install-frontend:
 # DEVELOPMENT SERVERS
 # ==============================================================================
 
-## dev: Run FastAPI backend and Expo frontend concurrently
-dev:
-	@echo "$(BLUE)Starting FastAPI backend (port 8080) & Expo frontend (--localhost)...$(RESET)"
+## local: Start full local environment (Docker infra + FastAPI backend + Expo frontend)
+local:
+	@echo "$(BLUE)Starting full local environment...$(RESET)"
+	@echo "$(BLUE)  → Docker: Firebase Auth (9099) + Firestore (8080) + Emulator UI (4000)$(RESET)"
+	@echo "$(BLUE)  → Backend: FastAPI (8080)$(RESET)"
+	@echo "$(BLUE)  → Frontend: Expo Metro$(RESET)"
+	@docker compose up -d firebase-emulators
+	@echo "$(YELLOW)Waiting for emulators to be ready...$(RESET)"
+	@docker compose exec -T firebase-emulators sh -c 'until curl -sf http://localhost:4000 >/dev/null 2>&1; do sleep 2; done'
+	@echo "$(GREEN)Emulators ready!$(RESET)"
 	@trap 'kill 0' INT TERM EXIT; \
 	(cd backend && uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8080) & \
-	(cd frontend && pnpm start -- --localhost) & \
+	(cd frontend && pnpm start) & \
+	wait
+
+## dev: Run FastAPI backend and Expo frontend concurrently (no emulators)
+dev:
+	@echo "$(BLUE)Starting FastAPI backend (port 8080) & Expo frontend...$(RESET)"
+	@trap 'kill 0' INT TERM EXIT; \
+	(cd backend && uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8080) & \
+	(cd frontend && pnpm start) & \
 	wait
 
 ## dev-backend: Run FastAPI backend with Uvicorn auto-reload
@@ -81,10 +104,37 @@ dev-backend:
 	@echo "$(BLUE)Starting FastAPI backend server on http://localhost:8080...$(RESET)"
 	cd backend && uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8080
 
-## dev-frontend: Run Expo frontend Metro server in localhost mode
+## dev-frontend: Run Expo frontend Metro server
 dev-frontend:
-	@echo "$(BLUE)Starting Expo frontend server (--localhost)...$(RESET)"
-	cd frontend && pnpm start -- --localhost
+	@echo "$(BLUE)Starting Expo frontend Metro server...$(RESET)"
+	cd frontend && pnpm start
+
+## docker-up: Start local Docker services (Firebase emulators) in background
+docker-up:
+	@echo "$(BLUE)Starting local Docker services (Firebase Auth + Firestore emulators)...$(RESET)"
+	docker compose up -d firebase-emulators
+	@echo "$(GREEN)Emulator UI: http://localhost:4000$(RESET)"
+
+## docker-down: Stop and remove all local Docker containers
+docker-down:
+	@echo "$(YELLOW)Stopping local Docker containers...$(RESET)"
+	docker compose down
+	@echo "$(GREEN)Local Docker services stopped.$(RESET)"
+
+## docker-build: Rebuild Docker images for local services
+docker-build:
+	@echo "$(BLUE)Rebuilding local Docker images...$(RESET)"
+	docker compose build --no-cache
+	@echo "$(GREEN)Docker images rebuilt.$(RESET)"
+
+## emulators: Start Firebase emulators in Docker (alias for docker-up)
+emulators: docker-up
+
+## emulators-stop: Stop Firebase emulators (alias for docker-down)
+emulators-stop: docker-down
+
+## dev-emulators: Alias for local (backwards compat)
+dev-emulators: local
 
 ## dev-web: Run Expo frontend Web server
 dev-web:
