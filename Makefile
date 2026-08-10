@@ -79,7 +79,7 @@ install-frontend:
 ## local: Start full local environment (Docker infra + FastAPI backend + Expo frontend)
 local:
 	@echo "$(BLUE)Starting full local environment...$(RESET)"
-	@echo "$(BLUE)  → Docker: Firebase Auth (9099) + Firestore (8080) + Emulator UI (4000)$(RESET)"
+	@echo "$(BLUE)  → Docker: Firebase Auth (9099) + Firestore (8081) + Emulator UI (4000)$(RESET)"
 	@echo "$(BLUE)  → Backend: FastAPI (8080)$(RESET)"
 	@echo "$(BLUE)  → Frontend: Expo Metro$(RESET)"
 	@docker compose up -d firebase-emulators

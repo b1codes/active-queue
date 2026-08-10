@@ -53,7 +53,7 @@ jobs:
         env:
           ENV: local
           GCP_PROJECT_ID: activequeue-local
-          FIRESTORE_EMULATOR_HOST: localhost:8080
+          FIRESTORE_EMULATOR_HOST: localhost:8081
           FIREBASE_AUTH_EMULATOR_HOST: localhost:9099
         run: |
           cd backend
