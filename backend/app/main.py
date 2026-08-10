@@ -22,6 +22,7 @@ from app.middleware.errors import (
     validation_error_handler,
 )
 from app.middleware.logging import RequestLoggingMiddleware
+from app.middleware.ratelimit import RateLimitMiddleware
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
@@ -47,8 +48,9 @@ app = FastAPI(
 app.add_exception_handler(RequestValidationError, validation_error_handler)  # type: ignore[arg-type]
 app.add_exception_handler(HTTPException, http_exception_handler)  # type: ignore[arg-type]
 
-# Middleware (outermost first — logging wraps error handling)
+# Middleware (outermost first — logging wraps ratelimit wraps error handling)
 app.add_middleware(RequestLoggingMiddleware)
+app.add_middleware(RateLimitMiddleware)
 app.add_middleware(ErrorHandlingMiddleware)
 
 # Health check at root (unauthenticated, no /api/v1 prefix)
