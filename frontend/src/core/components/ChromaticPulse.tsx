@@ -1,13 +1,15 @@
-import React, { memo, useEffect, useRef, useState } from 'react';
-import {
-  AccessibilityInfo,
-  Animated,
+import React, { memo, useEffect } from 'react';
+import { StyleProp, StyleSheet, View, ViewStyle } from 'react-native';
+import Animated, {
   Easing,
-  StyleProp,
-  StyleSheet,
-  View,
-  ViewStyle,
-} from 'react-native';
+  interpolate,
+  interpolateColor,
+  useAnimatedStyle,
+  useReducedMotion,
+  useSharedValue,
+  withRepeat,
+  withTiming,
+} from 'react-native-reanimated';
 import { colors, rounded, spacing } from '../theme';
 
 interface ChromaticPulseProps {
@@ -15,107 +17,72 @@ interface ChromaticPulseProps {
   testID?: string;
 }
 
+const CHROMATIC_PULSE_DURATION_MS = 3200;
+const CHROMATIC_EASE = Easing.bezier(0.45, 0, 0.55, 1);
+const EMBER_PALETTE = [
+  colors.heatCorona, // Corona (#FF9500)
+  colors.heatCore,   // Core (#FF3B30)
+  colors.emberDeep,  // Ember (#65201E)
+  colors.heatCorona, // Loop back to Corona
+];
+
 /**
- * Signature Chromatic Pulse Loading Indicator per DESIGN.md §5
+ * Signature Chromatic Pulse Loading Indicator per DESIGN.md §5 & llc-react standards
+ * UI Thread Worklet execution via Reanimated v3
  * Ember cycle: Corona (#FF9500) -> Core (#FF3B30) -> Ember (#65201E) -> Corona (#FF9500)
  * Duration: 3200ms, Easing: bezier(0.45, 0, 0.55, 1), Opacity: 0.55 -> 1.0 -> 0.55
- * Mandated Reduced Motion path included.
+ * Native Reduced Motion path included via useReducedMotion()
  */
 export const ChromaticPulse: React.FC<ChromaticPulseProps> = memo(({ style, testID }) => {
-  const [reduceMotion, setReduceMotion] = useState(false);
-  const animValue = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    let isMounted = true;
-
-    // Check reduced motion state
-    AccessibilityInfo.isReduceMotionEnabled().then((enabled) => {
-      if (isMounted) {
-        setReduceMotion(enabled);
-      }
-    });
-
-    const subscription = AccessibilityInfo.addEventListener(
-      'reduceMotionChanged',
-      (enabled) => {
-        if (isMounted) {
-          setReduceMotion(enabled);
-        }
-      }
-    );
-
-    return () => {
-      isMounted = false;
-      subscription.remove();
-    };
-  }, []);
+  const reduceMotion = useReducedMotion();
+  const progress = useSharedValue(0);
 
   useEffect(() => {
     if (reduceMotion) {
-      animValue.stopAnimation();
+      progress.value = 0;
       return;
     }
 
-    const animation = Animated.loop(
-      Animated.timing(animValue, {
-        toValue: 1,
-        duration: 3200,
-        easing: Easing.bezier(0.45, 0, 0.55, 1),
-        useNativeDriver: false,
-      })
+    progress.value = withRepeat(
+      withTiming(1, {
+        duration: CHROMATIC_PULSE_DURATION_MS,
+        easing: CHROMATIC_EASE,
+      }),
+      -1,
+      false
+    );
+  }, [reduceMotion, progress]);
+
+  const animatedStyle = useAnimatedStyle(() => {
+    if (reduceMotion) {
+      return {
+        backgroundColor: colors.heatCorona,
+        opacity: 1.0,
+      };
+    }
+
+    const backgroundColor = interpolateColor(
+      progress.value,
+      [0, 0.33, 0.66, 1],
+      EMBER_PALETTE
     );
 
-    animation.start();
+    const opacity = interpolate(
+      progress.value,
+      [0, 0.5, 1],
+      [0.55, 1.0, 0.55]
+    );
 
-    return () => {
-      animation.stop();
+    return {
+      backgroundColor,
+      opacity,
     };
-  }, [animValue, reduceMotion]);
-
-  if (reduceMotion) {
-    return (
-      <Animated.View
-        testID={testID}
-        style={[
-          styles.base,
-          {
-            backgroundColor: colors.heatCorona,
-            opacity: 1.0,
-          },
-          style,
-        ]}
-      />
-    );
-  }
-
-  // Ember Cycle Interpolation per DESIGN.md §5:
-  // Corona (#FF9500) -> Core (#FF3B30) -> Ember (#65201E) -> Corona (#FF9500)
-  const backgroundColor = animValue.interpolate({
-    inputRange: [0, 0.33, 0.66, 1],
-    outputRange: [
-      colors.heatCorona,
-      colors.heatCore,
-      colors.emberDeep,
-      colors.heatCorona,
-    ],
-  });
-
-  const opacity = animValue.interpolate({
-    inputRange: [0, 0.5, 1],
-    outputRange: [0.55, 1.0, 0.55],
   });
 
   return (
     <Animated.View
       testID={testID}
-      style={[
-        styles.base,
-        {
-          backgroundColor,
-          opacity,
-        },
-        style,
-      ]}
+      style={[styles.base, style, animatedStyle]}
     />
   );
 });
@@ -163,6 +130,7 @@ const styles = StyleSheet.create({
   skeletonRow: {
     backgroundColor: colors.lensFlat,
     borderColor: colors.glassEdge,
+    borderTopColor: colors.glassSpecularLight,
     borderRadius: rounded.md,
     borderWidth: 1,
     flexDirection: 'row',

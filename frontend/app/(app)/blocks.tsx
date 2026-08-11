@@ -8,7 +8,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { GlassHeader } from '@/core/components';
+import { GlassHeader, ThermalGlowTouchable } from '@/core/components';
 import { colors, rounded, spacing, typography } from '@/core/theme';
 import { useRouter } from 'expo-router';
 import { useQueueStore } from '@/features/queue/queueStore';
@@ -159,17 +159,17 @@ export default function BlocksScreen() {
                 Provider: {matchedItem.provider.toUpperCase()}
               </Text>
 
-              {/* Commitment Action: Primary Button per Black Label Rule */}
-              <TouchableOpacity
+              {/* Commitment Action: Primary Button with Thermal Glow Physics */}
+              <ThermalGlowTouchable
                 style={styles.startButton}
                 onPress={() => router.push(`/(app)/match/${matchedItem.content_id}`)}
-                activeOpacity={0.85}
+                borderRadius={rounded.md}
                 accessible={true}
                 accessibilityRole="button"
                 accessibilityLabel="Start session with matched media"
               >
                 <Text style={styles.startButtonText}>Start Session ({formattedSelectedLabel})</Text>
-              </TouchableOpacity>
+              </ThermalGlowTouchable>
             </View>
           ) : (
             <View style={styles.emptyCard}>

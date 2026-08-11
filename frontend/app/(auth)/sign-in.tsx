@@ -10,6 +10,7 @@ import {
   View,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { ThermalGlowTouchable } from "@/core/components";
 import { colors, rounded, spacing, typography } from "@/core/theme";
 import { useAuthStore } from "@/features/auth/authStore";
 
@@ -30,6 +31,8 @@ export default function SignInScreen() {
   const handleEmulatorSignIn = async () => {
     await signInWithEmulator();
   };
+
+  const isButtonDisabled = isLoading || !email || !password;
 
   return (
     <KeyboardAvoidingView
@@ -99,15 +102,15 @@ export default function SignInScreen() {
             />
           </View>
 
-          {/* Commitment Action: Primary Button per Black Label Rule */}
-          <TouchableOpacity
+          {/* Commitment Action: Primary Button with Thermal Glow Physics */}
+          <ThermalGlowTouchable
             style={[
               styles.button,
-              (isLoading || !email || !password) && styles.buttonDisabled,
+              isButtonDisabled && styles.buttonDisabled,
             ]}
             onPress={handleSignIn}
-            disabled={isLoading || !email || !password}
-            activeOpacity={0.85}
+            disabled={isButtonDisabled}
+            borderRadius={rounded.md}
             accessible={true}
             accessibilityRole="button"
             accessibilityLabel="Sign in"
@@ -118,7 +121,7 @@ export default function SignInScreen() {
             ) : (
               <Text style={styles.buttonText}>Sign in</Text>
             )}
-          </TouchableOpacity>
+          </ThermalGlowTouchable>
 
           {/* Development Shortcut Section */}
           <View style={styles.dividerContainer}>

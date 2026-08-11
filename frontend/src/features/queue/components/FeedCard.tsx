@@ -8,6 +8,7 @@ import {
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { ThermalGlowTouchable } from '../../../core/components';
 import { colors, rounded, spacing, typography } from '../../../core/theme';
 import { useQueueStore } from '../queueStore';
 import { FeedItem } from '../types';
@@ -72,10 +73,10 @@ export const FeedCard: React.FC<FeedCardProps> = memo(({ item, isMatched = false
   return (
     <View style={styles.cardContainer}>
       <View style={[styles.card, isMatched && styles.cardMatched]}>
-        <TouchableOpacity
+        <ThermalGlowTouchable
           style={styles.cardMainTouchable}
           onLongPress={showOptions}
-          activeOpacity={0.85}
+          borderRadius={rounded.md}
           accessible={true}
           accessibilityRole="button"
           accessibilityLabel={`${safeTitle}, duration ${formattedDuration}, from ${safeProvider}${isMatched ? ', duration matched' : ''}`}
@@ -111,7 +112,7 @@ export const FeedCard: React.FC<FeedCardProps> = memo(({ item, isMatched = false
               </View>
             </View>
           </View>
-        </TouchableOpacity>
+        </ThermalGlowTouchable>
 
         {/* Options Overflow Action Button */}
         <TouchableOpacity
