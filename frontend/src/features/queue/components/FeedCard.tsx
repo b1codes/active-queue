@@ -71,7 +71,11 @@ export const FeedCard: React.FC<FeedCardProps> = memo(({ item, isMatched = false
   const formattedDuration = formatTabularDuration(item?.duration_seconds, item?.duration_label);
 
   return (
-    <View style={styles.cardContainer}>
+    <View
+      style={styles.cardContainer}
+      shouldRasterizeIOS={true}
+      renderToHardwareTextureAndroid={true}
+    >
       <View style={[styles.card, isMatched && styles.cardMatched]}>
         <ThermalGlowTouchable
           style={styles.cardMainTouchable}

@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   AppState,
   FlatList,
+  Platform,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -100,6 +101,15 @@ export default function QueueScreen() {
     return `${count}`;
   }, []);
 
+  const getItemLayout = useCallback(
+    (_: any, index: number) => ({
+      length: 88,
+      offset: 88 * index,
+      index,
+    }),
+    []
+  );
+
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <GlassHeader
@@ -171,7 +181,6 @@ export default function QueueScreen() {
       {feedItems.length === 0 && isLoadingFeed ? (
         <QueueSkeletonList count={4} />
       ) : feedItems.length === 0 ? (
-
         <NoSourcesState onAddSourcePress={() => setIsAddModalVisible(true)} />
       ) : (
         <FlatList
@@ -179,13 +188,14 @@ export default function QueueScreen() {
           keyExtractor={(item) => item.id || item.content_id}
           renderItem={renderFeedCard}
           refreshing={isRefreshingFeed}
-
           onRefresh={() => fetchFeed(true)}
           onEndReached={() => fetchFeed(false)}
           onEndReachedThreshold={0.5}
           initialNumToRender={8}
           maxToRenderPerBatch={10}
           windowSize={5}
+          getItemLayout={getItemLayout}
+          removeClippedSubviews={Platform.OS === 'android'}
           contentContainerStyle={styles.listContent}
           ListEmptyComponent={
             <EmptyFeedState
