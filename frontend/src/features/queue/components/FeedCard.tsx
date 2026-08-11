@@ -144,6 +144,7 @@ const styles = StyleSheet.create({
     // One Lens Rule: lensFlat composite ground over Void
     backgroundColor: colors.lensFlat,
     borderColor: colors.glassEdge,
+    borderTopColor: colors.glassSpecularLight,
     borderRadius: rounded.md,
     borderWidth: 1,
     flexDirection: 'row',

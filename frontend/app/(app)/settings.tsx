@@ -8,6 +8,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { GlassHeader } from '@/core/components';
 import { colors, rounded, spacing, typography } from '@/core/theme';
 import { useAuthStore } from '@/features/auth/authStore';
 
@@ -34,11 +35,9 @@ export default function SettingsScreen() {
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
-      <View style={styles.headerBorder}>
-        <View style={styles.header}>
-          <Text style={styles.title}>Settings</Text>
-        </View>
-      </View>
+      <GlassHeader
+        title="Settings"
+      />
 
       <View style={styles.content}>
         {/* User Account Card */}
@@ -138,6 +137,7 @@ const styles = StyleSheet.create({
   card: {
     backgroundColor: colors.lensFlat,
     borderColor: colors.glassEdge,
+    borderTopColor: colors.glassSpecularLight,
     borderRadius: rounded.md,
     borderWidth: 1,
     padding: spacing.lg,

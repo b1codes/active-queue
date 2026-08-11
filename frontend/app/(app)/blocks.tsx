@@ -8,6 +8,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { GlassHeader } from '@/core/components';
 import { colors, rounded, spacing, typography } from '@/core/theme';
 import { useRouter } from 'expo-router';
 import { useQueueStore } from '@/features/queue/queueStore';
@@ -53,13 +54,10 @@ export default function BlocksScreen() {
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
-      {/* Screen Header */}
-      <View style={styles.headerBorder}>
-        <View style={styles.header}>
-          <Text style={styles.title}>Time Blocks</Text>
-          <Text style={styles.subtitle}>Time-first activity & runtime orchestrator</Text>
-        </View>
-      </View>
+      <GlassHeader
+        title="Time Blocks"
+        subtitle="Time-first activity & runtime orchestrator"
+      />
 
       <ScrollView
         contentContainerStyle={styles.scrollContent}
@@ -252,12 +250,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     justifyContent: 'center',
     alignItems: 'center',
-    minWidth: '30%',
-    flex: 1,
+    flexBasis: '30%',
+    flexGrow: 1,
   },
   durationButtonUnselected: {
     backgroundColor: colors.lensFlat,
     borderColor: colors.glassEdge,
+    borderTopColor: colors.glassSpecular,
   },
   durationButtonSelected: {
     backgroundColor: colors.lensFlatRaised,
@@ -287,6 +286,8 @@ const styles = StyleSheet.create({
   },
   chipUnselected: {
     backgroundColor: colors.strata,
+    borderColor: colors.glassEdge,
+    borderWidth: 1,
   },
   // Selection is an inversion per DESIGN.md §5 Chip Activity Selected
   chipSelected: {
@@ -306,6 +307,7 @@ const styles = StyleSheet.create({
   matchCard: {
     backgroundColor: colors.lensFlat,
     borderColor: colors.glassEdge,
+    borderTopColor: colors.glassSpecularLight,
     borderRadius: rounded.md,
     borderWidth: 1,
     padding: spacing.lg,

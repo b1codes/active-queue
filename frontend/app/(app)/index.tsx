@@ -18,7 +18,7 @@ import {
   ProviderQuotaBanner,
   SyncResumableCard,
 } from '@/core/components/states';
-import { QueueSkeletonList } from '@/core/components';
+import { GlassHeader, QueueSkeletonList } from '@/core/components';
 
 import { colors, rounded, spacing, typography } from '@/core/theme';
 import { Ionicons } from '@expo/vector-icons';
@@ -102,18 +102,17 @@ export default function QueueScreen() {
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
-      <View style={styles.headerBorder}>
-        <View style={styles.header}>
-          <View style={styles.headerLeft}>
-            <Text style={styles.headerTitle}>Active Queue</Text>
-            {totalUnconsumed !== null ? (
-              <View style={styles.countBadge}>
-                <Text style={styles.countBadgeText}>{formatCount(totalUnconsumed)}</Text>
-              </View>
-            ) : null}
-          </View>
-
-          <View style={styles.headerRight}>
+      <GlassHeader
+        title="Active Queue"
+        leftComponent={
+          totalUnconsumed !== null ? (
+            <View style={styles.countBadge}>
+              <Text style={styles.countBadgeText}>{formatCount(totalUnconsumed)}</Text>
+            </View>
+          ) : undefined
+        }
+        rightComponent={
+          <>
             <TouchableOpacity
               style={styles.addButton}
               onPress={() => setIsAddModalVisible(true)}
@@ -135,9 +134,9 @@ export default function QueueScreen() {
             >
               <Ionicons name="log-out-outline" size={20} color={colors.inkSecondary} />
             </TouchableOpacity>
-          </View>
-        </View>
-      </View>
+          </>
+        }
+      />
 
       {/* Top Banner Notifications per SPEC §11.3 */}
       {isOffline ? (

@@ -8,6 +8,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { GlassHeader } from '@/core/components';
 import { colors, rounded, spacing, typography } from '@/core/theme';
 import { useRouter } from 'expo-router';
 import { useSessionStore } from '@/features/sessions/sessionStore';
@@ -28,13 +29,10 @@ export default function HistoryScreen() {
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
-      {/* Screen Header */}
-      <View style={styles.headerBorder}>
-        <View style={styles.header}>
-          <Text style={styles.title}>History</Text>
-          <Text style={styles.subtitle}>Completed workout & media sessions</Text>
-        </View>
-      </View>
+      <GlassHeader
+        title="History"
+        subtitle="Completed workout & media sessions"
+      />
 
       <FlatList
         data={historySessions}
@@ -122,6 +120,7 @@ const styles = StyleSheet.create({
   sessionCard: {
     backgroundColor: colors.lensFlat,
     borderColor: colors.glassEdge,
+    borderTopColor: colors.glassSpecularLight,
     borderRadius: rounded.md,
     borderWidth: 1,
     padding: spacing.md,

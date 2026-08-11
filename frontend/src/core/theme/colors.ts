@@ -18,10 +18,11 @@ export const colors = {
   substrate: '#1A1615',
   strata: '#282423',
 
-  // Glass Material
+  // Glass Material per LLC Glass & DESIGN.md §2
   glassSurface: 'rgba(255, 255, 255, 0.05)',
   glassEdge: 'rgba(255, 255, 255, 0.12)',
   glassSpecular: 'rgba(255, 255, 255, 0.18)',
+  glassSpecularLight: 'rgba(255, 255, 255, 0.28)',
 
   // Precomputed Lens Composites (One Lens Rule per DESIGN.md §4)
   lensFlat: '#181515',
