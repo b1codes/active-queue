@@ -9,6 +9,8 @@ import { ChromaticPulse } from "@/core/components";
 import { colors, rounded } from "@/core/theme";
 import { useAuthStore } from "@/features/auth/authStore";
 
+import { GestureHandlerRootView } from "react-native-gesture-handler";
+
 function AppNavigation() {
   const { initAuth, isAuthenticated, isLoading } = useAuthStore();
   const segments = useSegments();
@@ -62,13 +64,18 @@ function AppNavigation() {
 
 export default function RootLayout() {
   return (
-    <Provider store={store}>
-      <AppNavigation />
-    </Provider>
+    <GestureHandlerRootView style={styles.rootView}>
+      <Provider store={store}>
+        <AppNavigation />
+      </Provider>
+    </GestureHandlerRootView>
   );
 }
 
 const styles = StyleSheet.create({
+  rootView: {
+    flex: 1,
+  },
   loadingContainer: {
     flex: 1,
     backgroundColor: colors.void,
