@@ -99,18 +99,21 @@ export const FeedCard: React.FC<FeedCardProps> = memo(({ item, isMatched = false
 
           {/* Card Content Column */}
           <View style={styles.content}>
-            <Text style={styles.title} numberOfLines={2} ellipsizeMode="tail">
+            <Text style={styles.title} numberOfLines={2} ellipsizeMode="tail" maxFontSizeMultiplier={1.5}>
               {safeTitle}
             </Text>
 
             <View style={styles.metaRow}>
-              <Text style={styles.providerText} numberOfLines={1}>
+              <Text style={styles.providerText} numberOfLines={1} maxFontSizeMultiplier={1.5}>
                 {safeProvider}
               </Text>
 
               {/* Signature Duration Pill per DESIGN.md §5 */}
               <View style={[styles.durationPill, isMatched ? styles.durationPillMatched : styles.durationPillRest]}>
-                <Text style={[styles.durationText, isMatched ? styles.durationTextMatched : styles.durationTextRest]}>
+                <Text
+                  style={[styles.durationText, isMatched ? styles.durationTextMatched : styles.durationTextRest]}
+                  maxFontSizeMultiplier={1.5}
+                >
                   {formattedDuration}
                 </Text>
               </View>

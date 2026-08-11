@@ -34,13 +34,13 @@ export const GlassHeader: React.FC<GlassHeaderProps> = memo(({
           <View style={styles.headerRow}>
             <View style={styles.titleContainer}>
               <View style={styles.titleRow}>
-                <Text style={styles.title} numberOfLines={1}>
+                <Text style={styles.title} numberOfLines={1} maxFontSizeMultiplier={1.5}>
                   {title}
                 </Text>
                 {leftComponent}
               </View>
               {subtitle ? (
-                <Text style={styles.subtitle} numberOfLines={1}>
+                <Text style={styles.subtitle} numberOfLines={1} maxFontSizeMultiplier={1.5}>
                   {subtitle}
                 </Text>
               ) : null}
