@@ -131,7 +131,7 @@ const styles = StyleSheet.create({
   },
   overlay: {
     alignItems: 'center',
-    backgroundColor: 'rgba(12, 9, 9, 0.70)',
+    backgroundColor: colors.modalOverlayBg,
     flex: 1,
     justifyContent: 'center',
     padding: spacing.lg,

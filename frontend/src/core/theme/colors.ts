@@ -24,6 +24,13 @@ export const colors = {
   glassSpecular: 'rgba(255, 255, 255, 0.18)',
   glassSpecularLight: 'rgba(255, 255, 255, 0.28)',
 
+  // Semantic Fills & Edges
+  heatCoreMuted: 'rgba(255, 59, 48, 0.4)',
+  thermalGlowDefault: 'rgba(255, 149, 0, 0.35)',
+  modalOverlayBg: 'rgba(12, 9, 9, 0.70)',
+  bannerAlertBg: 'rgba(255, 149, 0, 0.08)',
+  bannerAlertEdge: 'rgba(255, 149, 0, 0.25)',
+
   // Precomputed Lens Composites (One Lens Rule per DESIGN.md §4)
   lensFlat: '#181515',
   lensFlatRaised: '#252221',

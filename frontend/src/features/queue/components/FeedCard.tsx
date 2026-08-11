@@ -158,7 +158,7 @@ const styles = StyleSheet.create({
     padding: spacing.sm,
   },
   cardMatched: {
-    borderColor: 'rgba(255, 59, 48, 0.4)',
+    borderColor: colors.heatCoreMuted,
   },
   cardMainTouchable: {
     flex: 1,

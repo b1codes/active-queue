@@ -47,7 +47,7 @@ export const ThermalGlowTouchable: React.FC<ThermalGlowTouchableProps> = memo(({
   onPress,
   onLongPress,
   borderRadius = 14,
-  glowColor = 'rgba(255, 149, 0, 0.35)', // Thermal Heat Corona default
+  glowColor = colors.thermalGlowDefault, // Thermal Heat Corona default per DESIGN.md §2
   disabled = false,
   style,
   testID,

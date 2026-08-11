@@ -25,8 +25,8 @@ export const ProviderQuotaBanner: React.FC = () => {
 
 const styles = StyleSheet.create({
   banner: {
-    backgroundColor: 'rgba(255, 171, 0, 0.12)',
-    borderColor: 'rgba(255, 171, 0, 0.4)',
+    backgroundColor: colors.bannerAlertBg,
+    borderColor: colors.bannerAlertEdge,
     borderRadius: rounded.md,
     borderWidth: 1,
     marginHorizontal: spacing.lg,
@@ -47,7 +47,7 @@ const styles = StyleSheet.create({
   },
   title: {
     ...typography.label,
-    color: '#FFD54F',
+    color: colors.heatCorona,
     fontWeight: 'bold',
     marginBottom: 2,
   },

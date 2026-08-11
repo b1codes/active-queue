@@ -42,8 +42,8 @@ export const OfflineBanner: React.FC<OfflineBannerProps> = ({ onRetryPress }) =>
 
 const styles = StyleSheet.create({
   banner: {
-    backgroundColor: 'rgba(255, 69, 58, 0.12)',
-    borderColor: 'rgba(255, 69, 58, 0.4)',
+    backgroundColor: colors.bannerAlertBg,
+    borderColor: colors.bannerAlertEdge,
     borderRadius: rounded.md,
     borderWidth: 1,
     marginHorizontal: spacing.lg,
@@ -63,7 +63,7 @@ const styles = StyleSheet.create({
   },
   title: {
     ...typography.label,
-    color: '#FF6B6B',
+    color: colors.heatCorona,
     fontWeight: 'bold',
     marginBottom: 2,
   },
