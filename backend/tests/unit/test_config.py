@@ -6,8 +6,9 @@ from pydantic import ValidationError
 from app.core.config import Settings
 
 
-def test_settings_default_local_env() -> None:
+def test_settings_default_local_env(monkeypatch: pytest.MonkeyPatch) -> None:
     """Settings default to local environment with emulator hosts set."""
+    monkeypatch.delenv("GCP_PROJECT_ID", raising=False)
     s = Settings(
         env="local",
         firestore_emulator_host="localhost:9090",
