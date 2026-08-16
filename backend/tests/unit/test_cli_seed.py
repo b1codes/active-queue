@@ -81,10 +81,10 @@ async def test_seed_db_flow(monkeypatch: pytest.MonkeyPatch) -> None:
     assert counts["users"] == 2
     assert counts["authorizations"] == 2
     assert counts["auth_emulator_users"] == 2
-    assert counts["sources"] == 2
-    assert counts["content_cache"] == 15
-    assert counts["feed_items"] == 15
-    assert counts["sessions"] == 4
+    assert counts["sources"] == 3
+    assert counts["content_cache"] == 80
+    assert counts["feed_items"] == 100
+    assert counts["sessions"] == 12
 
 
 def test_seed_cli_main(monkeypatch: pytest.MonkeyPatch) -> None:
