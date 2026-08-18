@@ -1,7 +1,7 @@
 import React, { memo } from 'react';
 import { StyleSheet, Text, View, ViewStyle } from 'react-native';
-import { BlurView } from 'expo-blur';
 import { colors, spacing, typography } from '../theme';
+import { LiquidGlassSurface } from './LiquidGlassSurface';
 
 interface GlassHeaderProps {
   title: string;
@@ -13,7 +13,11 @@ interface GlassHeaderProps {
 
 /**
  * LLC Liquid Glass Header component per DESIGN.md §5 & llc-react standards
- * Real BlurView backdrop filter (intensity 20) with precomputed fallback color & specular light edge
+ * Renders through LiquidGlassSurface (Tier 3: Skia backdrop blur + 160% saturation matrix,
+ * per react-native-glass.md §3) with the directional light edge carried by this wrapper's own
+ * bottom border, since only the bottom edge needs a specular highlight here.
+ * Counts as 1 layer against the 2-blur-layer guardrail in gpu-acceleration.md — see
+ * AddSourceModal.tsx, which can share a screen with this header.
  */
 export const GlassHeader: React.FC<GlassHeaderProps> = memo(({
   title,
@@ -24,12 +28,7 @@ export const GlassHeader: React.FC<GlassHeaderProps> = memo(({
 }) => {
   return (
     <View style={[styles.wrapper, style]}>
-      <BlurView
-        intensity={20}
-        tint="dark"
-        experimentalBlurMethod="dimezisBlurView"
-        style={styles.blurView}
-      >
+      <LiquidGlassSurface blurRadius={20} specularEdge="none" style={styles.blurView}>
         <View style={styles.contentContainer}>
           <View style={styles.headerRow}>
             <View style={styles.titleContainer}>
@@ -51,7 +50,7 @@ export const GlassHeader: React.FC<GlassHeaderProps> = memo(({
             ) : null}
           </View>
         </View>
-      </BlurView>
+      </LiquidGlassSurface>
     </View>
   );
 });
