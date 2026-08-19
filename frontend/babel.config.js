@@ -13,7 +13,10 @@ module.exports = function (api) {
           },
         },
       ],
-      'react-native-reanimated/plugin',
+      // babel-preset-expo auto-adds react-native-worklets/plugin (which
+      // react-native-reanimated/plugin now forwards to) whenever
+      // react-native-worklets is installed — an explicit entry here would
+      // double-run the worklets transform.
     ],
   };
 };
