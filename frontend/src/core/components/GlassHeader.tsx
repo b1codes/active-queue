@@ -13,9 +13,10 @@ interface GlassHeaderProps {
 
 /**
  * LLC Liquid Glass Header component per DESIGN.md §5 & llc-react standards
- * Renders through LiquidGlassSurface (Tier 3: Skia backdrop blur + 160% saturation matrix,
- * per react-native-glass.md §3) with the directional light edge carried by this wrapper's own
- * bottom border, since only the bottom edge needs a specular highlight here.
+ * Renders through LiquidGlassSurface, which resolves the tier per react-native-glass.md §0 —
+ * the native UIVisualEffectView material on iOS 26+, the Skia fallback below that. The
+ * directional light edge is carried by this wrapper's own bottom border, since only the
+ * bottom edge needs a specular highlight here.
  * Counts as 1 layer against the 2-blur-layer guardrail in gpu-acceleration.md — see
  * AddSourceModal.tsx, which can share a screen with this header.
  */

@@ -1,5 +1,6 @@
 import React, { memo, useEffect, useState } from 'react';
 import { LayoutChangeEvent, StyleSheet, View, ViewStyle } from 'react-native';
+import { LiquidGlassView } from '@callstack/liquid-glass';
 import {
   BackdropFilter,
   Blur,
@@ -29,23 +30,34 @@ let activeGlassLayerCount = 0;
 interface LiquidGlassSurfaceProps {
   children?: React.ReactNode;
   borderRadius?: number;
+  /**
+   * Tier 3 only. Tier 1's blur radius is fixed by the OS material variant and cannot
+   * be tuned, so this is ignored when Tier 1 resolves.
+   */
   blurRadius?: number;
   style?: ViewStyle;
   /**
    * 'full' draws the 3-stop specular gradient stroke around all four edges (glass cards).
    * 'none' skips it — use when the caller renders its own directional edge (e.g. a header's
    * bottom border only) or when the surface is a full-bleed scrim with no edge at all.
+   *
+   * Tier 3 only. The Tier 1 native material draws its own specular edge as part of the
+   * UIVisualEffectView, so this is ignored when Tier 1 resolves.
    */
   specularEdge?: 'full' | 'none';
   testID?: string;
 }
 
 /**
- * Tier 3 (zero-dependency) Liquid Glass surface per llc-react/react-native-glass.md §3 —
- * Skia backdrop blur + 160% saturation matrix + specular gradient stroke.
+ * Liquid Glass surface, routed through useGlassTier() per llc-react/react-native-glass.md §0.
  *
- * Routed through useGlassTier() so this becomes a no-op passthrough once Tier 1/2 packages
- * are installed and a higher tier resolves; today useGlassTier() always returns 3.
+ * Tier 1 (iOS 26+ dev build): renders through @callstack/liquid-glass's LiquidGlassView —
+ * the real OS UIVisualEffectView material (§1).
+ * Tier 3 (everything else): the zero-dependency Skia fallback — backdrop blur + 160%
+ * saturation matrix + specular gradient stroke (§3).
+ *
+ * Every glass surface in the app goes through this component, so the whole app renders on
+ * one tier rather than mixing native material with the hand-rolled fallback on one screen.
  */
 export const LiquidGlassSurface: React.FC<LiquidGlassSurfaceProps> = memo(
   ({ children, borderRadius = 0, blurRadius = 20, style, specularEdge = 'full', testID }) => {
@@ -72,9 +84,28 @@ export const LiquidGlassSurface: React.FC<LiquidGlassSurfaceProps> = memo(
       setSize({ width, height });
     };
 
+    // Tier 1 — native OS material. No Canvas, no measured layout: UIKit composites the
+    // blur, vibrancy and edge highlight itself, so the Skia work below is pure overhead
+    // here. colorScheme is pinned to 'dark' rather than 'system' because the app is
+    // dark-only (app.json userInterfaceStyle), so the glass must stay dark even when the
+    // device is in light mode.
+    if (tier === 1) {
+      return (
+        <LiquidGlassView
+          testID={testID}
+          effect="regular"
+          colorScheme="dark"
+          tintColor={colors.glassSurface}
+          style={[styles.container, { borderRadius }, style]}
+        >
+          {children}
+        </LiquidGlassView>
+      );
+    }
+
     return (
       <View testID={testID} onLayout={onLayout} style={[styles.container, { borderRadius }, style]}>
-        {tier === 3 && size.width > 0 && size.height > 0 ? (
+        {size.width > 0 && size.height > 0 ? (
           <Canvas style={StyleSheet.absoluteFill} pointerEvents="none">
             <BackdropFilter
               filter={
