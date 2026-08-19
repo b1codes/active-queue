@@ -12,6 +12,7 @@ RESET   := \033[0m
 
 .PHONY: help install install-backend install-frontend \
         local dev dev-backend dev-frontend dev-web dev-emulators \
+        storybook storybook-ios storybook-android \
         docker-up docker-down docker-build emulators emulators-stop \
         seed-db seed \
         test test-backend test-frontend \
@@ -34,6 +35,10 @@ help:
 	@echo "  $(GREEN)dev-backend$(RESET)       Start FastAPI backend server on port 8080"
 	@echo "  $(GREEN)dev-frontend$(RESET)      Start Expo frontend Metro server"
 	@echo "  $(GREEN)dev-web$(RESET)           Start Expo frontend Web server"
+	@echo ""
+	@echo "  $(GREEN)storybook$(RESET)         Alias for storybook-ios"
+	@echo "  $(GREEN)storybook-ios$(RESET)     Run on-device Storybook on iOS simulator"
+	@echo "  $(GREEN)storybook-android$(RESET) Run on-device Storybook on Android emulator"
 	@echo ""
 	@echo "  $(GREEN)docker-up$(RESET)         Start local Docker services (Firebase emulators)"
 	@echo "  $(GREEN)docker-down$(RESET)       Stop and remove all local Docker containers"
@@ -143,6 +148,19 @@ dev-emulators: local
 dev-web:
 	@echo "$(BLUE)Starting Expo Web frontend server...$(RESET)"
 	cd frontend && pnpm web
+
+## storybook: Alias for storybook-ios
+storybook: storybook-ios
+
+## storybook-ios: Run on-device Storybook on iOS simulator
+storybook-ios:
+	@echo "$(BLUE)Starting Storybook on iOS simulator...$(RESET)"
+	cd frontend && pnpm storybook:ios
+
+## storybook-android: Run on-device Storybook on Android emulator
+storybook-android:
+	@echo "$(BLUE)Starting Storybook on Android emulator...$(RESET)"
+	cd frontend && pnpm storybook:android
 
 # ==============================================================================
 # DATABASE SEEDING
