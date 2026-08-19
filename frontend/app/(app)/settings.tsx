@@ -6,14 +6,13 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { GlassHeader } from '@/core/components';
+import { GlassHeader, useGlassHeaderHeight } from '@/core/components';
 import { colors, rounded, spacing, typography } from '@/core/theme';
 import { useAuthStore } from '@/features/auth/authStore';
 
 export default function SettingsScreen() {
-  const insets = useSafeAreaInsets();
+  const [headerHeight, setHeaderHeight] = useGlassHeaderHeight();
   const { user, signOut, signInWithEmulator } = useAuthStore();
 
   const handleSignOut = async () => {
@@ -34,12 +33,8 @@ export default function SettingsScreen() {
   };
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
-      <GlassHeader
-        title="Settings"
-      />
-
-      <View style={styles.content}>
+    <View style={styles.container}>
+      <View style={[styles.content, { paddingTop: headerHeight + spacing.lg }]}>
         {/* User Account Card */}
         <View style={styles.card}>
           <Text style={styles.cardSectionTitle}>Account profile</Text>
@@ -101,6 +96,11 @@ export default function SettingsScreen() {
           <Text style={styles.signOutButtonText}>Sign out</Text>
         </TouchableOpacity>
       </View>
+
+      <GlassHeader
+        title="Settings"
+        onHeightChange={setHeaderHeight}
+      />
     </View>
   );
 }

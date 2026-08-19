@@ -6,9 +6,8 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { GlassHeader, ThermalGlowTouchable } from '@/core/components';
+import { GlassHeader, useGlassHeaderHeight, ThermalGlowTouchable } from '@/core/components';
 import { colors, rounded, spacing, typography } from '@/core/theme';
 import { useRouter } from 'expo-router';
 import { useQueueStore } from '@/features/queue/queueStore';
@@ -36,8 +35,8 @@ const ACTIVITIES = [
 ];
 
 export default function BlocksScreen() {
-  const insets = useSafeAreaInsets();
   const router = useRouter();
+  const [headerHeight, setHeaderHeight] = useGlassHeaderHeight();
   const feedItems = useQueueStore((state) => state.feedItems);
 
   const [selectedDuration, setSelectedDuration] = useState<number>(1800); // 30 mins default
@@ -53,14 +52,9 @@ export default function BlocksScreen() {
   )?.label || `${Math.floor(selectedDuration / 60)}:00`;
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
-      <GlassHeader
-        title="Time Blocks"
-        subtitle="Time-first activity & runtime orchestrator"
-      />
-
+    <View style={styles.container}>
       <ScrollView
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[styles.scrollContent, { paddingTop: headerHeight + spacing.lg }]}
         showsVerticalScrollIndicator={false}
       >
         {/* Section 1: Workout Duration Selector */}
@@ -192,6 +186,12 @@ export default function BlocksScreen() {
           )}
         </View>
       </ScrollView>
+
+      <GlassHeader
+        title="Time Blocks"
+        subtitle="Time-first activity & runtime orchestrator"
+        onHeightChange={setHeaderHeight}
+      />
     </View>
   );
 }

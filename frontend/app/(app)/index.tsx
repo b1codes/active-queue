@@ -9,7 +9,6 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import {
   ActiveSessionBanner,
@@ -19,7 +18,7 @@ import {
   ProviderQuotaBanner,
   SyncResumableCard,
 } from '@/core/components/states';
-import { GlassHeader, QueueSkeletonList } from '@/core/components';
+import { GlassHeader, QueueSkeletonList, useGlassHeaderHeight } from '@/core/components';
 
 import { colors, rounded, spacing, typography } from '@/core/theme';
 import { Ionicons } from '@expo/vector-icons';
@@ -32,7 +31,7 @@ import { useSessionStore } from '@/features/sessions/sessionStore';
 
 export default function QueueScreen() {
   const router = useRouter();
-  const insets = useSafeAreaInsets();
+  const [headerHeight, setHeaderHeight] = useGlassHeaderHeight();
   const { signOut } = useAuthStore();
 
   const feedItems = useQueueStore((state) => state.feedItems);
@@ -101,19 +100,84 @@ export default function QueueScreen() {
     return `${count}`;
   }, []);
 
-  const getItemLayout = useCallback(
-    (_: any, index: number) => ({
-      length: 88,
-      offset: 88 * index,
-      index,
-    }),
-    []
+  // Banner stack rides inside the scroll content rather than sitting between the header and
+  // the list: the header is an overlay now, so anything in flow above the list would be hidden
+  // underneath it, and the list has to reach the top of the screen for content to pass behind
+  // the glass at all.
+  const bannerStack = (
+    <>
+      {/* Top Banner Notifications per SPEC §11.3 */}
+      {isOffline ? (
+        <OfflineBanner onRetryPress={() => { setIsOffline(false); fetchFeed(true); }} />
+      ) : null}
+
+      {isQuotaExceeded ? <ProviderQuotaBanner /> : null}
+
+      {currentSession ? (
+        <ActiveSessionBanner
+          sessionId={currentSession.id}
+          activityId={currentSession.activity_id}
+          durationSeconds={currentSession.duration_seconds}
+          onResumePress={handleResumeSession}
+        />
+      ) : null}
+
+      <SyncProgressBar />
+
+      {resumableSource ? (
+        <SyncResumableCard
+          sourceTitle={resumableSource.title}
+          onFinishSyncPress={() => {
+            startResumableSync(resumableSource.id);
+            setResumableSource(null);
+          }}
+          onDismissPress={() => setResumableSource(null)}
+        />
+      ) : null}
+    </>
   );
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
+    <View style={styles.container}>
+      {/* Main Feed Content or Designed Empty States */}
+      {feedItems.length === 0 && isLoadingFeed ? (
+        <View style={[styles.staticContent, { paddingTop: headerHeight }]}>
+          {bannerStack}
+          <QueueSkeletonList count={4} />
+        </View>
+      ) : feedItems.length === 0 ? (
+        <View style={[styles.staticContent, { paddingTop: headerHeight }]}>
+          {bannerStack}
+          <NoSourcesState onAddSourcePress={() => setIsAddModalVisible(true)} />
+        </View>
+      ) : (
+        <FlatList
+          data={feedItems}
+          keyExtractor={(item) => item.id || item.content_id}
+          renderItem={renderFeedCard}
+          refreshing={isRefreshingFeed}
+          onRefresh={() => fetchFeed(true)}
+          onEndReached={() => fetchFeed(false)}
+          onEndReachedThreshold={0.5}
+          initialNumToRender={8}
+          maxToRenderPerBatch={10}
+          windowSize={5}
+          removeClippedSubviews={Platform.OS === 'android'}
+          ListHeaderComponent={bannerStack}
+          contentContainerStyle={[styles.listContent, { paddingTop: headerHeight }]}
+          scrollIndicatorInsets={{ top: headerHeight }}
+          ListEmptyComponent={
+            <EmptyFeedState
+              onSyncPress={() => fetchFeed(true)}
+              onAddSourcePress={() => setIsAddModalVisible(true)}
+            />
+          }
+        />
+      )}
+
       <GlassHeader
         title="Active Queue"
+        onHeightChange={setHeaderHeight}
         leftComponent={
           totalUnconsumed !== null ? (
             <View style={styles.countBadge}>
@@ -147,64 +211,6 @@ export default function QueueScreen() {
           </>
         }
       />
-
-      {/* Top Banner Notifications per SPEC §11.3 */}
-      {isOffline ? (
-        <OfflineBanner onRetryPress={() => { setIsOffline(false); fetchFeed(true); }} />
-      ) : null}
-
-      {isQuotaExceeded ? <ProviderQuotaBanner /> : null}
-
-      {currentSession ? (
-        <ActiveSessionBanner
-          sessionId={currentSession.id}
-          activityId={currentSession.activity_id}
-          durationSeconds={currentSession.duration_seconds}
-          onResumePress={handleResumeSession}
-        />
-      ) : null}
-
-      <SyncProgressBar />
-
-      {resumableSource ? (
-        <SyncResumableCard
-          sourceTitle={resumableSource.title}
-          onFinishSyncPress={() => {
-            startResumableSync(resumableSource.id);
-            setResumableSource(null);
-          }}
-          onDismissPress={() => setResumableSource(null)}
-        />
-      ) : null}
-
-      {/* Main Feed Content or Designed Empty States */}
-      {feedItems.length === 0 && isLoadingFeed ? (
-        <QueueSkeletonList count={4} />
-      ) : feedItems.length === 0 ? (
-        <NoSourcesState onAddSourcePress={() => setIsAddModalVisible(true)} />
-      ) : (
-        <FlatList
-          data={feedItems}
-          keyExtractor={(item) => item.id || item.content_id}
-          renderItem={renderFeedCard}
-          refreshing={isRefreshingFeed}
-          onRefresh={() => fetchFeed(true)}
-          onEndReached={() => fetchFeed(false)}
-          onEndReachedThreshold={0.5}
-          initialNumToRender={8}
-          maxToRenderPerBatch={10}
-          windowSize={5}
-          getItemLayout={getItemLayout}
-          removeClippedSubviews={Platform.OS === 'android'}
-          contentContainerStyle={styles.listContent}
-          ListEmptyComponent={
-            <EmptyFeedState
-              onSyncPress={() => fetchFeed(true)}
-              onAddSourcePress={() => setIsAddModalVisible(true)}
-            />
-          }
-        />
-      )}
 
       <AddSourceModal
         visible={isAddModalVisible}
@@ -285,7 +291,10 @@ const styles = StyleSheet.create({
     color: colors.ink,
   },
   listContent: {
-    paddingVertical: spacing.sm,
+    paddingBottom: spacing.sm,
+  },
+  staticContent: {
+    flex: 1,
   },
   loadingContainer: {
     alignItems: 'center',

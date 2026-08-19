@@ -6,16 +6,15 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { GlassHeader } from '@/core/components';
+import { GlassHeader, useGlassHeaderHeight } from '@/core/components';
 import { colors, rounded, spacing, typography } from '@/core/theme';
 import { useRouter } from 'expo-router';
 import { useSessionStore } from '@/features/sessions/sessionStore';
 
 export default function HistoryScreen() {
-  const insets = useSafeAreaInsets();
   const router = useRouter();
+  const [headerHeight, setHeaderHeight] = useGlassHeaderHeight();
 
   // Retrieve past session logs or empty array
   const activeSession = useSessionStore((state) => state.currentSession);
@@ -28,16 +27,11 @@ export default function HistoryScreen() {
   };
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
-      <GlassHeader
-        title="History"
-        subtitle="Completed workout & media sessions"
-      />
-
+    <View style={styles.container}>
       <FlatList
         data={historySessions}
         keyExtractor={(item) => item.id}
-        contentContainerStyle={styles.listContent}
+        contentContainerStyle={[styles.listContent, { paddingTop: headerHeight + spacing.lg }]}
         renderItem={({ item }) => (
           <View style={styles.sessionCard}>
             <View style={styles.cardHeader}>
@@ -78,6 +72,12 @@ export default function HistoryScreen() {
             </TouchableOpacity>
           </View>
         }
+      />
+
+      <GlassHeader
+        title="History"
+        subtitle="Completed workout & media sessions"
+        onHeightChange={setHeaderHeight}
       />
     </View>
   );
