@@ -10,7 +10,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { BlurView } from 'expo-blur';
+import { LiquidGlassSurface } from '../../../core/components';
 import { WatchLaterRejectedState } from '../../../core/components/states';
 import { colors, rounded, spacing, typography } from '../../../core/theme';
 import { useQueueStore } from '../queueStore';
@@ -49,12 +49,10 @@ export const AddSourceModal: React.FC<AddSourceModalProps> = ({ visible, onClose
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={handleClose}>
-      <BlurView
-        intensity={30}
-        tint="dark"
-        experimentalBlurMethod="dimezisBlurView"
-        style={styles.overlayBlur}
-      >
+      {/* Full-screen scrim — counts as 1 layer against the 2-blur-layer guardrail in
+          gpu-acceleration.md, shared with GlassHeader.tsx when this modal opens over the
+          main queue screen. Don't add a second nested glass layer inside this modal. */}
+      <LiquidGlassSurface blurRadius={30} specularEdge="none" style={styles.overlayBlur}>
         <KeyboardAvoidingView
           style={styles.overlay}
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -120,7 +118,7 @@ export const AddSourceModal: React.FC<AddSourceModalProps> = ({ visible, onClose
             )}
           </View>
         </KeyboardAvoidingView>
-      </BlurView>
+      </LiquidGlassSurface>
     </Modal>
   );
 };
