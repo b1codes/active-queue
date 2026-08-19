@@ -10,32 +10,40 @@ import Animated, {
   withRepeat,
   withTiming,
 } from 'react-native-reanimated';
-import { colors, rounded, spacing } from '../theme';
+import { colors as themeColors, rounded, spacing } from '../theme';
 
 interface ChromaticPulseProps {
+  /**
+   * Palette to cycle through, in cycle order (min 2, recommended 3-4), sourced from the
+   * consuming screen's own theme tokens per chromatic-pulse.md's Implementation Notes.
+   * Defaults to the LLC ember cycle used by the existing skeleton states.
+   */
+  colors?: string[];
   style?: StyleProp<ViewStyle>;
   testID?: string;
 }
 
 const CHROMATIC_PULSE_DURATION_MS = 3200;
 const CHROMATIC_EASE = Easing.bezier(0.45, 0, 0.55, 1);
-const EMBER_PALETTE = [
-  colors.heatCorona, // Corona (#FF9500)
-  colors.heatCore,   // Core (#FF3B30)
-  colors.emberDeep,  // Ember (#65201E)
-  colors.heatCorona, // Loop back to Corona
+const DEFAULT_EMBER_PALETTE = [
+  themeColors.heatCorona, // Corona (#FF9500)
+  themeColors.heatCore,   // Core (#FF3B30)
+  themeColors.emberDeep,  // Ember (#65201E)
+  themeColors.heatCorona, // Loop back to Corona
 ];
 
 /**
  * Signature Chromatic Pulse Loading Indicator per DESIGN.md §5 & llc-react standards
  * UI Thread Worklet execution via Reanimated v3
- * Ember cycle: Corona (#FF9500) -> Core (#FF3B30) -> Ember (#65201E) -> Corona (#FF9500)
+ * Default ember cycle: Corona (#FF9500) -> Core (#FF3B30) -> Ember (#65201E) -> Corona (#FF9500)
  * Duration: 3200ms, Easing: bezier(0.45, 0, 0.55, 1), Opacity: 0.55 -> 1.0 -> 0.55
  * Native Reduced Motion path included via useReducedMotion()
  */
-export const ChromaticPulse: React.FC<ChromaticPulseProps> = memo(({ style, testID }) => {
+export const ChromaticPulse: React.FC<ChromaticPulseProps> = memo(({ colors, style, testID }) => {
   const reduceMotion = useReducedMotion();
   const progress = useSharedValue(0);
+  const palette = colors && colors.length >= 2 ? [...colors, colors[0]] : DEFAULT_EMBER_PALETTE;
+  const inputRange = palette.map((_, i) => i / (palette.length - 1));
 
   useEffect(() => {
     if (reduceMotion) {
@@ -56,15 +64,15 @@ export const ChromaticPulse: React.FC<ChromaticPulseProps> = memo(({ style, test
   const animatedStyle = useAnimatedStyle(() => {
     if (reduceMotion) {
       return {
-        backgroundColor: colors.heatCorona,
+        backgroundColor: palette[0],
         opacity: 1.0,
       };
     }
 
     const backgroundColor = interpolateColor(
       progress.value,
-      [0, 0.33, 0.66, 1],
-      EMBER_PALETTE
+      inputRange,
+      palette
     );
 
     const opacity = interpolate(
@@ -128,9 +136,9 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   skeletonRow: {
-    backgroundColor: colors.lensFlat,
-    borderColor: colors.glassEdge,
-    borderTopColor: colors.glassSpecularLight,
+    backgroundColor: themeColors.lensFlat,
+    borderColor: themeColors.glassEdge,
+    borderTopColor: themeColors.glassSpecularLight,
     borderRadius: rounded.md,
     borderWidth: 1,
     flexDirection: 'row',
