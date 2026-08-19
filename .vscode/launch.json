@@ -91,6 +91,20 @@
       "console": "integratedTerminal"
     },
     {
+      "name": "Frontend: Storybook iOS",
+      "type": "node",
+      "request": "launch",
+      "program": "${workspaceFolder}/frontend/node_modules/expo/bin/cli",
+      "args": [
+        "run:ios"
+      ],
+      "cwd": "${workspaceFolder}/frontend",
+      "env": {
+        "STORYBOOK_ENABLED": "true"
+      },
+      "console": "integratedTerminal"
+    },
+    {
       "name": "Frontend: Jest All Tests",
       "type": "node",
       "request": "launch",
