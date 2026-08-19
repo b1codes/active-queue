@@ -208,7 +208,8 @@ async def seed_db(
             notifications_enabled=True,
         ),
         consumed_content_ids=[
-            f"fx:{SAMPLE_WORKOUT_ITEMS[i]['external_id']}" for i in sorted(PRIMARY_CONSUMED_INDICES)
+            f"fx:{SAMPLE_WORKOUT_ITEMS[i]['external_id']}"
+            for i in sorted(PRIMARY_CONSUMED_INDICES)
         ],
     )
 
@@ -402,9 +403,7 @@ async def seed_db(
     for chunk_start in range(0, len(feed_items), 400):
         batch_feed = db.batch()
         for f_item in feed_items[chunk_start : chunk_start + 400]:
-            batch_feed.set(
-                db.collection("feed_items").document(f_item.id), f_item.to_firestore()
-            )
+            batch_feed.set(db.collection("feed_items").document(f_item.id), f_item.to_firestore())
         await batch_feed.commit()
 
     # 5. Seed Workout Sessions — a wide spread of statuses, activities, and dates for history/queue testing
