@@ -1,4 +1,4 @@
-import React, { memo } from 'react';
+import React, { memo, useCallback } from 'react';
 import {
   Alert,
   Image,
@@ -40,13 +40,16 @@ function formatTabularDuration(seconds: number, fallbackLabel?: string): string 
 export const FeedCard: React.FC<FeedCardProps> = memo(({ item, isMatched = false }) => {
   const hideFeedItem = useQueueStore((state) => state.hideFeedItem);
 
-  const handleHide = () => {
+  const handleHide = useCallback(() => {
     if (item?.content_id) {
       hideFeedItem(item.content_id);
     }
-  };
+  }, [hideFeedItem, item?.content_id]);
 
-  const showOptions = () => {
+  // Stable identity matters here: this is handed to ThermalGlowTouchable as
+  // onLongPress, and a fresh closure each render used to feed straight into
+  // rebuilding its gestures.
+  const showOptions = useCallback(() => {
     Alert.alert(
       item?.title || 'Queued Content',
       'Select an action for this queued content:',
@@ -63,7 +66,7 @@ export const FeedCard: React.FC<FeedCardProps> = memo(({ item, isMatched = false
       ],
       { cancelable: true }
     );
-  };
+  }, [handleHide, item?.title]);
 
   const safeTitle = (item?.title || 'Untitled Content').trim();
   const rawProvider = (item?.provider || 'Source').trim();
