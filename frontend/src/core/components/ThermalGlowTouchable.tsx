@@ -1,7 +1,8 @@
-import React, { memo } from 'react';
+import React, { memo, useCallback, useEffect } from 'react';
 import { StyleProp, StyleSheet, View, ViewStyle } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
+  cancelAnimation,
   Easing,
   runOnJS,
   useAnimatedStyle,
@@ -13,6 +14,9 @@ import { colors } from '../theme';
 
 const FAST_HEAT_EASE = Easing.out(Easing.quad);
 const COOL_DISSIPATE_EASE = Easing.out(Easing.cubic);
+
+const GLOW_DIAMETER = 120;
+const GLOW_RADIUS = GLOW_DIAMETER / 2;
 
 export const LIQUID_GLASS_SPRING = {
   stiffness: 180,
@@ -63,6 +67,45 @@ export const ThermalGlowTouchable: React.FC<ThermalGlowTouchableProps> = memo(({
   const glowOpacity = useSharedValue(0);
   const cardScale = useSharedValue(1);
 
+  /**
+   * Force every animated property back to its resting value.
+   *
+   * Reanimated writes the glow's opacity/transform straight to the native view
+   * on the UI thread, bypassing the shadow tree. Under Fabric that state can
+   * outlive this component: FlatList rows are virtualized, Fabric pools and
+   * reuses their native views, and it decides what to repaint by diffing the
+   * new element against the props *React* last recorded. The UI-thread writes
+   * were never in that record, so the diff reads "resting -> resting", emits no
+   * update, and the previous row's mid-glow frame stays painted on a card that
+   * was never touched.
+   *
+   * In-flight animations are cancelled first, otherwise the next frame would
+   * simply overwrite the reset.
+   */
+  const resetGlow = useCallback(() => {
+    cancelAnimation(glowOpacity);
+    cancelAnimation(glowScale);
+    cancelAnimation(cardScale);
+    glowOpacity.value = 0;
+    glowScale.value = 0;
+    cardScale.value = 1;
+    touchX.value = 0;
+    touchY.value = 0;
+  }, [cardScale, glowOpacity, glowScale, touchX, touchY]);
+
+  useEffect(() => {
+    // Unmount is the load-bearing half. `onBegin` drives the glow to full
+    // opacity and only `onFinalize` fades it out, so a row whose finger is
+    // still down when virtualization recycles it (windowSize={5} makes this
+    // easy to hit) dies mid-glow and hands that state to the view pool.
+    // Resetting here happens while the view is still attached, so the write is
+    // a genuine change and does reach the native view before it is reused.
+    // Resetting on mount covers the symmetric case of inheriting a view that
+    // some earlier instance already leaked onto.
+    resetGlow();
+    return resetGlow;
+  }, [resetGlow]);
+
   const triggerOnPress = () => {
     if (onPress && !disabled) {
       onPress();
@@ -110,8 +153,8 @@ export const ThermalGlowTouchable: React.FC<ThermalGlowTouchableProps> = memo(({
   const composedGesture = Gesture.Race(tapGesture, longPressGesture);
 
   const animatedGlowStyle = useAnimatedStyle(() => ({
-    left: touchX.value - 60,
-    top: touchY.value - 60,
+    left: touchX.value - GLOW_RADIUS,
+    top: touchY.value - GLOW_RADIUS,
     transform: [{ scale: glowScale.value }],
     opacity: glowOpacity.value,
   }));
@@ -143,7 +186,7 @@ export const ThermalGlowTouchable: React.FC<ThermalGlowTouchableProps> = memo(({
           pointerEvents="none"
           style={[
             styles.glowCircle,
-            { backgroundColor: glowColor, borderRadius: 60 },
+            { backgroundColor: glowColor },
             animatedGlowStyle,
           ]}
         />
@@ -160,9 +203,18 @@ const styles = StyleSheet.create({
     position: 'relative',
   },
   glowCircle: {
-    height: 120,
+    // Resting state is declared statically as well as in `animatedGlowStyle`,
+    // so React owns a baseline for every property Reanimated mutates and a
+    // freshly mounted glow paints invisible on frame one rather than
+    // inheriting whatever a recycled view arrived with.
+    borderRadius: GLOW_RADIUS,
+    height: GLOW_DIAMETER,
+    left: -GLOW_RADIUS,
+    opacity: 0,
     position: 'absolute',
-    width: 120,
+    top: -GLOW_RADIUS,
+    transform: [{ scale: 0 }],
+    width: GLOW_DIAMETER,
     zIndex: 10,
   },
 });

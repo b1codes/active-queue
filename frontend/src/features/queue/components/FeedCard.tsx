@@ -71,11 +71,14 @@ export const FeedCard: React.FC<FeedCardProps> = memo(({ item, isMatched = false
   const formattedDuration = formatTabularDuration(item?.duration_seconds, item?.duration_label);
 
   return (
-    <View
-      style={styles.cardContainer}
-      shouldRasterizeIOS={true}
-      renderToHardwareTextureAndroid={true}
-    >
+    // No shouldRasterizeIOS / renderToHardwareTextureAndroid here: this wrapper
+    // is plain layout (padding, maxWidth, centering) with nothing expensive to
+    // cache, so rasterizing bought nothing but a per-row offscreen bitmap. It
+    // also actively hurt — the cached CALayer is not invalidated by the
+    // UI-thread property writes ThermalGlowTouchable's glow performs, so a
+    // mid-glow frame could survive in the cache and be redrawn when Fabric
+    // reused this view for a different row.
+    <View style={styles.cardContainer}>
       <View style={[styles.card, isMatched && styles.cardMatched]}>
         <ThermalGlowTouchable
           style={styles.cardMainTouchable}
