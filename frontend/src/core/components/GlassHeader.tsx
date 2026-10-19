@@ -46,7 +46,9 @@ export function useGlassHeaderHeight(): [number, (height: number) => void] {
  * LLC Liquid Glass Header component per DESIGN.md §5 & llc-react standards.
  *
  * Renders through LiquidGlassSurface, which resolves the tier per react-native-glass.md §0 —
- * the native UIVisualEffectView material on iOS 26+, the Skia fallback below that.
+ * the native UIVisualEffectView material on iOS 26+ (Tier 1), the AGSL GPU shader on
+ * Android 13+ New Architecture dev builds (Tier 2), and the Skia fallback on iOS < 26 or
+ * older/Expo Go runtimes (Tier 3).
  *
  * The header is an absolute overlay, not an in-flow band, and it is deliberately transparent
  * behind the glass: both tiers refract whatever is painted beneath them, so a screen's content

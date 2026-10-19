@@ -30,6 +30,7 @@
     "@storybook/addon-ondevice-controls": "^10.5.4",
     "@storybook/react-native": "^10.5.4",
     "@storybook/react-native-ui-lite": "^10.5.4",
+    "@uginy/react-native-liquid-glass": "^1.2.6",
     "cross-env": "^10.1.0",
     "expo": "~54.0.37",
     "expo-asset": "^12.0.13",
