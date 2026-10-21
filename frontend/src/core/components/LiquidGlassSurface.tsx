@@ -53,8 +53,10 @@ interface LiquidGlassSurfaceProps {
  *
  * Tier 1 (iOS 26+ dev build): renders through @callstack/liquid-glass's LiquidGlassView —
  * the real OS UIVisualEffectView material (§1).
- * Tier 3 (everything else): the zero-dependency Skia fallback — backdrop blur + 160%
- * saturation matrix + specular gradient stroke (§3).
+ * Tier 3 (everything else): the zero-dependency Skia fallback — glassSurface fill + specular
+ * gradient stroke (§3). The BackdropFilter blur + 160% saturation matrix only filter content
+ * already drawn earlier in the same Skia Canvas, not the native views behind it, so over
+ * real screen content Tier 3 reads as a translucent tint rather than a frosted blur.
  *
  * Every glass surface in the app goes through this component, so the whole app renders on
  * one tier rather than mixing native material with the hand-rolled fallback on one screen.

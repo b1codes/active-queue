@@ -49,8 +49,8 @@ export function useGlassHeaderHeight(): [number, (height: number) => void] {
  * the native UIVisualEffectView material on iOS 26+, the Skia fallback below that.
  *
  * The header is an absolute overlay, not an in-flow band, and it is deliberately transparent
- * behind the glass: both tiers refract whatever is painted beneath them, so a screen's content
- * has to actually pass underneath for there to be anything to refract. It also absorbs the top
+ * behind the glass: Tier 1 refracts whatever is painted beneath it and Tier 3's translucent tint
+ * lets it show through, so a screen's content has to actually pass underneath. It also absorbs the top
  * safe-area inset itself so the material extends under the status bar rather than stopping at
  * it. Screens must render it *after* their scroll view and inset that view's content by
  * useGlassHeaderHeight().
