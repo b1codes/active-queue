@@ -1,6 +1,4 @@
 import { isLiquidGlassSupported } from '@callstack/liquid-glass';
-import { requireOptionalNativeModule } from 'expo';
-import { Platform } from 'react-native';
 
 /**
  * Liquid Glass tier resolution per llc-react/context/react-native-glass.md §0.
@@ -10,19 +8,15 @@ import { Platform } from 'react-native';
  * instead of mixing native material with a shader or hand-rolled fallback.
  *
  * - Tier 1 (@callstack/liquid-glass): iOS 26+ dev builds — real OS UIVisualEffectView material.
- * - Tier 2 (@uginy/react-native-liquid-glass): Android 13+ (API 33+) dev builds with New
- *   Architecture (Fabric) enabled — real-time AGSL RuntimeShader refraction.
- *   Note: although @uginy/react-native-liquid-glass ships an iOS 15+ Metal view, its
- *   `findBackdropSource` (ios/LiquidGlassView.swift) rejects any backdrop that is not a
- *   `UIImageView` covering >=15% of the window and renders 100% transparent over `<View>` /
- *   `<FlatList>` hierarchies (verified on iOS 18.6 simulator). iOS < 26 therefore falls through
- *   to Tier 3, whose Skia `BackdropFilter` blurs arbitrary UIKit view hierarchies.
- * - Tier 3 (@shopify/react-native-skia): zero-dependency Skia fallback for iOS < 26, Android < 13,
- *   Expo Go, or web.
+ * - Tier 2 (@uginy/react-native-liquid-glass): evaluated and rejected on both platforms, so it
+ *   never resolves today (see hasGpuShaderSupport). The tier number stays reserved so a future
+ *   shader backend slots in without renumbering.
+ * - Tier 3 (@shopify/react-native-skia): fallback for everything else. RN Skia's BackdropFilter
+ *   only filters content already drawn in the same Canvas, not the native views behind it, so
+ *   over real screen content this renders a translucent glassSurface fill + specular stroke,
+ *   not a true backdrop blur.
  */
 export type GlassTier = 1 | 2 | 3;
-
-const MIN_ANDROID_SHADER_API_LEVEL = 33;
 
 let cachedTier: GlassTier | null = null;
 
@@ -34,51 +28,27 @@ function isNativeMaterialSupported(): boolean {
   return isLiquidGlassSupported;
 }
 
-function parsePlatformMajorVersion(version: string | number): number {
-  const parsed = typeof version === 'number' ? version : parseInt(version, 10);
-  return Number.isNaN(parsed) ? 0 : parsed;
-}
-
-function isNewArchitectureEnabled(): boolean {
-  return Boolean((globalThis as { nativeFabricUIManager?: unknown }).nativeFabricUIManager);
-}
-
 function hasGpuShaderSupport(): boolean {
-  // Tier 2: real-time AGSL RuntimeShader refraction on Android 13+ (API 33+) with New
-  // Architecture enabled and a dev/release binary (no Expo Go) per react-native-glass.md §0 & §2.
-  // iOS < 26 intentionally skips Tier 2 and falls through to Tier 3: the package's iOS Metal
-  // implementation only samples UIImageView backdrops (>=15% window area) and renders nothing
-  // over View/FlatList content, whereas Android's LiquidGlassView.kt falls back to bestBgView.
-  if (!isNewArchitectureEnabled()) {
-    return false;
-  }
-
-  if (Platform.OS !== 'android') {
-    return false;
-  }
-
-  const apiLevel = parsePlatformMajorVersion(Platform.Version);
-  if (apiLevel < MIN_ANDROID_SHADER_API_LEVEL) {
-    return false;
-  }
-
-  // @uginy/react-native-liquid-glass registers an Expo module named 'LiquidGlass'.
-  // In Expo Go or unlinked builds this returns null, falling through to Tier 3.
-  return requireOptionalNativeModule('LiquidGlass') !== null;
+  // Tier 2: @uginy/react-native-liquid-glass@1.2.6 was evaluated and rejected on both platforms.
+  // - iOS: findBackdropSource (ios/LiquidGlassView.swift) only samples UIImageView backdrops and
+  //   renders fully transparent over View/FlatList content (verified on the iOS 18.6 simulator).
+  // - Android: LiquidGlassView.kt draws one static backdrop bitmap, shared by every instance and
+  //   only re-captured once all instances unmount, and paints it opaque (res.a = 1.0) — so the
+  //   glass freezes over a stale frame and hides the live list scrolling beneath it. The capture
+  //   source also prefers the largest ImageView (e.g. a single feed thumbnail) over the real
+  //   background, and includes each surface's own children, ghosting them behind themselves.
+  // Revisit if the package re-captures live content; until then every non-Tier-1 runtime uses Tier 3.
+  return false;
 }
 
 function resolveGlassTier(): GlassTier {
-  const nativeMaterial = isNativeMaterialSupported();
-  const gpuShader = !nativeMaterial && hasGpuShaderSupport();
-  const tier: GlassTier = nativeMaterial ? 1 : gpuShader ? 2 : 3;
+  const tier: GlassTier = isNativeMaterialSupported() ? 1 : hasGpuShaderSupport() ? 2 : 3;
   if (__DEV__) {
     // Which tier a build actually landed on is invisible from the UI alone — a Tier 1
     // surface over an opaque backdrop looks much like the Tier 3 fallback. Log it once so
     // "is the native material live?" is answerable without instrumenting a screen.
     // eslint-disable-next-line no-console
-    console.log(
-      `[useGlassTier] resolved Tier ${tier} (isLiquidGlassSupported=${nativeMaterial}, hasGpuShaderSupport=${gpuShader})`
-    );
+    console.log(`[useGlassTier] resolved Tier ${tier} (isLiquidGlassSupported=${isLiquidGlassSupported})`);
   }
   return tier;
 }

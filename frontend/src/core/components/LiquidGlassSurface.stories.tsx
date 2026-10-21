@@ -5,10 +5,10 @@ import { LiquidGlassSurface } from './LiquidGlassSurface';
 import { colors, rounded, spacing, typography } from '../theme';
 
 /**
- * Both render tiers refract whatever is painted beneath them, so every story
- * here needs real content behind the surface — a flat fill would make Tier 1
- * (native material) and Tier 3 (Skia fallback) look identical and defeat the
- * point of testing on-device.
+ * Tier 1 refracts whatever is painted beneath it and Tier 3 tints it, so every
+ * story here needs real content behind the surface — a flat fill would make
+ * Tier 1 (native material) and Tier 3 (Skia fallback) look identical and defeat
+ * the point of testing on-device.
  */
 function Backdrop() {
   return (

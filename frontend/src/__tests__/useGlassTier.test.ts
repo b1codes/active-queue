@@ -5,18 +5,12 @@ jest.mock("@callstack/liquid-glass", () => ({
   isLiquidGlassSupported: false,
 }));
 
-const mockRequireOptionalNativeModule = jest.fn<unknown, [string]>(() => null);
-
-jest.mock("expo", () => ({
-  requireOptionalNativeModule: (name: string) => mockRequireOptionalNativeModule(name),
-}));
-
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const liquidGlass = require("@callstack/liquid-glass") as { isLiquidGlassSupported: boolean };
 
 const globalWithFabric = globalThis as { nativeFabricUIManager?: unknown };
 
-function setPlatform(os: "ios" | "android" | "web", version: string | number) {
+function setPlatform(os: "ios" | "android", version: string | number) {
   Object.defineProperty(Platform, "OS", { configurable: true, value: os });
   Object.defineProperty(Platform, "Version", { configurable: true, value: version });
 }
@@ -29,22 +23,14 @@ describe("useGlassTier", () => {
   beforeEach(() => {
     __resetGlassTierCacheForTests();
     liquidGlass.isLiquidGlassSupported = false;
-    mockRequireOptionalNativeModule.mockReset();
-    mockRequireOptionalNativeModule.mockReturnValue(null);
-    delete globalWithFabric.nativeFabricUIManager;
-    setPlatform("ios", "18.6");
   });
 
   afterAll(() => {
-    setPlatform(originalOS as "ios" | "android" | "web", originalVersion);
-    if (originalFabric === undefined) {
-      delete globalWithFabric.nativeFabricUIManager;
-    } else {
-      globalWithFabric.nativeFabricUIManager = originalFabric;
-    }
+    setPlatform(originalOS as "ios" | "android", originalVersion);
+    globalWithFabric.nativeFabricUIManager = originalFabric;
   });
 
-  it("falls back to Tier 3 when neither Tier 1 nor Tier 2 is available", () => {
+  it("falls back to Tier 3 when the native liquid glass material is unavailable", () => {
     expect(useGlassTier()).toBe(3);
   });
 
@@ -53,56 +39,17 @@ describe("useGlassTier", () => {
     expect(useGlassTier()).toBe(1);
   });
 
-  it("prefers Tier 1 over Tier 2 when both native material and GPU shader are available", () => {
-    liquidGlass.isLiquidGlassSupported = true;
+  // Tier 2 (@uginy/react-native-liquid-glass) was rejected on both platforms — guard against
+  // it being re-enabled on the runtimes it was evaluated on without revisiting that decision.
+  it("resolves to Tier 3, not Tier 2, on Android 13+ with New Architecture", () => {
     globalWithFabric.nativeFabricUIManager = {};
-    mockRequireOptionalNativeModule.mockReturnValue({});
-    setPlatform("ios", "26.2");
-
-    expect(useGlassTier()).toBe(1);
+    setPlatform("android", 34);
+    expect(useGlassTier()).toBe(3);
   });
 
-  it("resolves to Tier 2 on Android 13+ (API 33+) with New Architecture and linked LiquidGlass module", () => {
+  it("resolves to Tier 3, not Tier 2, on iOS below 26", () => {
     globalWithFabric.nativeFabricUIManager = {};
-    mockRequireOptionalNativeModule.mockImplementation((name) =>
-      name === "LiquidGlass" ? {} : null
-    );
-    setPlatform("android", 33);
-
-    expect(useGlassTier()).toBe(2);
-  });
-
-  it("falls back to Tier 3 on iOS 15–25 so non-image View/FlatList backdrops blur via Skia", () => {
-    globalWithFabric.nativeFabricUIManager = {};
-    mockRequireOptionalNativeModule.mockImplementation((name) =>
-      name === "LiquidGlass" ? {} : null
-    );
     setPlatform("ios", "18.6");
-
-    expect(useGlassTier()).toBe(3);
-  });
-
-  it("falls back to Tier 3 when New Architecture (Fabric) is disabled", () => {
-    delete globalWithFabric.nativeFabricUIManager;
-    mockRequireOptionalNativeModule.mockReturnValue({});
-    setPlatform("android", 34);
-
-    expect(useGlassTier()).toBe(3);
-  });
-
-  it("falls back to Tier 3 below the Android OS version floor (API < 33)", () => {
-    globalWithFabric.nativeFabricUIManager = {};
-    mockRequireOptionalNativeModule.mockReturnValue({});
-
-    setPlatform("android", 32);
-    expect(useGlassTier()).toBe(3);
-  });
-
-  it("falls back to Tier 3 in Expo Go when the native LiquidGlass module is not linked", () => {
-    globalWithFabric.nativeFabricUIManager = {};
-    mockRequireOptionalNativeModule.mockReturnValue(null);
-    setPlatform("android", 34);
-
     expect(useGlassTier()).toBe(3);
   });
 

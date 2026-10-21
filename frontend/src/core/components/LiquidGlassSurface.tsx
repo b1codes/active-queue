@@ -1,10 +1,6 @@
 import React, { memo, useEffect, useState } from 'react';
 import { LayoutChangeEvent, StyleSheet, View, ViewStyle } from 'react-native';
-import { LiquidGlassView as NativeLiquidGlassView } from '@callstack/liquid-glass';
-import type {
-  LiquidGlassConfig,
-  LiquidGlassViewProps as ShaderLiquidGlassViewProps,
-} from '@uginy/react-native-liquid-glass';
+import { LiquidGlassView } from '@callstack/liquid-glass';
 import {
   BackdropFilter,
   Blur,
@@ -25,30 +21,6 @@ const SATURATE_160_MATRIX = [
   0, 0, 0, 1, 0,
 ];
 
-// Tier 2 (@uginy/react-native-liquid-glass) parses tintColor as #RRGGBB / rgb() and takes
-// alpha separately via glassOpacity (0–0.5), matching colors.glassSurface ('rgba(255,255,255,0.05)').
-const TIER_2_TINT_HEX = '#ffffff';
-const TIER_2_GLASS_OPACITY = 0.05;
-const TIER_2_SATURATION = 1.6;
-
-type ShaderLiquidGlassModule = {
-  LiquidGlassView: React.ComponentType<ShaderLiquidGlassViewProps>;
-  LIQUID_GLASS_FROSTED: LiquidGlassConfig;
-};
-
-let cachedShaderModule: ShaderLiquidGlassModule | null = null;
-
-function getShaderLiquidGlassModule(): ShaderLiquidGlassModule {
-  if (cachedShaderModule === null) {
-    // Gate the runtime import behind useGlassTier()'s capability check rather than
-    // evaluating @uginy/react-native-liquid-glass at module load time (react-native-glass.md §2):
-    // the package calls requireNativeView('LiquidGlass') at top-level evaluation.
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    cachedShaderModule = require('@uginy/react-native-liquid-glass') as ShaderLiquidGlassModule;
-  }
-  return cachedShaderModule;
-}
-
 // GPU Overdraw Guardrail, per gpu-acceleration.md: max 2 concurrent blur/backdrop-filter
 // layers app-wide, counted per rendered instance regardless of tier. Dev-only mount counter
 // so a 3rd concurrent glass layer fails loudly instead of silently degrading frame rate.
@@ -59,18 +31,18 @@ interface LiquidGlassSurfaceProps {
   children?: React.ReactNode;
   borderRadius?: number;
   /**
-   * Used by Tier 2 (shader) and Tier 3 (Skia). Tier 1's blur radius is fixed by the OS
-   * material variant and cannot be tuned, so this is ignored when Tier 1 resolves.
+   * Tier 3 only. Tier 1's blur radius is fixed by the OS material variant and cannot
+   * be tuned, so this is ignored when Tier 1 resolves.
    */
   blurRadius?: number;
   style?: ViewStyle;
   /**
-   * 'full' draws the specular highlight around all four edges (glass cards).
+   * 'full' draws the 3-stop specular gradient stroke around all four edges (glass cards).
    * 'none' skips it — use when the caller renders its own directional edge (e.g. a header's
    * bottom border only) or when the surface is a full-bleed scrim with no edge at all.
    *
-   * Used by Tier 2 and Tier 3. The Tier 1 native material draws its own specular edge as
-   * part of the UIVisualEffectView, so this is ignored when Tier 1 resolves.
+   * Tier 3 only. The Tier 1 native material draws its own specular edge as part of the
+   * UIVisualEffectView, so this is ignored when Tier 1 resolves.
    */
   specularEdge?: 'full' | 'none';
   testID?: string;
@@ -81,13 +53,13 @@ interface LiquidGlassSurfaceProps {
  *
  * Tier 1 (iOS 26+ dev build): renders through @callstack/liquid-glass's LiquidGlassView —
  * the real OS UIVisualEffectView material (§1).
- * Tier 2 (Android 13+ New Architecture dev build): renders through
- * @uginy/react-native-liquid-glass's AGSL GPU shader LiquidGlassView with the FROSTED preset (§2).
- * Tier 3 (iOS < 26, Android < 13, Expo Go, web): the zero-dependency Skia fallback — backdrop
- * blur + 160% saturation matrix + specular gradient stroke (§3).
+ * Tier 3 (everything else): the zero-dependency Skia fallback — glassSurface fill + specular
+ * gradient stroke (§3). The BackdropFilter blur + 160% saturation matrix only filter content
+ * already drawn earlier in the same Skia Canvas, not the native views behind it, so over
+ * real screen content Tier 3 reads as a translucent tint rather than a frosted blur.
  *
  * Every glass surface in the app goes through this component, so the whole app renders on
- * one tier rather than mixing native material with a shader or hand-rolled fallback on one screen.
+ * one tier rather than mixing native material with the hand-rolled fallback on one screen.
  */
 export const LiquidGlassSurface: React.FC<LiquidGlassSurfaceProps> = memo(
   ({ children, borderRadius = 0, blurRadius = 20, style, specularEdge = 'full', testID }) => {
@@ -121,7 +93,7 @@ export const LiquidGlassSurface: React.FC<LiquidGlassSurfaceProps> = memo(
     // device is in light mode.
     if (tier === 1) {
       return (
-        <NativeLiquidGlassView
+        <LiquidGlassView
           testID={testID}
           effect="regular"
           colorScheme="dark"
@@ -129,39 +101,7 @@ export const LiquidGlassSurface: React.FC<LiquidGlassSurfaceProps> = memo(
           style={[styles.container, { borderRadius }, style]}
         >
           {children}
-        </NativeLiquidGlassView>
-      );
-    }
-
-    // Tier 2 — AGSL GPU shader on Android 13+. Uses the package's LIQUID_GLASS_FROSTED
-    // preset per react-native-glass.md §2, overridden with the caller's blurRadius/cornerRadius
-    // and ActiveQueue's glassSurface tint token. Rendered inside an absoluteFill backdrop sized
-    // from onLayout because the package's internal wrapper View drops flex styles (which would
-    // collapse full-bleed flex:1 surfaces like AddSourceModal).
-    if (tier === 2) {
-      const { LiquidGlassView: ShaderLiquidGlassView, LIQUID_GLASS_FROSTED } =
-        getShaderLiquidGlassModule();
-      return (
-        <View testID={testID} onLayout={onLayout} style={[styles.container, { borderRadius }, style]}>
-          {size.width > 0 && size.height > 0 ? (
-            <View style={StyleSheet.absoluteFill} pointerEvents="none">
-              <ShaderLiquidGlassView
-                {...LIQUID_GLASS_FROSTED}
-                blurRadius={blurRadius}
-                cornerRadius={borderRadius}
-                tintColor={TIER_2_TINT_HEX}
-                glassOpacity={TIER_2_GLASS_OPACITY}
-                saturation={TIER_2_SATURATION}
-                borderIntensity={specularEdge === 'full' ? LIQUID_GLASS_FROSTED.borderIntensity : 0}
-                edgeGlowIntensity={
-                  specularEdge === 'full' ? LIQUID_GLASS_FROSTED.edgeGlowIntensity : 0
-                }
-                style={{ width: size.width, height: size.height }}
-              />
-            </View>
-          ) : null}
-          {children}
-        </View>
+        </LiquidGlassView>
       );
     }
 
