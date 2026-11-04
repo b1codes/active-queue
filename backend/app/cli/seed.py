@@ -144,7 +144,7 @@ async def seed_firebase_auth(users: list[dict[str, str]], quiet: bool = False) -
                     print(f"  ✓ Created Firebase Auth user: {display_name} ({target_uid})")
 
             seeded_count += 1
-        except Exception as err:
+        except Exception as err:  # noqa: BLE001 - best effort per user; report and continue
             logger.warning("firebase_auth_seed_failed", uid=target_uid, error=str(err))
             if not quiet:
                 print(f"  ⚠ Failed to seed Auth user {target_uid}: {err}")
@@ -663,7 +663,7 @@ def main() -> None:
                 quiet=args.quiet,
             )
         )
-    except Exception as err:
+    except Exception as err:  # noqa: BLE001 - CLI entrypoint: any failure exits 1
         print(f"\n❌ Error during database seeding: {err}", file=sys.stderr)
         sys.exit(1)
 

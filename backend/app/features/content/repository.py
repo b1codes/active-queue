@@ -50,7 +50,7 @@ def decode_cursor(cursor_str: str) -> FeedCursor | None:
             payload = json.loads(raw_str)
             return FeedCursor(datetime.fromisoformat(payload["t"]), str(payload["id"]))
         return FeedCursor(datetime.fromisoformat(raw_str))
-    except Exception:
+    except (ValueError, KeyError, TypeError):  # bad base64/UTF-8/JSON/ISO all raise these
         return None
 
 
@@ -251,7 +251,8 @@ class ContentRepository:
         if len(results) == limit:
             last = results[-1]
             return results, encode_cursor(last.published_at, last.id)
-        assert position is not None
+        if position is None:  # pragma: no cover - a scan that read nothing has exhausted
+            return results, None
         return results, encode_cursor(position.published_at, position.doc_id)
 
     def _cursor_values(self, cursor: FeedCursor, tie_break: bool) -> dict[str, Any]:

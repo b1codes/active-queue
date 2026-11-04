@@ -306,14 +306,14 @@ class ContentService:
                         },
                     )
                     raise
-                logger.error("sync_fetch_error", source_id=source_id, error=str(err))
+                logger.exception("sync_fetch_error", source_id=source_id)
                 await self._source_repo.update_source(
                     source.id,
                     {"status": "error", "error_message": str(err), "updated_at": now},
                 )
                 raise
             except Exception as err:
-                logger.error("sync_fetch_error", source_id=source_id, error=str(err))
+                logger.exception("sync_fetch_error", source_id=source_id)
                 await self._source_repo.update_source(
                     source.id,
                     {"status": "error", "error_message": str(err), "updated_at": now},

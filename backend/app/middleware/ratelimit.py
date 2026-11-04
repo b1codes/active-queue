@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import base64
+import contextlib
 import json
 import time
 from typing import TYPE_CHECKING
@@ -63,7 +64,7 @@ def _extract_identity(request: Request) -> tuple[str, str]:
             token = auth_header[7:].strip()
             parts = token.split(".")
             if len(parts) == 3:
-                try:
+                with contextlib.suppress(ValueError, TypeError):
                     payload_b64 = parts[1]
                     rem = len(payload_b64) % 4
                     if rem:
@@ -78,8 +79,6 @@ def _extract_identity(request: Request) -> tuple[str, str]:
                             uid = extracted_uid
                         if not role and claims.get("role") and isinstance(claims.get("role"), str):
                             role = claims.get("role")
-                except Exception:
-                    pass
 
     if uid:
         request.state.uid = uid
@@ -127,7 +126,7 @@ class FixedWindowRateLimiter:
             category = "sync" if is_sync_endpoint else "general"
 
         if role is None:
-            if identifier.startswith("uid:") or identifier.startswith("user"):
+            if identifier.startswith(("uid:", "user")):
                 role = "user"
             elif identifier.startswith("ip:") or identifier == "anonymous":
                 role = "anonymous"

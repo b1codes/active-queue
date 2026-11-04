@@ -3,7 +3,7 @@
  *   jest.mock('expo-router', () => require('@/test-utils/router').expoRouterMock);
  * then drive params with `setParams` and assert navigation through `router`.
  */
-import React, { useEffect } from 'react';
+import React, { useEffect, type EffectCallback } from 'react';
 
 export const router = {
   push: jest.fn(),
@@ -50,7 +50,7 @@ export const expoRouterMock = {
   useLocalSearchParams: () => params,
   useSegments: () => segments,
   // Screens refetch on focus; in tests "focus" is mount.
-  useFocusEffect: (effect: () => void | (() => void)) => {
+  useFocusEffect: (effect: EffectCallback) => {
     useEffect(effect, [effect]);
   },
   Stack: Navigator,

@@ -29,7 +29,7 @@ REDACT_KEYS = {
 
 
 def redact_sensitive_keys(
-    logger: structlog.types.WrappedLogger,
+    _logger: structlog.types.WrappedLogger,
     method_name: str,
     event_dict: structlog.types.EventDict,
 ) -> structlog.types.EventDict:
@@ -58,13 +58,12 @@ def redact_sensitive_keys(
             return [redact_val(key, item) for item in val]
         return val
 
-    res = {k: redact_val(k, v) for k, v in event_dict.items()}
-    return res
+    return {k: redact_val(k, v) for k, v in event_dict.items()}
 
 
 def map_house_fields(
-    logger: structlog.types.WrappedLogger,
-    method_name: str,
+    _logger: structlog.types.WrappedLogger,
+    _method_name: str,
     event_dict: structlog.types.EventDict,
 ) -> structlog.types.EventDict:
     """Maps structlog fields to the house logging format.

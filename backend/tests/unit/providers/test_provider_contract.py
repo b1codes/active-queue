@@ -117,7 +117,8 @@ async def test_provider_contract_get_playlist_metadata(
     assert isinstance(fx_meta, PlaylistMetadata)
     assert fx_meta.source_id == "PLcontract_1"
     assert isinstance(fx_meta.title, str)
-    assert fx_meta.item_count is not None and fx_meta.item_count > 0
+    assert fx_meta.item_count is not None
+    assert fx_meta.item_count > 0
 
     # Test YouTubeProvider with httpx mock
     transport = httpx.MockTransport(_mock_youtube_httpx_handler)

@@ -15,7 +15,7 @@ RESET   := \033[0m
         storybook storybook-ios storybook-android \
         docker-up docker-down docker-build emulators emulators-stop \
         seed-db seed \
-        test test-backend test-backend-fast test-emulator test-frontend \
+        check test test-backend test-backend-fast test-emulator test-frontend \
         lint lint-backend lint-frontend \
         typecheck typecheck-backend typecheck-frontend \
         format format-backend \
@@ -48,6 +48,7 @@ help:
 	@echo "  $(GREEN)seed-db$(RESET)         Seed local Firestore and Auth emulators with mock test data"
 	@echo "  $(GREEN)seed$(RESET)            Alias for seed-db"
 	@echo ""
+	@echo "  $(GREEN)check$(RESET)             Run every CI gate locally (lint, types, tests, coverage)"
 	@echo "  $(GREEN)test$(RESET)              Run all unit tests (backend + frontend)"
 	@echo "  $(GREEN)test-backend$(RESET)      Full pytest suite on test emulators + 95% coverage gate"
 	@echo "  $(GREEN)test-backend-fast$(RESET) Unit + mocked integration tests only (no emulators)"
@@ -183,6 +184,22 @@ seed: seed-db
 ## test: Run tests for both backend and frontend
 test: test-backend test-frontend
 
+## check: The same gates CI enforces (see docs/testing.md). Run before pushing.
+check:
+	@echo "$(BLUE)[1/6] Backend lint & format$(RESET)"
+	cd backend && uv run ruff check app tests && uv run ruff format --check app tests
+	@echo "$(BLUE)[2/6] Backend types (mypy --strict)$(RESET)"
+	cd backend && uv run mypy --strict app
+	@echo "$(BLUE)[3/6] Backend tests on test emulators + coverage gate$(RESET)"
+	$(MAKE) test-backend
+	@echo "$(BLUE)[4/6] Frontend lint & types$(RESET)"
+	cd frontend && pnpm lint && pnpm typecheck
+	@echo "$(BLUE)[5/6] Frontend tests + coverage gate + untested-file check$(RESET)"
+	cd frontend && pnpm test:coverage && node scripts/check-untested-files.js coverage/coverage-final.json
+	@echo "$(BLUE)[6/6] Workflow lint (actionlint, via Docker)$(RESET)"
+	docker run --rm -v "$(CURDIR):/repo" -w /repo rhysd/actionlint:1.7.11 -color
+	@echo "$(GREEN)All CI gates passed locally.$(RESET)"
+
 # Test emulators use firebase.test.json (Firestore 9190, Auth 9199) so a test run never
 # wipes the dev emulators started by `make local`. Requires Java 21+.
 FIREBASE_TOOLS  := npx -y firebase-tools@15.33.0
@@ -202,10 +219,10 @@ test-backend-fast:
 test-emulator:
 	$(FIREBASE_TOOLS) emulators:start $(TEST_EMULATORS)
 
-## test-frontend: Run Jest test suite on frontend
+## test-frontend: Run Jest test suite on frontend (random order, coverage gate)
 test-frontend:
 	@echo "$(BLUE)Running frontend Jest test suite...$(RESET)"
-	cd frontend && pnpm test
+	cd frontend && pnpm test:coverage
 
 # ==============================================================================
 # LINTING & TYPE CHECKING
@@ -217,7 +234,7 @@ lint: lint-backend lint-frontend typecheck
 ## lint-backend: Run ruff linter on backend
 lint-backend:
 	@echo "$(BLUE)Linting backend with ruff...$(RESET)"
-	cd backend && uv run ruff check .
+	cd backend && uv run ruff check app tests
 
 ## lint-frontend: Run eslint on frontend
 lint-frontend:
@@ -230,7 +247,7 @@ typecheck: typecheck-backend typecheck-frontend
 ## typecheck-backend: Run mypy typechecker on backend
 typecheck-backend:
 	@echo "$(BLUE)Typechecking backend with mypy...$(RESET)"
-	cd backend && uv run mypy app
+	cd backend && uv run mypy --strict app
 
 ## typecheck-frontend: Run TypeScript compiler on frontend
 typecheck-frontend:

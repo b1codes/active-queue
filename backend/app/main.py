@@ -29,7 +29,7 @@ if TYPE_CHECKING:
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
+async def lifespan(_app: FastAPI) -> AsyncGenerator[None]:
     """Startup and shutdown lifecycle for the FastAPI application."""
     configure_logging(debug=settings.debug, log_level=settings.log_level, env=settings.env)
     await init_firestore(settings)

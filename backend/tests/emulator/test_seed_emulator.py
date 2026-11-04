@@ -10,9 +10,9 @@ from app.cli.seed import seed_db
 from tests.emulator.conftest import AUTH_HOST
 
 if TYPE_CHECKING:
+    import pytest
     from google.cloud.firestore import AsyncClient as FirestoreAsyncClient
     from httpx import AsyncClient
-    from pytest import CaptureFixture, MonkeyPatch
 
 
 def _sign_in(email: str, password: str) -> dict[str, str]:
@@ -27,7 +27,7 @@ def _sign_in(email: str, password: str) -> dict[str, str]:
 
 
 async def test_seed_is_idempotent_and_consistent(
-    api: AsyncClient, db: FirestoreAsyncClient, capsys: CaptureFixture[str]
+    api: AsyncClient, db: FirestoreAsyncClient, capsys: pytest.CaptureFixture[str]
 ) -> None:
     first = await seed_db(clear=True, quiet=False)
     assert "Database seeding completed" in capsys.readouterr().out
@@ -54,7 +54,7 @@ async def test_seed_is_idempotent_and_consistent(
 
 
 async def test_seeded_primary_user_can_use_the_app(
-    api: AsyncClient, db: FirestoreAsyncClient, monkeypatch: MonkeyPatch
+    api: AsyncClient, db: FirestoreAsyncClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     await seed_db(clear=True, quiet=True)
     # seed_db closes the process-wide client on exit (it is a CLI); restore ours.

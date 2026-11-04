@@ -32,7 +32,7 @@ def decode_session_cursor(cursor_str: str) -> datetime | None:
     try:
         raw_str = base64.urlsafe_b64decode(cursor_str.encode("utf-8")).decode("utf-8")
         return datetime.fromisoformat(raw_str)
-    except Exception:
+    except ValueError:  # bad base64, UTF-8, or ISO timestamp
         return None
 
 

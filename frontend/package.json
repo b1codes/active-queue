@@ -9,7 +9,7 @@
     "android": "expo run:android",
     "ios": "expo run:ios",
     "web": "expo start --web",
-    "lint": "eslint .",
+    "lint": "eslint . --max-warnings=0",
     "typecheck": "tsc --noEmit",
     "test": "jest",
     "storybook:ios": "cross-env STORYBOOK_ENABLED=true expo run:ios",
@@ -60,11 +60,12 @@
     "@types/react": "~19.1.17",
     "babel-plugin-module-resolver": "^5.0.0",
     "babel-preset-expo": "~54.0.12",
-    "eslint": "^8.57.0",
+    "eslint": "^9.39.5",
     "eslint-config-expo": "~10.0.0",
     "jest": "^29.7.0",
     "jest-expo": "~54.0.18",
     "test-renderer": "1.2.0",
-    "typescript": "^5.3.3"
+    "typescript": "^5.3.3",
+    "typescript-eslint": "8.71.2"
   }
 }

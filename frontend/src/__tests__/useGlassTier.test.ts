@@ -5,7 +5,6 @@ jest.mock("@callstack/liquid-glass", () => ({
   isLiquidGlassSupported: false,
 }));
 
-// eslint-disable-next-line @typescript-eslint/no-require-imports
 const liquidGlass = require("@callstack/liquid-glass") as { isLiquidGlassSupported: boolean };
 
 const globalWithFabric = globalThis as { nativeFabricUIManager?: unknown };

@@ -14,7 +14,6 @@ import {
 import { __resetGlassTierCacheForTests } from '@/core/hooks/useGlassTier';
 import { renderWithProviders } from '@/test-utils';
 
-// eslint-disable-next-line @typescript-eslint/no-require-imports
 const liquidGlass = require('@callstack/liquid-glass') as { isLiquidGlassSupported: boolean };
 
 afterEach(() => {

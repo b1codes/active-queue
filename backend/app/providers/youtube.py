@@ -49,8 +49,7 @@ def parse_iso8601_duration(duration_str: str | None) -> int:
     minutes = int(parts["minutes"] or 0)
     seconds = int(parts["seconds"] or 0)
 
-    total_seconds = days * 86400 + hours * 3600 + minutes * 60 + seconds
-    return total_seconds
+    return days * 86400 + hours * 3600 + minutes * 60 + seconds
 
 
 class YouTubeProvider(ContentProvider):
@@ -263,7 +262,7 @@ def _parse_timestamp(value: str | None) -> datetime:
     """
     if value:
         try:
-            return datetime.fromisoformat(value.replace("Z", "+00:00"))
+            return datetime.fromisoformat(value)
         except ValueError:
             logger.warning("youtube_unparseable_timestamp", value=value)
     return datetime(1970, 1, 1, tzinfo=UTC)
