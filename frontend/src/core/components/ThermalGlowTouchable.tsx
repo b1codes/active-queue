@@ -1,5 +1,5 @@
 import React, { memo, useCallback, useEffect, useMemo, useRef } from 'react';
-import { StyleProp, StyleSheet, ViewStyle } from 'react-native';
+import { AccessibilityActionEvent, StyleProp, StyleSheet, ViewStyle } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
   cancelAnimation,
@@ -101,7 +101,8 @@ export const ThermalGlowTouchable: React.FC<ThermalGlowTouchableProps> = memo(({
   disabled = false,
   style,
   testID,
-  accessible,
+  // It is a single button to assistive tech unless a caller says otherwise.
+  accessible = true,
   accessibilityRole,
   accessibilityLabel,
   accessibilityHint,
@@ -161,6 +162,7 @@ export const ThermalGlowTouchable: React.FC<ThermalGlowTouchableProps> = memo(({
   // and whether a long-press handler exists can legitimately rebuild them.
   const composedGesture = useMemo(() => {
     const tapGesture = Gesture.Tap()
+      .withTestId(testID ? `${testID}.tap` : 'thermal-glow.tap')
       .enabled(!disabled)
       .onBegin((e) => {
         'worklet';
@@ -218,6 +220,7 @@ export const ThermalGlowTouchable: React.FC<ThermalGlowTouchableProps> = memo(({
       });
 
     const longPressGesture = Gesture.LongPress()
+      .withTestId(testID ? `${testID}.longPress` : 'thermal-glow.longPress')
       .enabled(!disabled && hasLongPress)
       .minDuration(500)
       .onStart(() => {
@@ -232,11 +235,28 @@ export const ThermalGlowTouchable: React.FC<ThermalGlowTouchableProps> = memo(({
     glowOpacity,
     glowScale,
     hasLongPress,
+    testID,
     touchX,
     touchY,
     triggerOnLongPress,
     triggerOnPress,
   ]);
+
+  const accessibilityActions = useMemo(
+    () => [
+      { name: 'activate' as const },
+      ...(hasLongPress ? [{ name: 'longpress' as const }] : []),
+    ],
+    [hasLongPress]
+  );
+
+  const onAccessibilityAction = useCallback(
+    (event: AccessibilityActionEvent) => {
+      if (event.nativeEvent.actionName === 'activate') triggerOnPress();
+      if (event.nativeEvent.actionName === 'longpress') triggerOnLongPress();
+    },
+    [triggerOnLongPress, triggerOnPress]
+  );
 
   const animatedGlowStyle = useAnimatedStyle(() => ({
     left: touchX.value - GLOW_RADIUS,
@@ -257,7 +277,11 @@ export const ThermalGlowTouchable: React.FC<ThermalGlowTouchableProps> = memo(({
         accessibilityRole={accessibilityRole || 'button'}
         accessibilityLabel={accessibilityLabel}
         accessibilityHint={accessibilityHint}
-        accessibilityState={accessibilityState}
+        accessibilityState={{ disabled, ...accessibilityState }}
+        // Assistive tech activates through accessibility actions, not touches, so the
+        // press/long-press handlers are exposed here as well as on the gestures.
+        accessibilityActions={accessibilityActions}
+        onAccessibilityAction={onAccessibilityAction}
         style={[
           styles.container,
           { borderRadius },

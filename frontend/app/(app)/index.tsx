@@ -1,6 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
-  ActivityIndicator,
   AppState,
   FlatList,
   Platform,
@@ -27,6 +26,8 @@ import { AddSourceModal } from '@/features/queue/components/AddSourceModal';
 import { FeedCard } from '@/features/queue/components/FeedCard';
 import { SyncProgressBar } from '@/features/queue/components/SyncProgressBar';
 import { useQueueStore } from '@/features/queue/queueStore';
+import type { FeedItem } from '@/features/queue/types';
+import { NETWORK_UNAVAILABLE } from '@/core/api/apiClient';
 import { useSessionStore } from '@/features/sessions/sessionStore';
 
 export default function QueueScreen() {
@@ -39,25 +40,33 @@ export default function QueueScreen() {
   const isLoadingFeed = useQueueStore((state) => state.isLoadingFeed);
   const isRefreshingFeed = useQueueStore((state) => state.isRefreshingFeed);
   const fetchFeed = useQueueStore((state) => state.fetchFeed);
+  const fetchSources = useQueueStore((state) => state.fetchSources);
   const startResumableSync = useQueueStore((state) => state.startResumableSync);
+  const sources = useQueueStore((state) => state.sources);
+  const feedError = useQueueStore((state) => state.feedError);
+  const syncProgress = useQueueStore((state) => state.syncProgress);
 
   const currentSession = useSessionStore((state) => state.currentSession);
   const checkActiveSession = useSessionStore((state) => state.checkActiveSession);
 
   const [isAddModalVisible, setIsAddModalVisible] = useState(false);
   const [lastForegroundCheck, setLastForegroundCheck] = useState<number>(Date.now());
-  const [isOffline, setIsOffline] = useState(false);
-  const [isQuotaExceeded] = useState(false);
-  const [resumableSource, setResumableSource] = useState<{ id: string; title: string } | null>(null);
+  const [dismissedResumeId, setDismissedResumeId] = useState<string | null>(null);
+
+  // SPEC §11.3 states, all derived from store data rather than local flags.
+  const isOffline = feedError?.code === NETWORK_UNAVAILABLE;
+  const isQuotaExceeded =
+    syncProgress.errorCode === 'PROVIDER_QUOTA_EXCEEDED' ||
+    (sources ?? []).some((src) => src.status === 'quota_paused');
+  // A source left mid-walk by an earlier app run. Never auto-resumed (needs a tap).
+  const resumableSource = syncProgress.isSyncing
+    ? null
+    : (sources ?? []).find((src) => src.status === 'syncing' && src.id !== dismissedResumeId) ??
+      null;
 
   const handleInitialFetch = useCallback(async () => {
-    try {
-      await fetchFeed(true);
-      await checkActiveSession();
-    } catch {
-      setIsOffline(true);
-    }
-  }, [fetchFeed, checkActiveSession]);
+    await Promise.all([fetchFeed(true), fetchSources(), checkActiveSession()]);
+  }, [fetchFeed, fetchSources, checkActiveSession]);
 
   useEffect(() => {
     handleInitialFetch();
@@ -89,9 +98,17 @@ export default function QueueScreen() {
     });
   }, [router]);
 
-  const renderFeedCard = useCallback(({ item }: { item: any }) => (
-    <FeedCard item={item} />
-  ), []);
+  const openMatch = useCallback(
+    (item: FeedItem) => {
+      router.push({ pathname: '/(app)/match/[contentId]', params: { contentId: item.content_id } });
+    },
+    [router]
+  );
+
+  const renderFeedCard = useCallback(
+    ({ item }: { item: FeedItem }) => <FeedCard item={item} onPress={openMatch} />,
+    [openMatch]
+  );
 
 
   const formatCount = useCallback((count: number | null): string => {
@@ -107,9 +124,7 @@ export default function QueueScreen() {
   const bannerStack = (
     <>
       {/* Top Banner Notifications per SPEC §11.3 */}
-      {isOffline ? (
-        <OfflineBanner onRetryPress={() => { setIsOffline(false); fetchFeed(true); }} />
-      ) : null}
+      {isOffline ? <OfflineBanner onRetryPress={handleInitialFetch} /> : null}
 
       {isQuotaExceeded ? <ProviderQuotaBanner /> : null}
 
@@ -127,11 +142,8 @@ export default function QueueScreen() {
       {resumableSource ? (
         <SyncResumableCard
           sourceTitle={resumableSource.title}
-          onFinishSyncPress={() => {
-            startResumableSync(resumableSource.id);
-            setResumableSource(null);
-          }}
-          onDismissPress={() => setResumableSource(null)}
+          onFinishSyncPress={() => startResumableSync(resumableSource.id, resumableSource.item_count)}
+          onDismissPress={() => setDismissedResumeId(resumableSource.id)}
         />
       ) : null}
     </>
@@ -148,10 +160,19 @@ export default function QueueScreen() {
       ) : feedItems.length === 0 ? (
         <View style={[styles.staticContent, { paddingTop: headerHeight }]}>
           {bannerStack}
-          <NoSourcesState onAddSourcePress={() => setIsAddModalVisible(true)} />
+          {sources !== null && sources.length === 0 ? (
+            <NoSourcesState onAddSourcePress={() => setIsAddModalVisible(true)} />
+          ) : sources !== null ? (
+            // Sources exist but nothing is queued: "all caught up", not "add a source".
+            <EmptyFeedState
+              onSyncPress={() => sources[0] && startResumableSync(sources[0].id, sources[0].item_count)}
+              onAddSourcePress={() => setIsAddModalVisible(true)}
+            />
+          ) : null}
         </View>
       ) : (
         <FlatList
+          testID="queue-list"
           data={feedItems}
           keyExtractor={(item) => item.id || item.content_id}
           renderItem={renderFeedCard}

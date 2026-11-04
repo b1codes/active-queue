@@ -13,6 +13,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { ThermalGlowTouchable } from "@/core/components";
 import { colors, rounded, spacing, typography } from "@/core/theme";
 import { useAuthStore } from "@/features/auth/authStore";
+import { isDevToolsEnabled } from "@/core/config/devTools";
 
 export default function SignInScreen() {
   const [email, setEmail] = useState("");
@@ -123,7 +124,9 @@ export default function SignInScreen() {
             )}
           </ThermalGlowTouchable>
 
-          {/* Development Shortcut Section */}
+          {/* Development Shortcut Section — never rendered in production builds */}
+          {isDevToolsEnabled() ? (
+          <>
           <View style={styles.dividerContainer}>
             <View style={styles.dividerLine} />
             <Text style={styles.dividerText}>Development testing</Text>
@@ -143,6 +146,8 @@ export default function SignInScreen() {
             <Ionicons name="flash-outline" size={18} color={colors.signalVerified} />
             <Text style={styles.emulatorButtonText}>Quick sign in (emulator)</Text>
           </TouchableOpacity>
+          </>
+          ) : null}
         </View>
       </View>
     </KeyboardAvoidingView>

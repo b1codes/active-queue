@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useCallback, useState } from 'react';
 import {
+  ActivityIndicator,
   FlatList,
   StyleSheet,
   Text,
@@ -7,76 +8,143 @@ import {
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { GlassHeader, useGlassHeaderHeight } from '@/core/components';
 import { colors, rounded, spacing, typography } from '@/core/theme';
-import { useRouter } from 'expo-router';
-import { useSessionStore } from '@/features/sessions/sessionStore';
+import { listSessions, type Session } from '@/features/sessions/sessionApi';
 
+const STATUS_META: Record<Session['status'], { label: string; icon: string; color: string }> = {
+  completed: { label: 'Completed', icon: 'checkmark-circle', color: colors.signalVerified },
+  abandoned: { label: 'Abandoned', icon: 'close-circle-outline', color: colors.inkMuted },
+  in_progress: { label: 'In progress', icon: 'play-circle-outline', color: colors.heatCore },
+  pending: { label: 'Not started', icon: 'time-outline', color: colors.inkSecondary },
+};
+
+function formatDuration(seconds: number): string {
+  const mins = Math.floor(seconds / 60);
+  return `${mins}:${String(seconds % 60).padStart(2, '0')}`;
+}
+
+function formatDate(iso: string): string {
+  return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+}
+
+/** Session history (SPEC §9.5): GET /sessions, newest first, cursor-paginated. */
 export default function HistoryScreen() {
   const router = useRouter();
   const [headerHeight, setHeaderHeight] = useGlassHeaderHeight();
 
-  // Retrieve past session logs or empty array
-  const activeSession = useSessionStore((state) => state.currentSession);
-  const historySessions = activeSession ? [activeSession] : [];
+  const [sessions, setSessions] = useState<Session[]>([]);
+  const [cursor, setCursor] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const formatDuration = (seconds: number): string => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins}:${String(secs).padStart(2, '0')}`;
-  };
+  const load = useCallback(async (reset: boolean, after: string | null) => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const page = await listSessions(reset ? null : after);
+      setSessions((prev) => (reset ? page.items : [...prev, ...page.items]));
+      setCursor(page.next_cursor);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Could not load history');
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  // Refresh whenever the tab gains focus: a session completed elsewhere should show up.
+  useFocusEffect(
+    useCallback(() => {
+      load(true, null);
+    }, [load])
+  );
 
   return (
     <View style={styles.container}>
       <FlatList
-        data={historySessions}
+        testID="history-list"
+        data={sessions}
         keyExtractor={(item) => item.id}
         contentContainerStyle={[styles.listContent, { paddingTop: headerHeight + spacing.lg }]}
-        renderItem={({ item }) => (
-          <View style={styles.sessionCard}>
-            <View style={styles.cardHeader}>
-              <View style={styles.verifiedBadge}>
-                <Ionicons name="checkmark-circle" size={18} color={colors.signalVerified} />
-                <Text style={styles.verifiedText}>Session Verified</Text>
-              </View>
-
-              <View style={styles.durationPill}>
-                <Text style={styles.durationText}>{formatDuration(item.duration_seconds)}</Text>
-              </View>
+        onEndReached={() => {
+          if (cursor && !isLoading) load(false, cursor);
+        }}
+        onEndReachedThreshold={0.5}
+        ListHeaderComponent={
+          error ? (
+            <View style={styles.sessionCard} accessible={true} accessibilityRole="alert">
+              <Text style={styles.cardTitle}>Couldn&apos;t load history</Text>
+              <Text style={styles.cardMeta}>{error}</Text>
+              <TouchableOpacity
+                style={[styles.primaryButton, { marginTop: spacing.sm }]}
+                onPress={() => load(true, null)}
+                accessible={true}
+                accessibilityRole="button"
+                accessibilityLabel="Retry loading history"
+              >
+                <Text style={styles.primaryButtonText}>Retry</Text>
+              </TouchableOpacity>
             </View>
-
-            <Text style={styles.cardTitle}>Activity Session #{item.id.slice(-6)}</Text>
-            <Text style={styles.cardMeta}>
-              Activity ID: {item.activity_id} · State: {item.status.toUpperCase()}
-            </Text>
-          </View>
-        )}
-        ListEmptyComponent={
-          <View style={styles.emptyContainer}>
-            <View style={styles.iconCircle}>
-              <Ionicons name="stats-chart-outline" size={32} color={colors.inkFaint} />
-            </View>
-            <Text style={styles.emptyTitle}>No Completed Sessions Yet</Text>
-            <Text style={styles.emptyBody}>
-              Your workout sessions matched with queued media will be logged here with HealthKit verification.
-            </Text>
-            <TouchableOpacity
-              style={styles.primaryButton}
-              onPress={() => router.push('/(app)/blocks')}
-              activeOpacity={0.85}
+          ) : null
+        }
+        ListFooterComponent={
+          isLoading ? (
+            <ActivityIndicator color={colors.heatCore} accessibilityLabel="Loading history" />
+          ) : null
+        }
+        renderItem={({ item }) => {
+          const meta = STATUS_META[item.status];
+          return (
+            <View
+              style={styles.sessionCard}
               accessible={true}
-              accessibilityRole="button"
-              accessibilityLabel="Start a Time Block Session"
+              accessibilityLabel={`${meta.label} ${item.activity_id} session, ${formatDuration(item.duration_seconds)}, ${formatDate(item.created_at)}`}
             >
-              <Text style={styles.primaryButtonText}>Browse Time Blocks</Text>
-            </TouchableOpacity>
-          </View>
+              <View style={styles.cardHeader}>
+                <View style={styles.verifiedBadge}>
+                  <Ionicons name={meta.icon as never} size={18} color={meta.color} />
+                  <Text style={[styles.verifiedText, { color: meta.color }]}>{meta.label}</Text>
+                </View>
+                <View style={styles.durationPill}>
+                  <Text style={styles.durationText}>{formatDuration(item.duration_seconds)}</Text>
+                </View>
+              </View>
+              <Text style={styles.cardTitle}>{item.activity_id}</Text>
+              <Text style={styles.cardMeta}>
+                {formatDate(item.created_at)} · {item.match_mode === 'content_first' ? 'Content first' : 'Time first'}
+              </Text>
+            </View>
+          );
+        }}
+        ListEmptyComponent={
+          isLoading || error ? null : (
+            <View style={styles.emptyContainer}>
+              <View style={styles.iconCircle}>
+                <Ionicons name="stats-chart-outline" size={32} color={colors.inkFaint} />
+              </View>
+              <Text style={styles.emptyTitle}>No Sessions Yet</Text>
+              <Text style={styles.emptyBody}>
+                Sessions you start from your queue or a time block will be listed here.
+              </Text>
+              <TouchableOpacity
+                style={styles.primaryButton}
+                onPress={() => router.push('/(app)/blocks')}
+                activeOpacity={0.85}
+                accessible={true}
+                accessibilityRole="button"
+                accessibilityLabel="Start a Time Block Session"
+              >
+                <Text style={styles.primaryButtonText}>Browse Time Blocks</Text>
+              </TouchableOpacity>
+            </View>
+          )
         }
       />
 
       <GlassHeader
         title="History"
-        subtitle="Completed workout & media sessions"
+        subtitle="Your workout & media sessions"
         onHeightChange={setHeaderHeight}
       />
     </View>

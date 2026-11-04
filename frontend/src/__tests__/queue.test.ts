@@ -21,6 +21,7 @@ describe('useQueueStore & Sync Loop Driver', () => {
         iterationCount: 0,
         isCancelled: false,
         error: null,
+        errorCode: null,
       },
       addSourceError: null,
       isAddingSource: false,

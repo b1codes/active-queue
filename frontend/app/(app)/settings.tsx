@@ -10,6 +10,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { GlassHeader, useGlassHeaderHeight } from '@/core/components';
 import { colors, rounded, spacing, typography } from '@/core/theme';
 import { useAuthStore } from '@/features/auth/authStore';
+import { isDevToolsEnabled } from '@/core/config/devTools';
 
 export default function SettingsScreen() {
   const [headerHeight, setHeaderHeight] = useGlassHeaderHeight();
@@ -62,7 +63,8 @@ export default function SettingsScreen() {
           </View>
         </View>
 
-        {/* Local Dev & Emulator Shortcuts */}
+        {/* Local Dev & Emulator Shortcuts — never rendered in production builds */}
+        {isDevToolsEnabled() ? (
         <View style={styles.card}>
           <Text style={styles.cardSectionTitle}>Local development & testing</Text>
 
@@ -81,6 +83,7 @@ export default function SettingsScreen() {
             </Text>
           </TouchableOpacity>
         </View>
+        ) : null}
 
         {/* Sign Out Action */}
         <TouchableOpacity

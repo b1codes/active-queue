@@ -101,3 +101,27 @@ export async function launchTrackerApp(
     error: `Unable to launch ${config.appName}. Please open the app manually.`,
   };
 }
+
+/**
+ * Which media registry entry plays a session's content, from its namespaced content_id
+ * (SPEC §4.1). Fixture content (fx:) mirrors YouTube, so it plays through the YouTube
+ * entry. A session with no content (bare time-first) has nothing to open: it resolves to
+ * the guided "custom" entry, which starts the session without launching anything.
+ */
+export function mediaTargetForContent(contentId?: string | null): {
+  provider: string;
+  externalId?: string;
+} {
+  if (!contentId || !contentId.includes(':')) return { provider: 'custom' };
+  const [prefix, ...rest] = contentId.split(':');
+  const externalId = rest.join(':');
+  switch (prefix) {
+    case 'yt':
+    case 'fx':
+      return { provider: 'youtube', externalId };
+    case 'sp':
+      return { provider: 'spotify', externalId };
+    default:
+      return { provider: 'custom' };
+  }
+}

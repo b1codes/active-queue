@@ -106,10 +106,12 @@ jobs:
           cd frontend
           pnpm typecheck
 
-      - name: Run Jest Unit Tests
+      - name: Run Jest (unit, store, component, screen) with coverage gate
+        # Thresholds live in frontend/jest.config.js (coverageThreshold) and cover every
+        # file under src/ and app/ via collectCoverageFrom. --randomize shuffles order.
         run: |
           cd frontend
-          pnpm test
+          pnpm test:coverage
 
   terraform:
     name: Infrastructure (Terraform)

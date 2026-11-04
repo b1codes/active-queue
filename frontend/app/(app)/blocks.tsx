@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
+  ActivityIndicator,
   ScrollView,
   StyleSheet,
   Text,
@@ -7,49 +8,109 @@ import {
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { GlassHeader, useGlassHeaderHeight, ThermalGlowTouchable } from '@/core/components';
-import { colors, rounded, spacing, typography } from '@/core/theme';
 import { useRouter } from 'expo-router';
-import { useQueueStore } from '@/features/queue/queueStore';
+import { GlassHeader, useGlassHeaderHeight, ThermalGlowTouchable } from '@/core/components';
+import { NoDurationMatchState } from '@/core/components/states';
+import { colors, rounded, spacing, typography } from '@/core/theme';
+import {
+  listActivities,
+  listTimeBlocks,
+  matchTimeBlock,
+  type Activity,
+  type TimeBlock,
+  type TimeMatchResult,
+} from '@/features/matching/matchingApi';
+import { useSessionStore } from '@/features/sessions/sessionStore';
 
-interface DurationOption {
-  label: string;
-  seconds: number;
+const DEFAULT_BLOCK_SECONDS = 1800;
+
+function tabular(seconds: number): string {
+  const mins = Math.floor(seconds / 60);
+  return `${mins}:${String(seconds % 60).padStart(2, '0')}`;
 }
 
-const DURATION_PRESETS: DurationOption[] = [
-  { label: '15:00', seconds: 900 },
-  { label: '20:00', seconds: 1200 },
-  { label: '30:00', seconds: 1800 },
-  { label: '45:00', seconds: 2700 },
-  { label: '60:00', seconds: 3600 },
-  { label: '90:00', seconds: 5400 },
-];
-
-const ACTIVITIES = [
-  { id: 'zone2', name: 'Zone 2 Cardio', icon: 'heart-outline' },
-  { id: 'treadmill', name: 'Treadmill Run', icon: 'walk-outline' },
-  { id: 'cycling', name: 'Indoor Cycling', icon: 'bicycle-outline' },
-  { id: 'rowing', name: 'Rowing', icon: 'boat-outline' },
-  { id: 'strength', name: 'Strength Training', icon: 'barbell-outline' },
-];
-
+/**
+ * Time-first flow (SPEC §5.3): pick a time block and an activity that fits it, then the
+ * server proposes queued media inside the asymmetric [B, B+300] / [B-120, B) windows.
+ * Starting creates a time_first session, with the chosen media or as a bare timer.
+ */
 export default function BlocksScreen() {
   const router = useRouter();
   const [headerHeight, setHeaderHeight] = useGlassHeaderHeight();
-  const feedItems = useQueueStore((state) => state.feedItems);
+  const { createNewSession, isLoading: isCreating, error: createError, errorCode, conflictSessionId } =
+    useSessionStore();
 
-  const [selectedDuration, setSelectedDuration] = useState<number>(1800); // 30 mins default
-  const [selectedActivity, setSelectedActivity] = useState<string>('zone2');
+  const [blocks, setBlocks] = useState<TimeBlock[] | null>(null);
+  const [activities, setActivities] = useState<Activity[] | null>(null);
+  const [catalogError, setCatalogError] = useState<string | null>(null);
+  const [selectedDuration, setSelectedDuration] = useState<number>(DEFAULT_BLOCK_SECONDS);
+  const [selectedActivity, setSelectedActivity] = useState<string | null>(null);
+  const [match, setMatch] = useState<TimeMatchResult | null>(null);
+  const [isMatching, setIsMatching] = useState(false);
 
-  // Find exact or closest media item match in the queue
-  const matchedItem = feedItems.find(
-    (item) => Math.abs(item.duration_seconds - selectedDuration) <= 300
-  ) || feedItems[0];
+  const loadCatalog = useCallback(async () => {
+    setCatalogError(null);
+    try {
+      const [tb, acts] = await Promise.all([listTimeBlocks(), listActivities()]);
+      setBlocks(tb);
+      setActivities(acts.filter((a) => a.is_active));
+    } catch (err: unknown) {
+      setCatalogError(err instanceof Error ? err.message : 'Could not load time blocks');
+    }
+  }, []);
 
-  const formattedSelectedLabel = DURATION_PRESETS.find(
-    (d) => d.seconds === selectedDuration
-  )?.label || `${Math.floor(selectedDuration / 60)}:00`;
+  useEffect(() => {
+    loadCatalog();
+  }, [loadCatalog]);
+
+  // Only offer activities whose catalog bounds accept the chosen block; the server would
+  // reject anything else with ACTIVITY_DURATION_MISMATCH.
+  const fittingActivities = useMemo(
+    () =>
+      (activities ?? []).filter(
+        (a) => a.min_duration_seconds <= selectedDuration && selectedDuration <= a.max_duration_seconds
+      ),
+    [activities, selectedDuration]
+  );
+
+  useEffect(() => {
+    if (!fittingActivities.some((a) => a.id === selectedActivity)) {
+      setSelectedActivity(fittingActivities[0]?.id ?? null);
+    }
+  }, [fittingActivities, selectedActivity]);
+
+  useEffect(() => {
+    let cancelled = false;
+    setIsMatching(true);
+    matchTimeBlock(selectedDuration)
+      .then((res) => {
+        if (!cancelled) setMatch(res);
+      })
+      .catch(() => {
+        if (!cancelled) setMatch(null);
+      })
+      .finally(() => {
+        if (!cancelled) setIsMatching(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedDuration]);
+
+  const start = async (contentId: string | null) => {
+    if (!selectedActivity) return;
+    const session = await createNewSession({
+      activity_id: selectedActivity,
+      match_mode: 'time_first',
+      content_id: contentId,
+      target_duration_seconds: contentId ? null : selectedDuration,
+    });
+    if (session) {
+      router.push({ pathname: '/(app)/session/[id]', params: { id: session.id } });
+    }
+  };
+
+  const topItem = match?.matched_items[0] ?? null;
 
   return (
     <View style={styles.container}>
@@ -57,134 +118,179 @@ export default function BlocksScreen() {
         contentContainerStyle={[styles.scrollContent, { paddingTop: headerHeight + spacing.lg }]}
         showsVerticalScrollIndicator={false}
       >
-        {/* Section 1: Workout Duration Selector */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Select Workout Duration</Text>
-          <View style={styles.presetGrid}>
-            {DURATION_PRESETS.map((preset) => {
-              const isSelected = selectedDuration === preset.seconds;
-              return (
-                <TouchableOpacity
-                  key={preset.seconds}
-                  style={[
-                    styles.durationButton,
-                    isSelected ? styles.durationButtonSelected : styles.durationButtonUnselected,
-                  ]}
-                  onPress={() => setSelectedDuration(preset.seconds)}
-                  activeOpacity={0.85}
-                  accessible={true}
-                  accessibilityRole="button"
-                  accessibilityLabel={`Target duration ${preset.label}`}
-                  accessibilityState={{ selected: isSelected }}
-                >
-                  <Text
-                    style={[
-                      styles.durationButtonText,
-                      isSelected ? styles.durationButtonTextSelected : styles.durationButtonTextUnselected,
-                    ]}
-                  >
-                    {preset.label}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
+        {catalogError ? (
+          <View style={styles.emptyCard} accessible={true} accessibilityRole="alert">
+            <Text style={styles.emptyTitle}>Couldn&apos;t load time blocks</Text>
+            <Text style={styles.emptyBody}>{catalogError}</Text>
+            <TouchableOpacity
+              style={styles.secondaryButton}
+              onPress={loadCatalog}
+              accessible={true}
+              accessibilityRole="button"
+              accessibilityLabel="Retry loading time blocks"
+            >
+              <Text style={styles.secondaryButtonText}>Retry</Text>
+            </TouchableOpacity>
           </View>
-        </View>
+        ) : null}
 
-        {/* Section 2: Activity Selector Chips */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Activity Type</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
-            {ACTIVITIES.map((act) => {
-              const isSelected = selectedActivity === act.id;
-              return (
-                <TouchableOpacity
-                  key={act.id}
-                  style={[
-                    styles.chip,
-                    isSelected ? styles.chipSelected : styles.chipUnselected,
-                  ]}
-                  onPress={() => setSelectedActivity(act.id)}
-                  activeOpacity={0.85}
+        {!blocks && !catalogError ? (
+          <ActivityIndicator color={colors.heatCore} accessibilityLabel="Loading time blocks" />
+        ) : null}
+
+        {blocks ? (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Select Workout Duration</Text>
+            <View style={styles.presetGrid} accessibilityRole="radiogroup">
+              {blocks.map((block) => {
+                const isSelected = selectedDuration === block.duration_seconds;
+                return (
+                  <TouchableOpacity
+                    key={block.id}
+                    style={[
+                      styles.durationButton,
+                      isSelected ? styles.durationButtonSelected : styles.durationButtonUnselected,
+                    ]}
+                    onPress={() => setSelectedDuration(block.duration_seconds)}
+                    activeOpacity={0.85}
+                    accessible={true}
+                    accessibilityRole="radio"
+                    accessibilityLabel={`Target duration ${block.label}`}
+                    accessibilityState={{ checked: isSelected }}
+                  >
+                    <Text
+                      style={[
+                        styles.durationButtonText,
+                        isSelected ? styles.durationButtonTextSelected : styles.durationButtonTextUnselected,
+                      ]}
+                    >
+                      {tabular(block.duration_seconds)}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </View>
+        ) : null}
+
+        {activities ? (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Activity Type</Text>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.chipRow}
+              accessibilityRole="radiogroup"
+            >
+              {fittingActivities.map((act) => {
+                const isSelected = selectedActivity === act.id;
+                return (
+                  <TouchableOpacity
+                    key={act.id}
+                    style={[styles.chip, isSelected ? styles.chipSelected : styles.chipUnselected]}
+                    onPress={() => setSelectedActivity(act.id)}
+                    activeOpacity={0.85}
+                    accessible={true}
+                    accessibilityRole="radio"
+                    accessibilityLabel={`Activity ${act.name}`}
+                    accessibilityState={{ checked: isSelected }}
+                  >
+                    <Text
+                      style={[styles.chipText, isSelected ? styles.chipTextSelected : styles.chipTextUnselected]}
+                    >
+                      {act.name}
+                    </Text>
+                    {isSelected ? <Ionicons name="checkmark" size={14} color={colors.void} /> : null}
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          </View>
+        ) : null}
+
+        {blocks && activities ? (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Matched Media</Text>
+
+            {createError ? (
+              <View accessible={true} accessibilityRole="alert">
+                <Text style={styles.emptyBody}>
+                  {errorCode === 'ACTIVE_SESSION_EXISTS'
+                    ? 'You already have a session in progress.'
+                    : createError}
+                </Text>
+                {conflictSessionId ? (
+                  <TouchableOpacity
+                    style={styles.secondaryButton}
+                    onPress={() =>
+                      router.push({ pathname: '/(app)/session/[id]', params: { id: conflictSessionId } })
+                    }
+                    accessible={true}
+                    accessibilityRole="button"
+                    accessibilityLabel="Resume active session"
+                  >
+                    <Text style={styles.secondaryButtonText}>Resume active session</Text>
+                  </TouchableOpacity>
+                ) : null}
+              </View>
+            ) : null}
+
+            {isMatching ? (
+              <ActivityIndicator color={colors.heatCore} accessibilityLabel="Finding media" />
+            ) : topItem ? (
+              <View style={styles.matchCard}>
+                <View style={styles.matchHeader}>
+                  <View style={styles.matchBadge}>
+                    <Ionicons name="sparkles" size={14} color={colors.heatCore} />
+                    <Text style={styles.matchBadgeText}>
+                      {match?.window_type === 'fallback' ? 'Slightly shorter' : 'Fits'} {tabular(selectedDuration)}
+                    </Text>
+                  </View>
+                  <View style={styles.durationPillMatched}>
+                    <Text style={styles.durationTextMatched}>{topItem.duration_label}</Text>
+                  </View>
+                </View>
+
+                <Text style={styles.itemTitle} numberOfLines={2}>
+                  {topItem.title}
+                </Text>
+                <Text style={styles.itemMeta}>Provider: {topItem.provider.toUpperCase()}</Text>
+
+                <ThermalGlowTouchable
+                  testID="start-matched-session"
+                  style={[styles.startButton, (!selectedActivity || isCreating) && { opacity: 0.5 }]}
+                  onPress={() => start(topItem.content_id)}
+                  disabled={!selectedActivity || isCreating}
+                  borderRadius={rounded.md}
                   accessible={true}
                   accessibilityRole="button"
-                  accessibilityLabel={`Activity ${act.name}`}
-                  accessibilityState={{ selected: isSelected }}
+                  accessibilityLabel="Start session with matched media"
                 >
-                  <Ionicons
-                    name={act.icon as any}
-                    size={16}
-                    color={isSelected ? colors.void : colors.inkSecondary}
-                  />
-                  <Text style={[styles.chipText, isSelected ? styles.chipTextSelected : styles.chipTextUnselected]}>
-                    {act.name}
-                  </Text>
-                  {isSelected ? <Ionicons name="checkmark" size={14} color={colors.void} /> : null}
-                </TouchableOpacity>
-              );
-            })}
-          </ScrollView>
-        </View>
-
-        {/* Section 3: Matched Media Card or Designed Empty State */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Matched Media</Text>
-
-          {matchedItem ? (
-            <View style={styles.matchCard}>
-              <View style={styles.matchHeader}>
-                <View style={styles.matchBadge}>
-                  <Ionicons name="sparkles" size={14} color={colors.heatCore} />
-                  <Text style={styles.matchBadgeText}>Target Match ({formattedSelectedLabel})</Text>
-                </View>
-
-                {/* Signature Duration Pill in Heat Core fill per DESIGN.md §5 */}
-                <View style={styles.durationPillMatched}>
-                  <Text style={styles.durationTextMatched}>
-                    {matchedItem.duration_label}
-                  </Text>
-                </View>
+                  <Text style={styles.startButtonText}>Start Session ({tabular(selectedDuration)})</Text>
+                </ThermalGlowTouchable>
               </View>
+            ) : (
+              <NoDurationMatchState
+                durationLabel={tabular(selectedDuration)}
+                rejectionReason="no_content_in_window"
+              />
+            )}
 
-              <Text style={styles.itemTitle} numberOfLines={2}>
-                {matchedItem.title}
-              </Text>
-              <Text style={styles.itemMeta}>
-                Provider: {matchedItem.provider.toUpperCase()}
-              </Text>
-
-              {/* Commitment Action: Primary Button with Thermal Glow Physics */}
-              <ThermalGlowTouchable
-                style={styles.startButton}
-                onPress={() => router.push(`/(app)/match/${matchedItem.content_id}`)}
-                borderRadius={rounded.md}
-                accessible={true}
-                accessibilityRole="button"
-                accessibilityLabel="Start session with matched media"
-              >
-                <Text style={styles.startButtonText}>Start Session ({formattedSelectedLabel})</Text>
-              </ThermalGlowTouchable>
-            </View>
-          ) : (
-            <View style={styles.emptyCard}>
-              <Ionicons name="layers-outline" size={32} color={colors.inkFaint} />
-              <Text style={styles.emptyTitle}>No Queued Media Available</Text>
-              <Text style={styles.emptyBody}>
-                Add your favorite YouTube playlists or video sources to start matching workout time blocks.
-              </Text>
-              <TouchableOpacity
-                style={styles.secondaryButton}
-                onPress={() => router.push('/(app)')}
-                activeOpacity={0.85}
-                accessible={true}
-                accessibilityRole="button"
-                accessibilityLabel="Go to Queue to add sources"
-              >
-                <Text style={styles.secondaryButtonText}>Return to Queue</Text>
-              </TouchableOpacity>
-            </View>
-          )}
-        </View>
+            <TouchableOpacity
+              style={styles.secondaryButton}
+              onPress={() => start(null)}
+              disabled={!selectedActivity || isCreating}
+              activeOpacity={0.85}
+              accessible={true}
+              accessibilityRole="button"
+              accessibilityLabel="Start a timer-only session"
+              accessibilityHint="Starts the time block without any media"
+              accessibilityState={{ disabled: !selectedActivity || isCreating }}
+            >
+              <Text style={styles.secondaryButtonText}>Timer only (no media)</Text>
+            </TouchableOpacity>
+          </View>
+        ) : null}
       </ScrollView>
 
       <GlassHeader

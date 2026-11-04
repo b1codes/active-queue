@@ -22,13 +22,11 @@ interface AddSourceModalProps {
 
 export const AddSourceModal: React.FC<AddSourceModalProps> = ({ visible, onClose }) => {
   const [urlOrId, setUrlOrId] = useState('');
-  const { addSource, isAddingSource, addSourceError, clearErrors } = useQueueStore();
+  const { addSource, isAddingSource, addSourceError, addSourceErrorCode, clearErrors } =
+    useQueueStore();
 
-  const isWatchLaterError =
-    addSourceError &&
-    (addSourceError.includes('Watch Later') ||
-      addSourceError.includes('SOURCE_UNSUPPORTED') ||
-      addSourceError.includes('system playlist'));
+  // Keyed on the SPEC §9.7 code, not the message text, which the server may reword.
+  const isWatchLaterError = addSourceErrorCode === 'SOURCE_UNSUPPORTED';
 
   const handleAdd = async () => {
     if (!urlOrId.trim()) {
