@@ -25,13 +25,22 @@ jobs:
         with:
           enable-cache: true
 
-      - name: Install Node.js & Firebase Emulators
+      - name: Set up Node.js (Firebase emulators)
         uses: actions/setup-node@v4
         with:
           node-version: "22"
 
-      - name: Install Firebase CLI
-        run: npm install -g firebase-tools
+      - name: Set up Java (Firestore emulator)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Cache Firebase emulator binaries
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/firebase/emulators
+          key: firebase-emulators-15.33.0
 
       - name: Install backend dependencies
         run: |
@@ -49,15 +58,18 @@ jobs:
           cd backend
           uv run mypy --strict app/
 
-      - name: Run Pytest Suite & Coverage
+      - name: Run Pytest Suite (unit + mocked + emulator tiers) & Coverage Gate
+        # emulators:exec sets FIRESTORE_EMULATOR_HOST / FIREBASE_AUTH_EMULATOR_HOST.
+        # REQUIRE_EMULATOR=1 turns "emulators unreachable" into a failure, not a skip.
+        # The coverage threshold lives in backend/pyproject.toml ([tool.coverage.report]).
         env:
           ENV: local
           GCP_PROJECT_ID: demo-activequeue-local
-          FIRESTORE_EMULATOR_HOST: localhost:9090
-          FIREBASE_AUTH_EMULATOR_HOST: localhost:9099
+          REQUIRE_EMULATOR: "1"
         run: |
-          cd backend
-          uv run pytest --cov=app/features --cov-fail-under=80 tests/
+          npx -y firebase-tools@15.33.0 emulators:exec \
+            --config firebase.test.json --project demo-activequeue-local --only auth,firestore \
+            "cd backend && uv run pytest --cov"
 
   frontend:
     name: Frontend (React Native Expo)

@@ -72,10 +72,11 @@ def map_house_fields(
     House fields: timestamp, level, component, message, latency_ms.
     Trace correlation: maps trace to logging.googleapis.com/trace for Cloud Logging.
     """
-    if "logger_name" in event_dict and "component" not in event_dict:
-        event_dict["component"] = event_dict.pop("logger_name")
-    elif "component" not in event_dict:
-        event_dict["component"] = "activequeue"
+    # structlog.stdlib.add_logger_name writes "logger"; "logger_name" kept for callers
+    # that set it explicitly.
+    logger_name = event_dict.pop("logger", None) or event_dict.pop("logger_name", None)
+    if "component" not in event_dict:
+        event_dict["component"] = logger_name or "activequeue"
 
     if "event" in event_dict and "message" not in event_dict:
         event_dict["message"] = event_dict.pop("event")

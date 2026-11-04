@@ -67,7 +67,9 @@ async def test_fixture_provider_pagination_1200_items() -> None:
     page1 = await provider.fetch_playlist_items(
         "fixture-large-playlist", page_token=None, max_results=50
     )
-    assert len(page1.items) == 50
+    # 50 playlist slots, but private #10 and deleted #20 are absent (as on YouTube)
+    assert len(page1.items) == 48
+    assert {"vid_private_10", "vid_deleted_20"}.isdisjoint(i.external_id for i in page1.items)
     assert page1.next_page_token == "50"
     assert page1.total_results == 1200
 
@@ -78,10 +80,9 @@ async def test_fixture_provider_pagination_1200_items() -> None:
     assert len(page2.items) == 50
     assert page2.next_page_token == "100"
 
-    # Edge cases in corpus
-    assert page1.items[10].title == "[Private video]"
-    assert page1.items[20].title == "[Deleted video]"
-    assert page1.items[30].duration_seconds == 0  # Live stream
+    # Edge cases in corpus: the live stream is still returned, with duration 0
+    live = next(i for i in page1.items if i.external_id == "vid_livestream_30")
+    assert live.duration_seconds == 0
 
 
 @pytest.mark.asyncio

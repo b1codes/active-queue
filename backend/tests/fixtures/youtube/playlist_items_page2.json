@@ -1,0 +1,61 @@
+{
+  "kind": "youtube#playlistItemListResponse",
+  "etag": "fixture",
+  "pageInfo": {
+    "totalResults": 5,
+    "resultsPerPage": 2
+  },
+  "items": [
+    {
+      "kind": "youtube#playlistItem",
+      "etag": "fixture",
+      "id": "PI_vidDel01",
+      "snippet": {
+        "publishedAt": "2025-01-03T08:00:00Z",
+        "title": "Deleted video",
+        "description": "",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/vidDel01/default.jpg"
+          }
+        },
+        "playlistId": "PLfixture123",
+        "position": 0,
+        "resourceId": {
+          "kind": "youtube#video",
+          "videoId": "vidDel01"
+        }
+      },
+      "contentDetails": {
+        "videoId": "vidDel01",
+        "videoPublishedAt": "2025-01-03T08:00:00Z"
+      }
+    },
+    {
+      "kind": "youtube#playlistItem",
+      "etag": "fixture",
+      "id": "PI_vidLive1",
+      "snippet": {
+        "publishedAt": "2025-01-04T08:00:00Z",
+        "title": "24/7 lofi radio",
+        "description": "",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/vidLive1/default.jpg"
+          }
+        },
+        "playlistId": "PLfixture123",
+        "position": 0,
+        "resourceId": {
+          "kind": "youtube#video",
+          "videoId": "vidLive1"
+        }
+      },
+      "contentDetails": {
+        "videoId": "vidLive1",
+        "videoPublishedAt": "2025-01-04T08:00:00Z"
+      }
+    }
+  ],
+  "nextPageToken": "TOKEN_P3"
+}

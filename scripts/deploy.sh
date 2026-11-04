@@ -19,7 +19,7 @@ echo "=== Deploying ActiveQueue to Environment: ${ENV} (Project: ${PROJECT_ID}) 
 
 # 1. Verify clean CI test suite before deployment
 echo "--> Running CI local verification..."
-(cd backend && uv run pytest --cov=app --cov-fail-under=80 tests/)
+make test-backend  # full suite on test emulators; coverage gate from backend/pyproject.toml
 (cd frontend && pnpm typecheck && pnpm test)
 
 # 2. Build & Submit Container to Artifact Registry

@@ -14,7 +14,7 @@ from app.features.content.matcher import (
     match_time_block_asymmetric,
 )
 from app.features.content.models import ContentCacheItem, FeedItem, Source
-from app.features.content.repository import ContentRepository, SourceRepository, decode_cursor
+from app.features.content.repository import decode_cursor
 from app.features.content.schemas import (
     ContentMatchResponse,
     FeedItemSchema,
@@ -29,6 +29,7 @@ from app.providers.base import format_content_id, parse_content_id
 from app.providers.factory import get_provider
 
 if TYPE_CHECKING:
+    from app.features.content.repository import ContentRepository, SourceRepository
     from app.features.users.repository import UserRepository
 
 logger = structlog.get_logger(__name__)
@@ -61,8 +62,8 @@ class ContentService:
     def __init__(
         self,
         source_repo: SourceRepository,
-        content_repo: ContentRepository | None = None,
-        user_repo: UserRepository | None = None,
+        content_repo: ContentRepository,
+        user_repo: UserRepository,
     ) -> None:
         self._source_repo = source_repo
         self._content_repo = content_repo
@@ -270,9 +271,7 @@ class ContentService:
 
         # feed_items.consumed is a projection of the user's durable consumed record
         # (SPEC §4.7): re-syncs and re-added playlists must not resurface watched items.
-        consumed_ids: set[str] = (
-            await self._user_repo.get_consumed_content_ids(user_id) if self._user_repo else set()
-        )
+        consumed_ids = await self._user_repo.get_consumed_content_ids(user_id)
 
         current_token = source.next_page_token
         chunk_cache_items: list[ContentCacheItem] = []
@@ -280,6 +279,7 @@ class ContentService:
 
         pages_fetched = 0
         total_items_in_chunk = 0
+        skipped_unplayable = 0
 
         while pages_fetched < settings.pages_per_chunk:
             try:
@@ -323,6 +323,11 @@ class ContentService:
             pages_fetched += 1
 
             for raw in page.items:
+                if raw.duration_seconds <= 0:
+                    # Live streams (P0D) and anything without a duration can't be
+                    # time-boxed; keep them out of the feed and the cache.
+                    skipped_unplayable += 1
+                    continue
                 cid = format_content_id(source.provider, raw.external_id)
 
                 cache_item = ContentCacheItem(
@@ -334,7 +339,7 @@ class ContentService:
                     published_at=raw.published_at,
                     thumbnail_url=raw.thumbnail_url,
                     video_url=raw.video_url,
-                    is_available=(raw.duration_seconds > 0 or "Private" not in raw.title),
+                    is_available=True,
                     created_at=now,
                     updated_at=now,
                 )
@@ -353,15 +358,14 @@ class ContentService:
                 )
                 chunk_feed_items.append(feed_item)
 
-            total_items_in_chunk += len(page.items)
+            total_items_in_chunk = len(chunk_feed_items)
             current_token = page.next_page_token
 
             if not current_token:
                 break
 
-        if self._content_repo:
-            await self._content_repo.upsert_content_cache_batch(chunk_cache_items)
-            await self._content_repo.upsert_feed_items_batch(chunk_feed_items)
+        await self._content_repo.upsert_content_cache_batch(chunk_cache_items)
+        await self._content_repo.upsert_feed_items_batch(chunk_feed_items)
 
         is_complete = current_token is None
         new_status = "active" if is_complete else "syncing"
@@ -380,6 +384,7 @@ class ContentService:
             "sync_chunk_completed",
             source_id=source_id,
             items_synced=total_items_in_chunk,
+            skipped_unplayable=skipped_unplayable,
             has_more=not is_complete,
             next_page_token=current_token,
         )
@@ -402,9 +407,6 @@ class ContentService:
         max_duration: int | None = None,
     ) -> FeedResponse:
         """Fetch user feed items with cursor pagination, duration filters, and server duration_label per SPEC §9.2."""
-        if not self._content_repo:
-            return FeedResponse(items=[], next_cursor=None, total_unconsumed=0)
-
         total_unconsumed: int | None = None
         if cursor is None:
             total_unconsumed = await self._content_repo.get_user_feed_count(user_id)
@@ -467,22 +469,11 @@ class ContentService:
 
     async def hide_feed_item(self, user_id: str, content_id: str) -> dict[str, Any]:
         """Manually hide feed item per SPEC §9.1 & §9.2."""
-        if not self._content_repo:
-            raise NotFoundError(
-                code="CONTENT_NOT_FOUND",
-                message=f"Feed item '{content_id}' not found",
-            )
         await self._content_repo.hide_feed_item(user_id, content_id)
         return {"content_id": content_id, "hidden": True}
 
     async def match_content(self, content_id: str) -> ContentMatchResponse:
         """Match content duration against activity catalog with distinct rejection reasons per SPEC §5.2 & §9.6."""
-        if not self._content_repo:
-            raise NotFoundError(
-                code="CONTENT_NOT_FOUND",
-                message=f"Content '{content_id}' not found",
-            )
-
         cache_doc = await self._content_repo.get_content_cache(content_id)
         if not cache_doc:
             raise NotFoundError(
@@ -507,16 +498,6 @@ class ContentService:
         self, user_id: str, target_duration_seconds: int
     ) -> TimeMatchResponse:
         """Match target time block duration against user feed using asymmetric windows per SPEC §5.3 & §9.6."""
-        if not self._content_repo:
-            return TimeMatchResponse(
-                target_duration_seconds=target_duration_seconds,
-                target_duration_label=format_duration_label(target_duration_seconds),
-                matched_items=[],
-                window_type=None,
-                is_valid=False,
-                rejection_reason="no_content_in_window",
-            )
-
         unconsumed = await self._content_repo.get_all_unconsumed_feed_items(user_id)
         match_res = match_time_block_asymmetric(target_duration_seconds, unconsumed)
 

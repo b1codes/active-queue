@@ -7,6 +7,8 @@ from typing import TYPE_CHECKING, Any
 
 import pytest
 
+from app.features.content.models import ContentCacheItem
+
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable
 
@@ -116,7 +118,8 @@ async def test_chunked_resumable_sync_of_large_playlist(
         chunks.append(chunk)
         if not chunk["has_more"]:
             break
-    assert [c["items_synced"] for c in chunks] == [250, 250, 250, 250, 200]
+    # Chunk 1 loses private #10 / deleted #20 (absent upstream) and live #30 (unplayable).
+    assert [c["items_synced"] for c in chunks] == [247, 250, 250, 250, 200]
     assert [c["status"] for c in chunks] == ["syncing"] * 4 + ["active"]
     assert chunks[-1]["next_page_token"] is None
 
@@ -126,7 +129,7 @@ async def test_chunked_resumable_sync_of_large_playlist(
     assert doc["last_sync_at"] is not None
 
     feed = (await api.get("/api/v1/content/feed?limit=1", headers=alice.headers)).json()
-    assert feed["data"]["total_unconsumed"] == 1200
+    assert feed["data"]["total_unconsumed"] == 1197
 
 
 async def test_sync_throttle_preflight_and_full_walk(
@@ -134,7 +137,7 @@ async def test_sync_throttle_preflight_and_full_walk(
 ) -> None:
     src = (await _add(api, alice, "fixture-small-playlist")).json()["data"]
     first = await _sync(api, alice, src["id"])
-    assert first["items_synced"] == 15
+    assert first["items_synced"] == 14
 
     throttled = await _sync(api, alice, src["id"])
     assert throttled["items_synced"] == 0
@@ -148,7 +151,7 @@ async def test_sync_throttle_preflight_and_full_walk(
 
     await ref.update({"last_sync_at": datetime.now(UTC) - timedelta(days=8)})
     walk = await _sync(api, alice, src["id"])
-    assert walk["items_synced"] == 15
+    assert walk["items_synced"] == 14
 
 
 async def test_stalled_sync_restarts_from_the_beginning(
@@ -179,7 +182,7 @@ async def test_quota_exhaustion_mid_sync_keeps_cursor(
     # Feed stays fully readable while paused (SPEC §8.3).
     feed = await api.get("/api/v1/content/feed", headers=alice.headers)
     assert feed.status_code == 200
-    assert feed.json()["data"]["total_unconsumed"] == 250
+    assert feed.json()["data"]["total_unconsumed"] == 247
 
 
 async def test_resync_does_not_resurface_consumed_items(
@@ -239,7 +242,7 @@ async def test_feed_pagination_visits_every_item_once(
     assert sorted(seen) == sorted(i["content_id"] for i in all_items)
     assert len(seen) == len(set(seen))
     # total_unconsumed only on the first page (SPEC §9.2).
-    assert totals[0] == 15
+    assert totals[0] == 14
     assert all(t is None for t in totals[1:])
     published = [i["published_at"] for i in all_items]
     assert published == sorted(published, reverse=True)
@@ -270,6 +273,7 @@ async def test_feed_items_are_enriched_from_content_cache(
     api: AsyncClient, alice: EmulatorUser, seed_feed: SeedFeed
 ) -> None:
     items = await seed_feed(alice)
+    assert all(i["duration_seconds"] > 0 for i in items)  # unplayable items never queued
     first = next(i for i in items if i["content_id"] == "fx:fx_vid_0001")
     assert first["title"].startswith("Fixture Workout Video #1")
     assert first["provider"] == "fixture"
@@ -304,7 +308,7 @@ async def test_hide_is_scoped_to_the_callers_feed(
 
 
 async def test_content_match_and_rejections(
-    api: AsyncClient, alice: EmulatorUser, seed_feed: SeedFeed
+    api: AsyncClient, db: FirestoreAsyncClient, alice: EmulatorUser, seed_feed: SeedFeed
 ) -> None:
     await seed_feed(alice)
     ok = await api.post(
@@ -316,11 +320,20 @@ async def test_content_match_and_rejections(
     assert data["is_valid"] is True
     assert {a["id"] for a in data["matching_activities"]} >= {"running", "yoga"}
 
-    live = await api.post(
-        "/api/v1/content/match", json={"content_id": "fx:vid_private_10"}, headers=alice.headers
+    short = ContentCacheItem(
+        content_id="fx:too_short",
+        provider="fixture",
+        external_id="too_short",
+        title="Two minute warmup",
+        duration_seconds=120,
+        published_at=datetime.now(UTC),
     )
-    assert live.json()["data"]["is_valid"] is False
-    assert live.json()["data"]["rejection_reason"] == "duration_out_of_range"
+    await db.collection("content_cache").document(short.content_id).set(short.to_firestore())
+    rejected = await api.post(
+        "/api/v1/content/match", json={"content_id": "fx:too_short"}, headers=alice.headers
+    )
+    assert rejected.json()["data"]["is_valid"] is False
+    assert rejected.json()["data"]["rejection_reason"] == "duration_out_of_range"
 
     missing = await api.post(
         "/api/v1/content/match", json={"content_id": "fx:missing"}, headers=alice.headers
@@ -391,3 +404,46 @@ async def test_hostile_path_ids_are_400(
     resp = await getattr(api, method)(template.format(bad_id), headers=alice.headers)
     assert resp.status_code == 400, resp.text
     assert resp.json()["error"]["code"] == "VALIDATION_FAILED"
+
+
+async def test_filter_with_no_matches_has_bounded_reads_per_page(
+    api: AsyncClient, alice: EmulatorUser, seed_feed: SeedFeed
+) -> None:
+    """A filter that matches nothing must not scan the whole feed in one request."""
+    await seed_feed(alice, "fixture-large-playlist")  # 1197 items
+    pages = 0
+    cursor: str | None = None
+    while True:
+        pages += 1
+        url = "/api/v1/content/feed?limit=20&min_duration=86000" + (
+            f"&cursor={cursor}" if cursor else ""
+        )
+        page = (await api.get(url, headers=alice.headers)).json()["data"]
+        assert page["items"] == []
+        cursor = page["next_cursor"]
+        if not cursor:
+            break
+        assert pages < 10
+    # MAX_FEED_SCAN_PER_REQUEST = 500, so 1197 docs take 3 requests.
+    assert pages == 3
+
+
+async def test_garbage_and_legacy_cursors(
+    api: AsyncClient, alice: EmulatorUser, seed_feed: SeedFeed
+) -> None:
+    import base64
+
+    items = await seed_feed(alice)
+    garbage = await api.get("/api/v1/content/feed?cursor=%%%not-base64", headers=alice.headers)
+    assert garbage.status_code == 200
+    # An undecodable cursor falls back to the first page (no 500).
+    assert garbage.json()["data"]["items"][0]["content_id"] == items[0]["content_id"]
+
+    legacy = base64.urlsafe_b64encode(items[2]["published_at"].encode()).decode()
+    page = (await api.get(f"/api/v1/content/feed?cursor={legacy}", headers=alice.headers)).json()[
+        "data"
+    ]
+    assert page["items"][0]["content_id"] == items[3]["content_id"]
+
+    sessions = await api.get("/api/v1/sessions?cursor=bm90LWEtZGF0ZQ==", headers=alice.headers)
+    assert sessions.status_code == 200

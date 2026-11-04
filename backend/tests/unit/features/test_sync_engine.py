@@ -9,6 +9,12 @@ from app.features.content.models import Source
 from app.features.content.service import ContentService
 
 
+def _user_repo(consumed: set[str] | None = None) -> AsyncMock:
+    repo = AsyncMock()
+    repo.get_consumed_content_ids.return_value = consumed or set()
+    return repo
+
+
 @pytest.mark.asyncio
 async def test_sync_source_chunk_single_page() -> None:
     """sync_source_chunk completes small playlist sync in one chunk."""
@@ -28,11 +34,11 @@ async def test_sync_source_chunk_single_page() -> None:
     mock_source_repo.get_source = AsyncMock(return_value=source)
     mock_source_repo.update_source = AsyncMock()
 
-    service = ContentService(mock_source_repo, mock_content_repo)
+    service = ContentService(mock_source_repo, mock_content_repo, _user_repo())
     res = await service.sync_source_chunk("u1", source.id)
 
     assert res.status == "active"
-    assert res.items_synced == 15
+    assert res.items_synced == 14  # private #10 omitted by the provider
     assert res.has_more is False
     assert res.next_page_token is None
 
@@ -66,12 +72,13 @@ async def test_sync_source_chunk_1200_items_multichunk_completion() -> None:
 
     mock_source_repo.update_source = AsyncMock(side_effect=fake_update)
 
-    service = ContentService(mock_source_repo, mock_content_repo)
+    service = ContentService(mock_source_repo, mock_content_repo, _user_repo())
 
-    # Chunk 1 (0 -> 250 items)
+    # Chunk 1 (offsets 0 -> 250): private #10 and deleted #20 are absent from the
+    # provider page, and live stream #30 (P0D) is skipped as unplayable.
     res1 = await service.sync_source_chunk("u1", source.id)
     assert res1.status == "syncing"
-    assert res1.items_synced == 250
+    assert res1.items_synced == 247
     assert res1.has_more is True
     assert res1.next_page_token == "250"
 
@@ -120,7 +127,7 @@ async def test_sync_source_preflight_no_change() -> None:
     mock_source_repo.get_source = AsyncMock(return_value=source)
     mock_source_repo.update_source = AsyncMock()
 
-    service = ContentService(mock_source_repo)
+    service = ContentService(mock_source_repo, AsyncMock(), _user_repo())
     res = await service.sync_source_chunk("u1", source.id)
 
     assert res.items_synced == 0
@@ -148,10 +155,10 @@ async def test_sync_stalled_expiration() -> None:
     mock_source_repo.get_source = AsyncMock(return_value=source)
     mock_source_repo.update_source = AsyncMock()
 
-    service = ContentService(mock_source_repo)
+    service = ContentService(mock_source_repo, AsyncMock(), _user_repo())
     res = await service.sync_source_chunk("u1", source.id)
 
     # Re-synced small playlist cleanly
     assert res.status == "active"
-    assert res.items_synced == 15
+    assert res.items_synced == 14  # private #10 omitted by the provider
     assert res.has_more is False

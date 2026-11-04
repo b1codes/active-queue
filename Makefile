@@ -15,7 +15,7 @@ RESET   := \033[0m
         storybook storybook-ios storybook-android \
         docker-up docker-down docker-build emulators emulators-stop \
         seed-db seed \
-        test test-backend test-frontend \
+        test test-backend test-backend-fast test-emulator test-frontend \
         lint lint-backend lint-frontend \
         typecheck typecheck-backend typecheck-frontend \
         format format-backend \
@@ -49,7 +49,9 @@ help:
 	@echo "  $(GREEN)seed$(RESET)            Alias for seed-db"
 	@echo ""
 	@echo "  $(GREEN)test$(RESET)              Run all unit tests (backend + frontend)"
-	@echo "  $(GREEN)test-backend$(RESET)      Run pytest suite with coverage in backend"
+	@echo "  $(GREEN)test-backend$(RESET)      Full pytest suite on test emulators + 95% coverage gate"
+	@echo "  $(GREEN)test-backend-fast$(RESET) Unit + mocked integration tests only (no emulators)"
+	@echo "  $(GREEN)test-emulator$(RESET)     Start test emulators (9190/9199) in the foreground"
 	@echo "  $(GREEN)test-frontend$(RESET)     Run Jest test suite in frontend"
 	@echo ""
 	@echo "  $(GREEN)lint$(RESET)              Run linting & typechecking across full stack"
@@ -181,10 +183,24 @@ seed: seed-db
 ## test: Run tests for both backend and frontend
 test: test-backend test-frontend
 
-## test-backend: Run pytest suite on backend with coverage report
+# Test emulators use firebase.test.json (Firestore 9190, Auth 9199) so a test run never
+# wipes the dev emulators started by `make local`. Requires Java 21+.
+FIREBASE_TOOLS  := npx -y firebase-tools@15.33.0
+TEST_EMULATORS  := --config firebase.test.json --project demo-activequeue-local --only auth,firestore
+
+## test-backend: Full backend suite (unit + mocked + emulator tiers) with the coverage gate
 test-backend:
-	@echo "$(BLUE)Running backend pytest test suite...$(RESET)"
-	cd backend && uv run pytest
+	@echo "$(BLUE)Running backend pytest suite against the test emulators...$(RESET)"
+	$(FIREBASE_TOOLS) emulators:exec $(TEST_EMULATORS) \
+		"cd backend && REQUIRE_EMULATOR=1 uv run pytest --cov"
+
+## test-backend-fast: Unit + mocked integration tiers only (no emulators, no coverage gate)
+test-backend-fast:
+	cd backend && uv run pytest tests/unit tests/integration
+
+## test-emulator: Run the test emulators in the foreground (for iterating on tests/emulator)
+test-emulator:
+	$(FIREBASE_TOOLS) emulators:start $(TEST_EMULATORS)
 
 ## test-frontend: Run Jest test suite on frontend
 test-frontend:

@@ -422,3 +422,24 @@ async def test_slot_is_reclaimed_after_discard_and_completion(
     await api.post(f"/api/v1/sessions/{sid}/complete", headers=alice.headers)
     code, body = await _create(api, alice, target_duration_seconds=900)
     assert code == 201, body
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        {"external_workout_url": "https://www.strava.com/activities/1"},
+        {"healthkit_uuid": "8F6A1C2E-0000-4000-8000-000000000000"},
+    ],
+)
+async def test_v1_1_completion_fields_are_501(
+    api: AsyncClient, alice: EmulatorUser, body: dict[str, str]
+) -> None:
+    _, created = await _create(api, alice, target_duration_seconds=900)
+    sid = created["data"]["id"]
+    await api.post(f"/api/v1/sessions/{sid}/start", headers=alice.headers)
+    resp = await api.post(f"/api/v1/sessions/{sid}/complete", json=body, headers=alice.headers)
+    assert resp.status_code == 501
+    assert resp.json()["error"]["code"] == "FEATURE_NOT_AVAILABLE"
+    # The session is untouched and can still be completed normally.
+    ok = await api.post(f"/api/v1/sessions/{sid}/complete", headers=alice.headers)
+    assert ok.json()["data"]["status"] == "completed"

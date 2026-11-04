@@ -23,6 +23,7 @@ dev = [
     "ruff>=0.12",
     "mypy>=1.16",
     "coverage>=7.8",
+    "respx>=0.23.1",
 ]
 
 [tool.ruff]
@@ -86,7 +87,9 @@ source = ["app"]
 branch = true
 
 [tool.coverage.report]
-fail_under = 80
+# The single backend coverage gate (branch coverage over all of app/). CI,
+# `make test-backend`, and scripts/deploy.sh all run `pytest --cov` and read it here.
+fail_under = 95
 exclude_lines = [
     "pragma: no cover",
     "if TYPE_CHECKING:",

@@ -9,6 +9,12 @@ from app.features.content.models import Source
 from app.features.content.service import ContentService
 
 
+def _user_repo(consumed: set[str] | None = None) -> AsyncMock:
+    repo = AsyncMock()
+    repo.get_consumed_content_ids.return_value = consumed or set()
+    return repo
+
+
 @pytest.mark.asyncio
 async def test_add_source_success() -> None:
     """ContentService.add_source adds valid content source."""
@@ -17,7 +23,7 @@ async def test_add_source_success() -> None:
     mock_repo.get_user_source_by_external_id = AsyncMock(return_value=None)
     mock_repo.create_source = AsyncMock(side_effect=lambda s: s)
 
-    service = ContentService(mock_repo)
+    service = ContentService(mock_repo, AsyncMock(), _user_repo())
     source = await service.add_source("user1", "fixture-small-playlist")
 
     assert source.user_id == "user1"
@@ -30,7 +36,7 @@ async def test_add_source_success() -> None:
 async def test_add_source_system_playlists_rejection() -> None:
     """ContentService.add_source rejects WL, LL, HL system playlists per SPEC §9.3."""
     mock_repo = MagicMock()
-    service = ContentService(mock_repo)
+    service = ContentService(mock_repo, AsyncMock(), _user_repo())
 
     for sys_id in (
         "WL",
@@ -52,7 +58,7 @@ async def test_add_source_max_sources_limit() -> None:
     mock_repo = MagicMock()
     mock_repo.get_user_sources = AsyncMock(return_value=[MagicMock()] * 5)
 
-    service = ContentService(mock_repo)
+    service = ContentService(mock_repo, AsyncMock(), _user_repo())
     with pytest.raises(ValidationError) as exc_info:
         await service.add_source("user1", "fixture-small-playlist")
     assert exc_info.value.code == "SOURCE_LIMIT_REACHED"
@@ -72,7 +78,7 @@ async def test_add_source_duplicate_check() -> None:
     )
     mock_repo.get_user_source_by_external_id = AsyncMock(return_value=existing_source)
 
-    service = ContentService(mock_repo)
+    service = ContentService(mock_repo, AsyncMock(), _user_repo())
     with pytest.raises(ConflictError) as exc_info:
         await service.add_source("user1", "fixture-small-playlist")
     assert exc_info.value.code == "SOURCE_ALREADY_ADDED"
@@ -85,7 +91,7 @@ async def test_add_source_not_accessible() -> None:
     mock_repo.get_user_sources = AsyncMock(return_value=[])
     mock_repo.get_user_source_by_external_id = AsyncMock(return_value=None)
 
-    service = ContentService(mock_repo)
+    service = ContentService(mock_repo, AsyncMock(), _user_repo())
     with pytest.raises(NotFoundError) as exc_info:
         await service.add_source("user1", "fixture-unavailable")
     assert exc_info.value.code == "SOURCE_NOT_ACCESSIBLE"

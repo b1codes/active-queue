@@ -55,5 +55,5 @@ async def test_post_sources_sync_endpoint(mock_firestore_client: AsyncMock) -> N
     data = resp.json()
     assert data["status"] == "success"
     assert data["data"]["source_id"] == source.id
-    assert data["data"]["items_synced"] == 15
+    assert data["data"]["items_synced"] == 14
     assert data["data"]["has_more"] is False

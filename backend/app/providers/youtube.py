@@ -18,6 +18,8 @@ from app.providers.base import (
 
 logger = structlog.get_logger(__name__)
 
+API_BASE = "https://www.googleapis.com/youtube/v3"
+
 # ISO-8601 Duration Regex: P[n]DT[n]H[n]M[n]S
 ISO_DURATION_REGEX = re.compile(
     r"^P(?:(?P<days>\d+)D)?(?:T(?:(?P<hours>\d+)H)?(?:(?P<minutes>\d+)M)?(?:(?P<seconds>\d+)S)?)?$"
@@ -90,45 +92,63 @@ class YouTubeProvider(ContentProvider):
             message=f"Unable to parse YouTube playlist or channel ID from URL '{url}'",
         )
 
-    async def get_playlist_metadata(self, source_id: str) -> PlaylistMetadata:
-        """Fetch playlist metadata from YouTube Data API v3 playlists.list."""
+    async def _api_get(self, url: str, params: dict[str, Any]) -> dict[str, Any]:
+        """GET a Data API v3 endpoint, mapping failures onto the SPEC §9.7 error codes.
+
+        - 403 quotaExceeded / dailyLimitExceeded -> PROVIDER_QUOTA_EXCEEDED (503)
+        - 404 playlistNotFound -> SOURCE_NOT_FOUND (404)
+        - timeouts, transport errors, any other non-200 -> PROVIDER_UNAVAILABLE (503)
+        """
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                resp = await client.get(url, params=params)
+        except httpx.HTTPError as err:
+            logger.warning("youtube_transport_error", url=url, error_type=type(err).__name__)
+            raise ProviderError(
+                code="PROVIDER_UNAVAILABLE",
+                message="YouTube API is unreachable",
+            ) from err
+
+        if resp.status_code == 200:
+            body: dict[str, Any] = resp.json()
+            return body
+
+        try:
+            error_body = resp.json().get("error", {}) or {}
+        except ValueError:
+            error_body = {}
+        errors = error_body.get("errors") or [{}]
+        reason = errors[0].get("reason", "")
+
+        if resp.status_code == 403 and reason in ("quotaExceeded", "dailyLimitExceeded"):
+            raise ProviderError(
+                code="PROVIDER_QUOTA_EXCEEDED",
+                message="YouTube Data API quota limit exceeded",
+            )
+        if resp.status_code == 404 and reason == "playlistNotFound":
+            raise NotFoundError(
+                code="SOURCE_NOT_FOUND",
+                message="YouTube playlist not found or private",
+            )
+        raise ProviderError(
+            code="PROVIDER_UNAVAILABLE",
+            message=f"YouTube API returned HTTP {resp.status_code}",
+        )
+
+    def _require_key(self) -> str:
         if not self._api_key:
             raise ProviderError(
                 code="PROVIDER_UNAVAILABLE",
                 message="YouTube API key is not configured",
             )
+        return self._api_key
 
-        url = "https://www.googleapis.com/youtube/v3/playlists"
-        params = {
-            "part": "snippet,contentDetails",
-            "id": source_id,
-            "key": self._api_key,
-        }
-
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            resp = await client.get(url, params=params)
-
-        if resp.status_code == 403:
-            body = resp.json().get("error", {})
-            errors = body.get("errors", [])
-            reason = errors[0].get("reason") if errors else ""
-            if reason in ("quotaExceeded", "dailyLimitExceeded"):
-                raise ProviderError(
-                    code="PROVIDER_QUOTA_EXCEEDED",
-                    message="YouTube Data API quota limit exceeded",
-                )
-            raise ProviderError(
-                code="PROVIDER_UNAVAILABLE",
-                message=f"YouTube API error: {body.get('message', 'Forbidden')}",
-            )
-
-        if resp.status_code != 200:
-            raise ProviderError(
-                code="PROVIDER_UNAVAILABLE",
-                message=f"YouTube API returned HTTP {resp.status_code}",
-            )
-
-        data = resp.json()
+    async def get_playlist_metadata(self, source_id: str) -> PlaylistMetadata:
+        """Fetch playlist metadata from YouTube Data API v3 playlists.list (1 unit)."""
+        data = await self._api_get(
+            f"{API_BASE}/playlists",
+            {"part": "snippet,contentDetails", "id": source_id, "key": self._require_key()},
+        )
         items = data.get("items", [])
         if not items:
             raise NotFoundError(
@@ -138,17 +158,12 @@ class YouTubeProvider(ContentProvider):
 
         snippet = items[0].get("snippet", {})
         content_details = items[0].get("contentDetails", {})
-        thumbnails = snippet.get("thumbnails", {})
-        thumb_url = thumbnails.get("high", {}).get("url") or thumbnails.get("default", {}).get(
-            "url"
-        )
-
         return PlaylistMetadata(
             source_id=source_id,
             title=snippet.get("title", "Untitled Playlist"),
             description=snippet.get("description"),
             item_count=content_details.get("itemCount"),
-            thumbnail_url=thumb_url,
+            thumbnail_url=_best_thumbnail(snippet.get("thumbnails")),
         )
 
     async def fetch_playlist_items(
@@ -157,145 +172,69 @@ class YouTubeProvider(ContentProvider):
         page_token: str | None = None,
         max_results: int = 50,
     ) -> PlaylistPage:
-        """Fetch page of playlist items via playlistItems.list and videos.list.
+        """Fetch one page via playlistItems.list + videos.list (1 unit each).
 
-        Handles the silent case where private/deleted videos are absent from videos.list.
+        Private and deleted videos still appear in playlistItems.list but are silently
+        absent from videos.list (SPEC §12.3). They are unplayable, so they are omitted
+        from the page rather than emitted with a null duration and a made-up timestamp.
         """
-        if not self._api_key:
-            raise ProviderError(
-                code="PROVIDER_UNAVAILABLE",
-                message="YouTube API key is not configured",
-            )
-
-        # Step 1: Fetch playlist items page (1 unit)
-        items_url = "https://www.googleapis.com/youtube/v3/playlistItems"
-        items_params: dict[str, Any] = {
+        key = self._require_key()
+        params: dict[str, Any] = {
             "part": "snippet,contentDetails",
             "playlistId": source_id,
             "maxResults": min(max_results, 50),
-            "key": self._api_key,
+            "key": key,
         }
         if page_token:
-            items_params["pageToken"] = page_token
+            params["pageToken"] = page_token
+        items_data = await self._api_get(f"{API_BASE}/playlistItems", params)
 
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            resp = await client.get(items_url, params=items_params)
-
-        if resp.status_code == 403:
-            body = resp.json().get("error", {})
-            errors = body.get("errors", [])
-            reason = errors[0].get("reason") if errors else ""
-            if reason in ("quotaExceeded", "dailyLimitExceeded"):
-                raise ProviderError(
-                    code="PROVIDER_QUOTA_EXCEEDED",
-                    message="YouTube Data API quota limit exceeded",
-                )
-            raise ProviderError(
-                code="PROVIDER_UNAVAILABLE",
-                message=f"YouTube API error: {body.get('message', 'Forbidden')}",
-            )
-
-        if resp.status_code != 200:
-            raise ProviderError(
-                code="PROVIDER_UNAVAILABLE",
-                message=f"YouTube API returned HTTP {resp.status_code}",
-            )
-
-        items_data = resp.json()
-        raw_playlist_items = items_data.get("items", [])
         next_page_token = items_data.get("nextPageToken")
         total_results = items_data.get("pageInfo", {}).get("totalResults")
 
-        if not raw_playlist_items:
-            return PlaylistPage(
-                items=[],
-                next_page_token=next_page_token,
-                total_results=total_results,
-            )
-
-        # Extract video IDs for videos.list call
         video_ids: list[str] = []
-        video_id_to_snippet: dict[str, dict[str, Any]] = {}
-        for item in raw_playlist_items:
+        playlist_snippets: dict[str, dict[str, Any]] = {}
+        for item in items_data.get("items", []):
             snippet = item.get("snippet", {})
-            res_id = snippet.get("resourceId", {})
-            vid_id = res_id.get("videoId") or item.get("contentDetails", {}).get("videoId")
-            if vid_id:
+            vid_id = snippet.get("resourceId", {}).get("videoId") or item.get(
+                "contentDetails", {}
+            ).get("videoId")
+            if vid_id and vid_id not in playlist_snippets:
                 video_ids.append(vid_id)
-                video_id_to_snippet[vid_id] = snippet
+                playlist_snippets[vid_id] = snippet
 
         if not video_ids:
             return PlaylistPage(
-                items=[],
-                next_page_token=next_page_token,
-                total_results=total_results,
+                items=[], next_page_token=next_page_token, total_results=total_results
             )
 
-        # Step 2: Batch fetch video details for duration & status (1 unit)
-        videos_url = "https://www.googleapis.com/youtube/v3/videos"
-        videos_params = {
-            "part": "contentDetails,snippet",
-            "id": ",".join(video_ids),
-            "key": self._api_key,
-        }
+        videos_data = await self._api_get(
+            f"{API_BASE}/videos",
+            {"part": "contentDetails,snippet", "id": ",".join(video_ids), "key": key},
+        )
+        details = {v["id"]: v for v in videos_data.get("items", []) if v.get("id")}
 
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            videos_resp = await client.get(videos_url, params=videos_params)
-
-        video_details_map: dict[str, dict[str, Any]] = {}
-        if videos_resp.status_code == 200:
-            videos_data = videos_resp.json()
-            for v_item in videos_data.get("items", []):
-                v_id = v_item.get("id")
-                if v_id:
-                    video_details_map[v_id] = v_item
-
-        # Step 3: Combine and handle silent missing private/deleted videos per SPEC §8.3
         result_items: list[RawContentItem] = []
         for vid_id in video_ids:
-            snippet = video_id_to_snippet.get(vid_id, {})
-            v_details = video_details_map.get(vid_id)
-
-            if not v_details:
-                # Private or deleted video absent from videos.list per SPEC §8.3
-                title = snippet.get("title", "[Private or Deleted Video]")
-                result_items.append(
-                    RawContentItem(
-                        external_id=vid_id,
-                        title=title,
-                        duration_seconds=0,
-                        published_at=datetime.now(UTC),
-                        thumbnail_url=None,
-                        video_url=f"https://www.youtube.com/watch?v={vid_id}",
-                    )
-                )
+            video = details.get(vid_id)
+            if video is None:
+                logger.info("youtube_video_unavailable_skipped", video_id=vid_id)
                 continue
-
-            v_snippet = v_details.get("snippet", {})
-            v_content = v_details.get("contentDetails", {})
-            iso_duration = v_content.get("duration")
-            duration_secs = parse_iso8601_duration(iso_duration)
-
-            pub_str = v_snippet.get("publishedAt") or snippet.get("publishedAt")
-            try:
-                pub_dt = (
-                    datetime.fromisoformat(pub_str.replace("Z", "+00:00"))
-                    if pub_str
-                    else datetime.now(UTC)
-                )
-            except ValueError:
-                pub_dt = datetime.now(UTC)
-
-            thumbs = v_snippet.get("thumbnails", {}) or snippet.get("thumbnails", {})
-            thumb_url = thumbs.get("high", {}).get("url") or thumbs.get("default", {}).get("url")
-
+            v_snippet = video.get("snippet", {})
+            p_snippet = playlist_snippets[vid_id]
             result_items.append(
                 RawContentItem(
                     external_id=vid_id,
-                    title=v_snippet.get("title") or snippet.get("title", "Untitled Video"),
-                    duration_seconds=duration_secs,
-                    published_at=pub_dt,
-                    thumbnail_url=thumb_url,
+                    title=v_snippet.get("title") or p_snippet.get("title") or "Untitled Video",
+                    duration_seconds=parse_iso8601_duration(
+                        video.get("contentDetails", {}).get("duration")
+                    ),
+                    published_at=_parse_timestamp(
+                        v_snippet.get("publishedAt") or p_snippet.get("publishedAt")
+                    ),
+                    thumbnail_url=_best_thumbnail(
+                        v_snippet.get("thumbnails") or p_snippet.get("thumbnails")
+                    ),
                     video_url=f"https://www.youtube.com/watch?v={vid_id}",
                 )
             )
@@ -305,3 +244,26 @@ class YouTubeProvider(ContentProvider):
             next_page_token=next_page_token,
             total_results=total_results,
         )
+
+
+def _best_thumbnail(thumbnails: dict[str, Any] | None) -> str | None:
+    thumbs = thumbnails or {}
+    for size in ("high", "medium", "default"):
+        url = (thumbs.get(size) or {}).get("url")
+        if url:
+            return str(url)
+    return None
+
+
+def _parse_timestamp(value: str | None) -> datetime:
+    """Parse an RFC 3339 API timestamp. Unparseable values fall back to the epoch, not now().
+
+    now() would give the item a new published_at on every sync, making it jump to the top
+    of the newest-first feed each time.
+    """
+    if value:
+        try:
+            return datetime.fromisoformat(value.replace("Z", "+00:00"))
+        except ValueError:
+            logger.warning("youtube_unparseable_timestamp", value=value)
+    return datetime(1970, 1, 1, tzinfo=UTC)
