@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import re
 from datetime import UTC, datetime
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import structlog
 
@@ -27,6 +27,9 @@ from app.features.content.schemas import (
 )
 from app.providers.base import format_content_id, parse_content_id
 from app.providers.factory import get_provider
+
+if TYPE_CHECKING:
+    from app.features.users.repository import UserRepository
 
 logger = structlog.get_logger(__name__)
 
@@ -59,9 +62,11 @@ class ContentService:
         self,
         source_repo: SourceRepository,
         content_repo: ContentRepository | None = None,
+        user_repo: UserRepository | None = None,
     ) -> None:
         self._source_repo = source_repo
         self._content_repo = content_repo
+        self._user_repo = user_repo
 
     async def add_source(self, user_id: str, url_or_id: str) -> Source:
         """Add a new content source for user_id with strict validation per SPEC §9.3."""
@@ -263,6 +268,12 @@ class ContentService:
                     message="No changes detected in preflight check",
                 )
 
+        # feed_items.consumed is a projection of the user's durable consumed record
+        # (SPEC §4.7): re-syncs and re-added playlists must not resurface watched items.
+        consumed_ids: set[str] = (
+            await self._user_repo.get_consumed_content_ids(user_id) if self._user_repo else set()
+        )
+
         current_token = source.next_page_token
         chunk_cache_items: list[ContentCacheItem] = []
         chunk_feed_items: list[FeedItem] = []
@@ -336,7 +347,7 @@ class ContentService:
                     source_id=source.id,
                     published_at=raw.published_at,
                     duration_seconds=raw.duration_seconds,
-                    consumed=False,
+                    consumed=cid in consumed_ids,
                     created_at=now,
                     updated_at=now,
                 )
@@ -398,12 +409,12 @@ class ContentService:
         if cursor is None:
             total_unconsumed = await self._content_repo.get_user_feed_count(user_id)
 
-        cursor_dt = decode_cursor(cursor) if cursor else None
+        feed_cursor = decode_cursor(cursor) if cursor else None
 
         feed_items, next_cursor = await self._content_repo.get_user_feed_items_page(
             user_id=user_id,
             limit=limit,
-            cursor_dt=cursor_dt,
+            cursor=feed_cursor,
             min_duration=min_duration,
             max_duration=max_duration,
         )

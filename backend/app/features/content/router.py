@@ -2,11 +2,11 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from fastapi import APIRouter, Depends, Path, Query, status
+from fastapi import APIRouter, Depends, Query, status
 
-from app.core.dependencies import get_db
+from app.core.dependencies import DocumentIdPath, get_db
 from app.core.envelopes import SuccessEnvelope, success_response
-from app.core.security import AuthenticatedUser, get_current_user
+from app.core.security import AuthenticatedUser
 from app.features.content.repository import ContentRepository, SourceRepository
 from app.features.content.schemas import (
     ContentMatchRequest,
@@ -19,6 +19,8 @@ from app.features.content.schemas import (
     TimeMatchResponse,
 )
 from app.features.content.service import ContentService
+from app.features.users.dependencies import get_authorized_user
+from app.features.users.repository import UserRepository
 
 if TYPE_CHECKING:
     from google.cloud.firestore import AsyncClient
@@ -30,7 +32,7 @@ def get_content_service(db: AsyncClient = Depends(get_db)) -> ContentService:
     """Dependency injector for ContentService."""
     source_repo = SourceRepository(db)
     content_repo = ContentRepository(db)
-    return ContentService(source_repo, content_repo)
+    return ContentService(source_repo, content_repo, UserRepository(db))
 
 
 # Sources endpoints
@@ -42,7 +44,7 @@ def get_content_service(db: AsyncClient = Depends(get_db)) -> ContentService:
     description="Fetch all content sources registered by authenticated user per SPEC §9.1 & §9.3.",
 )
 async def get_user_sources(
-    current_user: AuthenticatedUser = Depends(get_current_user),
+    current_user: AuthenticatedUser = Depends(get_authorized_user),
     service: ContentService = Depends(get_content_service),
 ) -> SuccessEnvelope[dict[str, Any]]:
     """GET /api/v1/sources list endpoint."""
@@ -59,7 +61,7 @@ async def get_user_sources(
 )
 async def create_source(
     body: CreateSourceRequest,
-    current_user: AuthenticatedUser = Depends(get_current_user),
+    current_user: AuthenticatedUser = Depends(get_authorized_user),
     service: ContentService = Depends(get_content_service),
 ) -> SuccessEnvelope[dict[str, Any]]:
     """Add content source endpoint."""
@@ -75,8 +77,8 @@ async def create_source(
     description="Remove a content source for authenticated user per SPEC §9.1.",
 )
 async def delete_source(
-    source_id: str = Path(..., min_length=1, max_length=200, pattern=r"^[a-zA-Z0-9_\-\.:/]+$"),
-    current_user: AuthenticatedUser = Depends(get_current_user),
+    source_id: DocumentIdPath,
+    current_user: AuthenticatedUser = Depends(get_authorized_user),
     service: ContentService = Depends(get_content_service),
 ) -> SuccessEnvelope[dict[str, Any]]:
     """DELETE /api/v1/sources/{source_id} endpoint."""
@@ -92,8 +94,8 @@ async def delete_source(
     description="Process one chunk (<= 5 pages / ~250 items) of resumable sync per SPEC §9.4.",
 )
 async def sync_source_chunk(
-    source_id: str = Path(..., min_length=1, max_length=200, pattern=r"^[a-zA-Z0-9_\-\.:/]+$"),
-    current_user: AuthenticatedUser = Depends(get_current_user),
+    source_id: DocumentIdPath,
+    current_user: AuthenticatedUser = Depends(get_authorized_user),
     service: ContentService = Depends(get_content_service),
 ) -> SuccessEnvelope[dict[str, Any]]:
     """Trigger chunked resumable sync endpoint."""
@@ -114,7 +116,7 @@ async def get_user_feed(
     cursor: str | None = Query(None, max_length=200),
     min_duration: int | None = Query(None, ge=0, le=86400),
     max_duration: int | None = Query(None, ge=0, le=86400),
-    current_user: AuthenticatedUser = Depends(get_current_user),
+    current_user: AuthenticatedUser = Depends(get_authorized_user),
     service: ContentService = Depends(get_content_service),
 ) -> SuccessEnvelope[dict[str, Any]]:
     """GET /api/v1/content/feed endpoint."""
@@ -133,11 +135,11 @@ async def get_user_feed(
     status_code=status.HTTP_200_OK,
     response_model=None,
     summary="Manually hide feed item",
-    description="Mark feed item as consumed and update user consumed_content for media consumed outside a workout per SPEC §9.1 & §9.2.",
+    description="Mark feed item as consumed and update user consumed_content_ids for media consumed outside a workout per SPEC §9.1 & §9.2.",
 )
 async def hide_feed_item(
-    content_id: str = Path(..., min_length=1, max_length=200, pattern=r"^[a-zA-Z0-9_\-\.:/]+$"),
-    current_user: AuthenticatedUser = Depends(get_current_user),
+    content_id: DocumentIdPath,
+    current_user: AuthenticatedUser = Depends(get_authorized_user),
     service: ContentService = Depends(get_content_service),
 ) -> SuccessEnvelope[dict[str, Any]]:
     """POST /api/v1/content/feed/{content_id}/hide endpoint."""
@@ -155,7 +157,7 @@ async def hide_feed_item(
 )
 async def match_content(
     body: ContentMatchRequest,
-    _current_user: AuthenticatedUser = Depends(get_current_user),
+    _current_user: AuthenticatedUser = Depends(get_authorized_user),
     service: ContentService = Depends(get_content_service),
 ) -> SuccessEnvelope[dict[str, Any]]:
     """POST /api/v1/content/match endpoint."""
@@ -173,7 +175,7 @@ async def match_content(
 )
 async def match_time_block(
     body: TimeMatchRequest,
-    current_user: AuthenticatedUser = Depends(get_current_user),
+    current_user: AuthenticatedUser = Depends(get_authorized_user),
     service: ContentService = Depends(get_content_service),
 ) -> SuccessEnvelope[dict[str, Any]]:
     """POST /api/v1/content/match-time endpoint."""

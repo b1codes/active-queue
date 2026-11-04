@@ -37,37 +37,52 @@ class UserService:
         auth_doc = await self._repo.get_authorization(auth_user.uid)
         user_doc = await self._repo.get_user(auth_user.uid)
 
-        if auth_doc is not None and (auth_doc.disabled or auth_doc.status == "disabled"):
-            logger.warning(
-                "account_disabled_access_attempt",
-                uid=auth_user.uid,
-            )
-            raise AuthorizationError(
-                code="ACCOUNT_DISABLED",
-                message="Account disabled",
-            )
+        if auth_doc is not None:
+            self._raise_if_disabled(auth_doc)
 
         if user_doc is None or auth_doc is None:
-            display_name = auth_user.name or (
-                auth_user.email.split("@")[0] if auth_user.email else auth_user.uid
+            user_doc, auth_doc = await self._repo.provision_user_transactional(
+                *self._new_user_documents(auth_user)
             )
+            self._raise_if_disabled(auth_doc)
 
-            new_user = User(
+        return user_doc, auth_doc
+
+    async def ensure_authorized(self, auth_user: AuthenticatedUser) -> UserAuthorization:
+        """Resolve authorization for a verified token per SPEC §3.2.
+
+        Reads user_authorization/{uid} through the 60s TTL cache. A missing document means
+        first login, so both documents are provisioned. A disabled account raises
+        403 ACCOUNT_DISABLED.
+        """
+        auth_doc = await self._repo.get_authorization(auth_user.uid)
+        if auth_doc is None:
+            _, auth_doc = await self._repo.provision_user_transactional(
+                *self._new_user_documents(auth_user)
+            )
+        self._raise_if_disabled(auth_doc)
+        return auth_doc
+
+    @staticmethod
+    def _raise_if_disabled(auth_doc: UserAuthorization) -> None:
+        if auth_doc.disabled or auth_doc.status == "disabled":
+            logger.warning("account_disabled_access_attempt", uid=auth_doc.uid)
+            raise AuthorizationError(code="ACCOUNT_DISABLED", message="Account disabled")
+
+    @staticmethod
+    def _new_user_documents(auth_user: AuthenticatedUser) -> tuple[User, UserAuthorization]:
+        display_name = auth_user.name or (
+            auth_user.email.split("@")[0] if auth_user.email else auth_user.uid
+        )
+        return (
+            User(
                 uid=auth_user.uid,
                 email=auth_user.email or "",
                 display_name=display_name,
                 photo_url=auth_user.picture,
-            )
-            new_auth = UserAuthorization(
-                uid=auth_user.uid,
-                role="user",
-                status="active",
-                disabled=False,
-            )
-
-            user_doc, auth_doc = await self._repo.provision_user_transactional(new_user, new_auth)
-
-        return user_doc, auth_doc
+            ),
+            UserAuthorization(uid=auth_user.uid, role="user", status="active", disabled=False),
+        )
 
     async def get_user_profile(self, uid: str) -> User:
         """Fetch user profile by UID."""

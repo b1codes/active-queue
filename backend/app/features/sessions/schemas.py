@@ -5,7 +5,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field, field_validator
 
-from app.core.sanitizer import sanitize_identifier, sanitize_url
+from app.core.sanitizer import sanitize_document_id, sanitize_identifier, sanitize_url
 from app.features.sessions.models import Session
 
 
@@ -44,7 +44,7 @@ class CreateSessionRequest(BaseModel):
     def sanitize_cnt_id(cls, v: str | None) -> str | None:
         if v is None:
             return None
-        sanitized = sanitize_identifier(v, max_length=200)
+        sanitized = sanitize_document_id(v, max_length=200)
         return sanitized or None
 
 

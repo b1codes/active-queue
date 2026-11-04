@@ -73,6 +73,9 @@ ignore_missing_imports = true
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
+markers = [
+    "emulator: runs against the Firestore + Auth emulators (tests/emulator/)",
+]
 filterwarnings = [
     "error",
     "ignore::DeprecationWarning",
@@ -80,11 +83,7 @@ filterwarnings = [
 
 [tool.coverage.run]
 source = ["app"]
-omit = [
-    "app/main.py",
-    "app/features/activities/*",
-    "app/features/sessions/*",
-]
+branch = true
 
 [tool.coverage.report]
 fail_under = 80

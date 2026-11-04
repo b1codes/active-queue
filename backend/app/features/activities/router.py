@@ -5,7 +5,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, status
 
 from app.core.envelopes import SuccessEnvelope, success_response
-from app.core.security import AuthenticatedUser, get_current_user
+from app.core.security import AuthenticatedUser
 from app.features.activities.schemas import (
     ActivityListResponse,
     ActivitySchema,
@@ -13,6 +13,7 @@ from app.features.activities.schemas import (
     TimeBlockSchema,
 )
 from app.features.activities.service import ActivityService
+from app.features.users.dependencies import get_authorized_user
 
 router = APIRouter(prefix="/activities", tags=["activities"])
 
@@ -30,7 +31,7 @@ def get_activity_service() -> ActivityService:
     description="Fetch static catalog of 9 predefined physical activities per SPEC §5.1 & §9.5.",
 )
 async def list_activities(
-    _user: AuthenticatedUser = Depends(get_current_user),
+    _user: AuthenticatedUser = Depends(get_authorized_user),
     service: ActivityService = Depends(get_activity_service),
 ) -> SuccessEnvelope[dict[str, Any]]:
     """GET /api/v1/activities endpoint."""
@@ -49,7 +50,7 @@ async def list_activities(
     description="Fetch static catalog of 7 predefined time blocks per SPEC §5.3 & §9.5.",
 )
 async def list_time_blocks(
-    _user: AuthenticatedUser = Depends(get_current_user),
+    _user: AuthenticatedUser = Depends(get_authorized_user),
     service: ActivityService = Depends(get_activity_service),
 ) -> SuccessEnvelope[dict[str, Any]]:
     """GET /api/v1/activities/time-blocks endpoint."""

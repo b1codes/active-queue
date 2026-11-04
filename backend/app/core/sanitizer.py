@@ -95,6 +95,35 @@ def sanitize_identifier(identifier: str | None, max_length: int = 200) -> str | 
     return cleaned.strip()
 
 
+# Firestore document ID rules: no "/", not "." or "..", not matching __.*__ (reserved).
+# IDs here are interpolated into document paths (content_cache/{id},
+# feed_items/{uid}_{id}), so an invalid one would otherwise surface as a 500.
+DOCUMENT_ID_RE = re.compile(r"^[A-Za-z0-9_\-.:]+$")
+RESERVED_DOCUMENT_ID_RE = re.compile(r"^__.*__$")
+
+
+def is_valid_document_id(identifier: str) -> bool:
+    """Return True if identifier is safe to use as (part of) a Firestore document ID."""
+    return (
+        bool(DOCUMENT_ID_RE.match(identifier))
+        and identifier not in (".", "..")
+        and not RESERVED_DOCUMENT_ID_RE.match(identifier)
+    )
+
+
+def sanitize_document_id(identifier: str | None, max_length: int = 200) -> str | None:
+    """sanitize_identifier, then enforce Firestore document ID rules.
+
+    Raises ValueError (surfaced as 400 VALIDATION_FAILED by Pydantic) on invalid input.
+    """
+    cleaned = sanitize_identifier(identifier, max_length=max_length)
+    if cleaned is None:
+        return None
+    if not is_valid_document_id(cleaned):
+        raise ValueError("must contain only letters, digits, '_', '-', '.', ':'")
+    return cleaned
+
+
 def sanitize_string_list(
     items: list[str] | None, max_item_length: int = 100, max_items: int = 50
 ) -> list[str]:

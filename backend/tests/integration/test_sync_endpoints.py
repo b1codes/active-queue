@@ -37,6 +37,10 @@ async def test_post_sources_sync_endpoint(mock_firestore_client: AsyncMock) -> N
             "app.features.content.repository.ContentRepository.upsert_feed_items_batch",
             AsyncMock(),
         ),
+        patch(
+            "app.features.users.repository.UserRepository.get_consumed_content_ids",
+            AsyncMock(return_value=set()),
+        ),
     ):
         async with AsyncClient(
             transport=ASGITransport(app=app),

@@ -5,7 +5,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field, field_validator
 
-from app.core.sanitizer import sanitize_identifier, sanitize_text
+from app.core.sanitizer import sanitize_document_id, sanitize_text
 from app.features.activities.schemas import ActivitySchema
 from app.features.content.models import Source
 
@@ -143,7 +143,7 @@ class ContentMatchRequest(BaseModel):
     @field_validator("content_id")
     @classmethod
     def sanitize_content_id(cls, v: str) -> str:
-        sanitized = sanitize_identifier(v, max_length=200)
+        sanitized = sanitize_document_id(v, max_length=200)
         if not sanitized:
             raise ValueError("content_id must not be empty or contain invalid characters")
         return sanitized
