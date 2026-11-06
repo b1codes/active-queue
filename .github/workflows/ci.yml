@@ -22,6 +22,7 @@ env:
   UV_VERSION: "0.13.2"
   FIREBASE_TOOLS_VERSION: "15.33.0"
   TERRAFORM_VERSION: "1.9.0"
+  OPENAPI_TS_VERSION: "7.13.0"
 
 jobs:
   workflows:
@@ -128,6 +129,18 @@ jobs:
       - name: ESLint (flat config, typescript-eslint strict, zero warnings)
         working-directory: frontend
         run: pnpm lint
+
+      - name: Contract types match contracts/openapi.json
+        # The generated types feed src/__tests__/contracts/types.contract.ts, which the
+        # TypeScript step checks against the app's hand-written API types.
+        working-directory: frontend
+        run: |
+          npx -y "openapi-typescript@${OPENAPI_TS_VERSION}" ../contracts/openapi.json \
+            -o src/__tests__/contracts/openapi.gen.ts
+          git diff --exit-code src/__tests__/contracts/openapi.gen.ts || {
+            echo "::error::openapi.gen.ts is stale. Run 'make contracts' and commit the result."
+            exit 1
+          }
 
       - name: TypeScript
         working-directory: frontend

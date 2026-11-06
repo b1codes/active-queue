@@ -193,7 +193,9 @@ check:
 	cd backend && uv run mypy --strict app
 	@echo "$(BLUE)[3/6] Backend tests on test emulators + coverage gate$(RESET)"
 	$(MAKE) test-backend
-	@echo "$(BLUE)[4/6] Frontend lint & types$(RESET)"
+	@echo "$(BLUE)[4/6] Frontend contract types, lint & types$(RESET)"
+	cd frontend && npx -y openapi-typescript@$(OPENAPI_TS_VERSION) ../contracts/openapi.json \
+		-o src/__tests__/contracts/openapi.gen.ts && git diff --exit-code src/__tests__/contracts/openapi.gen.ts
 	cd frontend && pnpm lint && pnpm typecheck
 	@echo "$(BLUE)[5/6] Frontend tests + coverage gate + untested-file check$(RESET)"
 	cd frontend && pnpm test:coverage && node scripts/check-untested-files.js coverage/coverage-final.json
@@ -204,6 +206,7 @@ check:
 # Test emulators use firebase.test.json (Firestore 9190, Auth 9199) so a test run never
 # wipes the dev emulators started by `make local`. Requires Java 21+.
 FIREBASE_TOOLS  := npx -y firebase-tools@15.33.0
+OPENAPI_TS_VERSION := 7.13.0
 TEST_EMULATORS  := --config firebase.test.json --project demo-activequeue-local --only auth,firestore
 
 ## test-backend: Full backend suite (unit + mocked + emulator tiers) with the coverage gate
@@ -220,10 +223,14 @@ test-backend-fast:
 test-emulator:
 	$(FIREBASE_TOOLS) emulators:start $(TEST_EMULATORS)
 
-## contracts: Regenerate contracts/openapi.json after an intentional API change
+## contracts: Regenerate contracts/openapi.json and the frontend's generated contract types
+## after an intentional API change. Re-record interaction examples with
+## `UPDATE_CONTRACTS=1 make test-backend`.
 contracts:
 	@echo "$(BLUE)Regenerating API contract files...$(RESET)"
 	cd backend && UPDATE_CONTRACTS=1 uv run pytest -p no:randomly tests/contract/test_openapi_snapshot.py
+	cd frontend && npx -y openapi-typescript@$(OPENAPI_TS_VERSION) ../contracts/openapi.json \
+		-o src/__tests__/contracts/openapi.gen.ts
 
 ## test-frontend: Run Jest test suite on frontend (random order, coverage gate)
 test-frontend:
