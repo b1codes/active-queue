@@ -26,6 +26,8 @@ dev = [
     "respx>=0.23.1",
     "pytest-randomly>=5.0.0",
     "jsonschema>=4.23",
+    "rfc3339-validator>=0.1.4",
+    "rfc3986-validator>=0.1.1",
 ]
 
 [tool.ruff]
@@ -108,6 +110,7 @@ asyncio_mode = "auto"
 testpaths = ["tests"]
 markers = [
     "emulator: runs against the Firestore + Auth emulators (tests/emulator/)",
+    "live: calls real third-party services; nightly only (tests/contract/thirdparty/)",
 ]
 filterwarnings = [
     "error",

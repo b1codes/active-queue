@@ -7,6 +7,8 @@ against these files, so a change that breaks the other side fails CI.
 |------|------------|------------|
 | `openapi.json` | generated from the FastAPI app (`make contracts`) | backend drift test, CI breaking-change diff against `main`, frontend generated types |
 | `interactions/*.json` | hand-written requests, provider-recorded responses | backend provider replay (emulators), frontend consumer replay (Jest) |
+| `third_party/youtube/*.schema.json` | the YouTube Data API v3 fields `YouTubeProvider` relies on | recorded fixtures on every PR; the real API nightly |
+| `third_party/firebase/*.schema.json`, `examples/` | ID-token claims `get_current_user` relies on; signing-cert shape | claim examples and Auth-emulator tokens on every PR; Google's real signing certs nightly |
 
 ## Interaction format
 
@@ -46,3 +48,23 @@ fails on breaking changes: a removed or narrowed response field, a new required 
 field, or a removed endpoint. The installed app can't be updated in lockstep with the API,
 so prefer additive changes. When a break is intended and the app rollout is planned, label
 the PR `api-breaking-ok` and re-run the job.
+
+## Third-party contracts
+
+The backend depends on two services it doesn't control. Their schemas list only the
+fields the code relies on, and they allow extra fields, which those APIs add freely.
+
+- **YouTube Data API v3** (`playlists.list`, `playlistItems.list`, `videos.list`, error
+  envelope). On every PR, the recorded fixtures in `backend/tests/fixtures/youtube/` must
+  satisfy the schemas. `YouTubeProvider`, fed those fixtures, must pass the same
+  `ContentProvider` contract as `FixtureProvider`
+  (`backend/tests/unit/providers/test_provider_contract.py`). Nightly, the real API must
+  satisfy the same schemas, including the empty-items and `playlistNotFound` shapes the
+  error mapping depends on. That run spends about 8 quota units.
+- **Firebase Auth.** The claims schema is checked on every PR against hand-built
+  Sign in with Apple and email/password examples, and against tokens the Auth emulator
+  mints. Nightly, Google's production signing certificates (the URL `firebase_admin`
+  fetches) must parse, be current, and carry a cache `max-age`.
+
+The nightly workflow needs the `YOUTUBE_API_KEY` secret and the
+`YOUTUBE_CONTRACT_PLAYLIST_ID` variable. Without them it skips YouTube with a notice.
