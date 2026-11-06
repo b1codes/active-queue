@@ -15,7 +15,7 @@ RESET   := \033[0m
         storybook storybook-ios storybook-android \
         docker-up docker-down docker-build emulators emulators-stop \
         seed-db seed \
-        check test test-backend test-backend-fast test-emulator test-frontend \
+        check contracts test test-backend test-backend-fast test-emulator test-frontend \
         lint lint-backend lint-frontend \
         typecheck typecheck-backend typecheck-frontend \
         format format-backend \
@@ -54,6 +54,7 @@ help:
 	@echo "  $(GREEN)test-backend-fast$(RESET) Unit + mocked integration tests only (no emulators)"
 	@echo "  $(GREEN)test-emulator$(RESET)     Start test emulators (9190/9199) in the foreground"
 	@echo "  $(GREEN)test-frontend$(RESET)     Run Jest test suite in frontend"
+	@echo "  $(GREEN)contracts$(RESET)         Regenerate API contract files after an API change"
 	@echo ""
 	@echo "  $(GREEN)lint$(RESET)              Run linting & typechecking across full stack"
 	@echo "  $(GREEN)lint-backend$(RESET)      Run ruff lint on backend"
@@ -213,11 +214,16 @@ test-backend:
 
 ## test-backend-fast: Unit + mocked integration tiers only (no emulators, no coverage gate)
 test-backend-fast:
-	cd backend && uv run pytest tests/unit tests/integration
+	cd backend && uv run pytest tests/unit tests/integration tests/contract
 
 ## test-emulator: Run the test emulators in the foreground (for iterating on tests/emulator)
 test-emulator:
 	$(FIREBASE_TOOLS) emulators:start $(TEST_EMULATORS)
+
+## contracts: Regenerate contracts/openapi.json after an intentional API change
+contracts:
+	@echo "$(BLUE)Regenerating API contract files...$(RESET)"
+	cd backend && UPDATE_CONTRACTS=1 uv run pytest -p no:randomly tests/contract/test_openapi_snapshot.py
 
 ## test-frontend: Run Jest test suite on frontend (random order, coverage gate)
 test-frontend:

@@ -10,6 +10,8 @@ from app.core.errors import NotFoundError
 from app.main import app
 
 if TYPE_CHECKING:
+    from collections.abc import Iterator
+
     from httpx import AsyncClient
 
 dummy_router = APIRouter(prefix="/test-errors")
@@ -36,7 +38,19 @@ async def trigger_http_error() -> None:
     raise HTTPException(status_code=401, detail="Unauthorized token missing")
 
 
-app.include_router(dummy_router)
+@pytest.fixture(autouse=True)
+def _dummy_routes() -> Iterator[None]:
+    """Mount the error-raising routes on the real app for this module only.
+
+    Mounting at import time leaked /test-errors/* into every later test (including the
+    OpenAPI snapshot in tests/contract), depending on collection order.
+    """
+    before = list(app.router.routes)
+    app.include_router(dummy_router)
+    app.openapi_schema = None
+    yield
+    app.router.routes[:] = before
+    app.openapi_schema = None
 
 
 @pytest.mark.asyncio

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 from fastapi import APIRouter, Depends
 
@@ -27,11 +27,11 @@ def get_user_service(db: AsyncClient = Depends(get_db)) -> UserService:
     return UserService(UserRepository(db))
 
 
-@router.get("/me", response_model=None)
+@router.get("/me", response_model=SuccessEnvelope[UserMeData])
 async def get_current_user_profile(
     auth_user: AuthenticatedUser = Depends(get_current_user),
     service: UserService = Depends(get_user_service),
-) -> SuccessEnvelope[dict[str, Any]]:
+) -> SuccessEnvelope[UserMeData]:
     """GET /api/v1/users/me — Fetch current authenticated user profile & authorization.
 
     Ensures first-login user provisioning and validates account authorization status per SPEC §4.2.
@@ -41,16 +41,16 @@ async def get_current_user_profile(
         user=UserSchema.from_domain(user),
         authorization=UserAuthorizationSchema.from_domain(auth_doc),
     )
-    return success_response(data.model_dump())
+    return success_response(data)
 
 
-@router.patch("/me/preferences", response_model=None)
+@router.patch("/me/preferences", response_model=SuccessEnvelope[UserSchema])
 async def update_current_user_preferences(
     body: UpdatePreferencesRequest,
     auth_user: AuthenticatedUser = Depends(get_current_user),
     service: UserService = Depends(get_user_service),
-) -> SuccessEnvelope[dict[str, Any]]:
+) -> SuccessEnvelope[UserSchema]:
     """PATCH /api/v1/users/me/preferences — Update user preferences per SPEC §4.2."""
     await service.ensure_user_provisioned(auth_user)
     updated_user = await service.update_user_preferences(auth_user.uid, body)
-    return success_response(UserSchema.from_domain(updated_user).model_dump())
+    return success_response(UserSchema.from_domain(updated_user))

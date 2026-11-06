@@ -8,6 +8,7 @@ from fastapi.exceptions import RequestValidationError
 from starlette.exceptions import HTTPException
 
 from app.core.config import settings
+from app.core.envelopes import ERROR_RESPONSES
 from app.core.firestore import close_firestore, init_firestore
 from app.core.logging import configure_logging
 from app.core.security import init_firebase_admin
@@ -57,7 +58,7 @@ app.add_middleware(RequestLoggingMiddleware)
 app.include_router(health_router)
 
 # Feature routers under /api/v1
-app.include_router(users_router, prefix="/api/v1")
-app.include_router(content_router, prefix="/api/v1")
-app.include_router(activities_router, prefix="/api/v1")
-app.include_router(sessions_router, prefix="/api/v1")
+app.include_router(users_router, prefix="/api/v1", responses=ERROR_RESPONSES)
+app.include_router(content_router, prefix="/api/v1", responses=ERROR_RESPONSES)
+app.include_router(activities_router, prefix="/api/v1", responses=ERROR_RESPONSES)
+app.include_router(sessions_router, prefix="/api/v1", responses=ERROR_RESPONSES)
