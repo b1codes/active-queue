@@ -2,6 +2,11 @@
 module.exports = {
   preset: 'jest-expo',
   clearMocks: true,
+  // Screen tests render the full Skia/Reanimated tree. Under --randomize, whichever test
+  // runs first in a file pays the cold first render, which with coverage instrumentation
+  // on a 2-core CI runner exceeded Jest's 5s default (session.test.tsx, seed 899895621).
+  // Real hangs still fail; they just take 20s to do it.
+  testTimeout: 20000,
   setupFilesAfterEnv: ['<rootDir>/jest.setup.ts'],
   transformIgnorePatterns: [
     '/node_modules/(?!(.pnpm|react-native|@react-native|@react-native-community|expo|@expo|@expo-google-fonts|react-navigation|@react-navigation|@sentry/react-native|native-base|immer|react-redux))',
