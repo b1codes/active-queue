@@ -41,4 +41,8 @@ against these files, so a change that breaks the other side fails CI.
 2. `UPDATE_CONTRACTS=1 make test-backend` re-records response examples from the real provider.
 3. Review the diff, then run `make test-frontend`.
 
-The installed app can't be updated in lockstep with the API, so prefer additive changes.
+The `API breaking changes` CI job (oasdiff) diffs `openapi.json` against the PR's base and
+fails on breaking changes: a removed or narrowed response field, a new required request
+field, or a removed endpoint. The installed app can't be updated in lockstep with the API,
+so prefer additive changes. When a break is intended and the app rollout is planned, label
+the PR `api-breaking-ok` and re-run the job.

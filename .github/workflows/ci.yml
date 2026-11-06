@@ -23,6 +23,7 @@ env:
   FIREBASE_TOOLS_VERSION: "15.33.0"
   TERRAFORM_VERSION: "1.9.0"
   OPENAPI_TS_VERSION: "7.13.0"
+  OASDIFF_VERSION: "v1.34.1"
 
 jobs:
   workflows:
@@ -154,6 +155,47 @@ jobs:
           pnpm test:coverage
           node scripts/check-untested-files.js coverage/coverage-final.json
 
+  api-breaking:
+    name: API breaking changes (oasdiff)
+    # The installed app can't be updated in lockstep with the API, so a breaking change to
+    # contracts/openapi.json (removed or narrowed response field, new required request
+    # field, removed endpoint) fails the PR. Label the PR `api-breaking-ok` once the
+    # rollout plan is agreed, then re-run this job.
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Diff contracts/openapi.json against the base commit
+        env:
+          EVENT: ${{ github.event_name }}
+          BASE_REF: ${{ github.base_ref }}
+          BEFORE: ${{ github.event.before }}
+          ALLOW_BREAKING: ${{ contains(github.event.pull_request.labels.*.name, 'api-breaking-ok') }}
+        run: |
+          if [ "${EVENT}" = "pull_request" ]; then
+            base="$(git merge-base "origin/${BASE_REF}" HEAD)"
+          else
+            base="${BEFORE}"
+          fi
+          if ! git cat-file -e "${base}:contracts/openapi.json" 2>/dev/null; then
+            echo "::notice::No contracts/openapi.json at base ${base}; nothing to compare."
+            exit 0
+          fi
+          mkdir -p "${RUNNER_TEMP}/specs"
+          git show "${base}:contracts/openapi.json" > "${RUNNER_TEMP}/specs/base.json"
+          cp contracts/openapi.json "${RUNNER_TEMP}/specs/revision.json"
+          fail_on="ERR"
+          if [ "${ALLOW_BREAKING}" = "true" ]; then
+            echo "::warning::api-breaking-ok label set; reporting breaking changes without failing."
+            fail_on=""
+          fi
+          docker run --rm -v "${RUNNER_TEMP}/specs:/specs" "tufin/oasdiff:${OASDIFF_VERSION}" \
+            breaking /specs/base.json /specs/revision.json --format githubactions \
+            ${fail_on:+--fail-on "${fail_on}"}
+
   terraform:
     name: Infrastructure (Terraform)
     runs-on: ubuntu-latest
@@ -185,7 +227,7 @@ jobs:
   ci-passed:
     name: CI Passed
     if: always()
-    needs: [workflows, backend, frontend, terraform]
+    needs: [workflows, backend, frontend, api-breaking, terraform]
     runs-on: ubuntu-latest
     steps:
       - name: Check required jobs
