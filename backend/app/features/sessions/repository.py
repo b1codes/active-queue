@@ -39,6 +39,10 @@ def decode_session_cursor(cursor_str: str) -> datetime | None:
 # Claim attempts for the per-user active-session slot before reporting a conflict.
 SLOT_CLAIM_ATTEMPTS = 4
 
+# Transaction attempts for complete. Concurrent completes of one session (double taps)
+# contend on the same documents; the SDK default of 5 can be exhausted by 4 contenders.
+COMPLETE_TXN_ATTEMPTS = 10
+
 
 def _active_session_conflict(active_session_id: str) -> ConflictError:
     return ConflictError(
@@ -324,7 +328,22 @@ class SessionRepository:
             )
             return session
 
-        return await _complete(self._client.transaction())
+        try:
+            return await _complete(self._client.transaction(max_attempts=COMPLETE_TXN_ATTEMPTS))
+        except Aborted:
+            # Every attempt lost to a concurrent transaction on the same documents. For a
+            # double-tap (SPEC §7.1) the winner was another complete of this session, so the
+            # idempotent answer is the session as it now stands, not a 500.
+            snap = await session_ref.get()
+            current = Session.from_firestore(snap.to_dict() or {}) if snap.exists else None
+            if (
+                current is not None
+                and current.user_id == user_id
+                and current.status == "completed"
+            ):
+                logger.info("session_complete_contention_resolved", session_id=session_id)
+                return current
+            raise
 
     async def abandon_session(self, session_id: str, user_id: str, now: datetime) -> Session:
         """Explicitly mark session as abandoned per SPEC §7.1 & §9.5."""
