@@ -82,6 +82,10 @@ async def test_add_source_duplicate_check() -> None:
     with pytest.raises(ConflictError) as exc_info:
         await service.add_source("user1", "fixture-small-playlist")
     assert exc_info.value.code == "SOURCE_ALREADY_ADDED"
+    # SPEC §9.7: the existing source is identified in error.details.
+    assert [(d.field, d.issue) for d in exc_info.value.details] == [
+        ("source_id", "user1_fixture_fixture-small-playlist")
+    ]
 
 
 @pytest.mark.asyncio

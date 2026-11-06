@@ -1,0 +1,190 @@
+{
+  "description": "Static activity and time-block catalogs (SPEC §5.1, §5.3).",
+  "interactions": [
+    {
+      "id": "activities.list",
+      "description": "Activity catalog",
+      "request": {
+        "method": "GET",
+        "path": "/api/v1/activities"
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "status": "success",
+          "data": {
+            "activities": [
+              {
+                "id": "running",
+                "name": "Outdoor / Treadmill Run",
+                "category": "cardio",
+                "tracker": "apple_fitness",
+                "min_duration_seconds": 300,
+                "max_duration_seconds": 14400,
+                "default_duration_seconds": 1800,
+                "icon_name": "run",
+                "is_active": true
+              },
+              {
+                "id": "cycling",
+                "name": "Cycling / Spin Workout",
+                "category": "cardio",
+                "tracker": "apple_fitness",
+                "min_duration_seconds": 300,
+                "max_duration_seconds": 14400,
+                "default_duration_seconds": 2700,
+                "icon_name": "bike",
+                "is_active": true
+              },
+              {
+                "id": "strength",
+                "name": "Strength Training",
+                "category": "workout",
+                "tracker": "apple_fitness",
+                "min_duration_seconds": 600,
+                "max_duration_seconds": 7200,
+                "default_duration_seconds": 2700,
+                "icon_name": "dumbbell",
+                "is_active": true
+              },
+              {
+                "id": "yoga",
+                "name": "Yoga & Stretching",
+                "category": "flexibility",
+                "tracker": "youtube",
+                "min_duration_seconds": 300,
+                "max_duration_seconds": 5400,
+                "default_duration_seconds": 1800,
+                "icon_name": "yoga",
+                "is_active": true
+              },
+              {
+                "id": "pilates",
+                "name": "Pilates Session",
+                "category": "flexibility",
+                "tracker": "youtube",
+                "min_duration_seconds": 300,
+                "max_duration_seconds": 5400,
+                "default_duration_seconds": 1800,
+                "icon_name": "mat",
+                "is_active": true
+              },
+              {
+                "id": "hiit",
+                "name": "HIIT Workout",
+                "category": "workout",
+                "tracker": "youtube",
+                "min_duration_seconds": 300,
+                "max_duration_seconds": 3600,
+                "default_duration_seconds": 1200,
+                "icon_name": "lightning",
+                "is_active": true
+              },
+              {
+                "id": "walking",
+                "name": "Walking / Power Walk",
+                "category": "cardio",
+                "tracker": "apple_fitness",
+                "min_duration_seconds": 300,
+                "max_duration_seconds": 14400,
+                "default_duration_seconds": 1800,
+                "icon_name": "walk",
+                "is_active": true
+              },
+              {
+                "id": "rowing",
+                "name": "Rowing Machine",
+                "category": "cardio",
+                "tracker": "apple_fitness",
+                "min_duration_seconds": 300,
+                "max_duration_seconds": 7200,
+                "default_duration_seconds": 1200,
+                "icon_name": "row",
+                "is_active": true
+              },
+              {
+                "id": "meditation",
+                "name": "Mindfulness & Meditation",
+                "category": "mindfulness",
+                "tracker": "spotify",
+                "min_duration_seconds": 180,
+                "max_duration_seconds": 3600,
+                "default_duration_seconds": 600,
+                "icon_name": "lotus",
+                "is_active": true
+              }
+            ]
+          },
+          "error": null
+        }
+      },
+      "consumers": [
+        "listActivities"
+      ]
+    },
+    {
+      "id": "activities.time_blocks",
+      "description": "Time-block catalog",
+      "request": {
+        "method": "GET",
+        "path": "/api/v1/activities/time-blocks"
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "status": "success",
+          "data": {
+            "time_blocks": [
+              {
+                "id": "tb_15m",
+                "label": "15 min",
+                "duration_seconds": 900,
+                "description": "Quick micro-session"
+              },
+              {
+                "id": "tb_20m",
+                "label": "20 min",
+                "duration_seconds": 1200,
+                "description": "Short workout or focal block"
+              },
+              {
+                "id": "tb_30m",
+                "label": "30 min",
+                "duration_seconds": 1800,
+                "description": "Standard active time-box"
+              },
+              {
+                "id": "tb_45m",
+                "label": "45 min",
+                "duration_seconds": 2700,
+                "description": "Full training session"
+              },
+              {
+                "id": "tb_60m",
+                "label": "60 min",
+                "duration_seconds": 3600,
+                "description": "Hour-long deep session"
+              },
+              {
+                "id": "tb_75m",
+                "label": "75 min",
+                "duration_seconds": 4500,
+                "description": "Extended workout block"
+              },
+              {
+                "id": "tb_90m",
+                "label": "90 min",
+                "duration_seconds": 5400,
+                "description": "Maximal time-boxing block"
+              }
+            ]
+          },
+          "error": null
+        }
+      },
+      "consumers": [
+        "listTimeBlocks"
+      ]
+    }
+  ]
+}

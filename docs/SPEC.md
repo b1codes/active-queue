@@ -852,14 +852,17 @@ Effects run in a **single Firestore transaction**: update the session, set `feed
 | 401 | `AUTH_TOKEN_EXPIRED` | `exp` passed — client refreshes and retries once |
 | 403 | `ACCOUNT_DISABLED` | `user_authorization.is_active == false` |
 | 404 | `SESSION_NOT_FOUND` | Also returned when the session belongs to another user |
+| 404 | `ACTIVITY_NOT_FOUND` | `activity_id` is not in the catalog (§5.1) |
+| 404 | `USER_NOT_FOUND` | Profile missing after provisioning (should not happen in practice) |
 | 404 | `CONTENT_NOT_FOUND` | Not in cache, or no feed item for this user |
 | 404 | `SOURCE_NOT_FOUND` | |
 | 422 | `SOURCE_URL_UNPARSEABLE` | No playlist ID found in the supplied URL (§9.3) |
 | 422 | `SOURCE_UNSUPPORTED` | `WL` / `LL` / `HL` — not exposed by the Data API (§9.3) |
 | 404 | `SOURCE_NOT_ACCESSIBLE` | Playlist is private or does not exist |
-| 409 | `SOURCE_ALREADY_ADDED` | Existing source returned in `error.details` |
-| 409 | `ACTIVE_SESSION_EXISTS` | A non-terminal session already exists |
+| 409 | `SOURCE_ALREADY_ADDED` | Existing source ID returned in `error.details` as `{field: "source_id", issue: <id>}` |
+| 409 | `ACTIVE_SESSION_EXISTS` | A non-terminal session already exists; its ID is in `error.details` as `{field: "active_session_id", issue: <id>}` |
 | 409 | `SESSION_NOT_STARTED` | `complete` attempted from `created` |
+| 409 | `SESSION_ALREADY_STARTED` | Discard attempted on an in-progress session (abandon it instead) |
 | 409 | `SESSION_ALREADY_TERMINAL` | Transition attempted from `completed`/`abandoned` |
 | 422 | `DURATION_OUT_OF_RANGE` | Outside [300, 10800] |
 | 422 | `ACTIVITY_DURATION_MISMATCH` | Duration outside the activity's `[min, max]` |
@@ -871,6 +874,8 @@ Effects run in a **single Firestore transaction**: update the session, set `feed
 | 500 | `INTERNAL_ERROR` | Never leaks an exception message or stack trace |
 
 `SESSION_NOT_FOUND` is deliberately returned for another user's session rather than `403`. A `403` would confirm the ID exists — an enumeration oracle.
+
+This table mirrors `ERROR_CODES` in `backend/app/core/errors.py`. The contract suite (`backend/tests/contract/`) fails if the backend raises a code that isn't registered there, or if a contract example's status disagrees with it.
 
 ### 9.8 `GET /healthz`
 

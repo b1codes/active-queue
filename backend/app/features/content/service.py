@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, Any
 import structlog
 
 from app.core.config import settings
+from app.core.envelopes import ErrorDetail
 from app.core.errors import ConflictError, NotFoundError, ProviderError, ValidationError
 from app.features.activities.schemas import ActivitySchema
 from app.features.content.matcher import (
@@ -115,9 +116,12 @@ class ContentService:
             user_id, provider_name, external_id
         )
         if duplicate:
+            # SPEC §9.7: the existing source travels in error.details so the client can
+            # jump to it instead of showing a dead-end error.
             raise ConflictError(
                 code="SOURCE_ALREADY_ADDED",
                 message="Source has already been added to your account",
+                details=[ErrorDetail(field="source_id", issue=duplicate.id)],
             )
 
         try:

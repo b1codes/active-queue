@@ -17,7 +17,7 @@ from app.core.errors import (
 
 
 def test_all_spec_97_error_codes_registered() -> None:
-    """Verify all 23 SPEC §9.7 error codes are registered with HTTP status mapping."""
+    """Verify all 26 SPEC §9.7 error codes are registered with HTTP status mapping."""
     expected_codes = {
         "VALIDATION_FAILED": 400,
         "AUTH_TOKEN_MISSING": 401,
@@ -25,6 +25,8 @@ def test_all_spec_97_error_codes_registered() -> None:
         "AUTH_TOKEN_EXPIRED": 401,
         "ACCOUNT_DISABLED": 403,
         "SESSION_NOT_FOUND": 404,
+        "ACTIVITY_NOT_FOUND": 404,
+        "USER_NOT_FOUND": 404,
         "CONTENT_NOT_FOUND": 404,
         "SOURCE_NOT_FOUND": 404,
         "SOURCE_URL_UNPARSEABLE": 422,
@@ -33,6 +35,7 @@ def test_all_spec_97_error_codes_registered() -> None:
         "SOURCE_ALREADY_ADDED": 409,
         "ACTIVE_SESSION_EXISTS": 409,
         "SESSION_NOT_STARTED": 409,
+        "SESSION_ALREADY_STARTED": 409,
         "SESSION_ALREADY_TERMINAL": 409,
         "DURATION_OUT_OF_RANGE": 422,
         "ACTIVITY_DURATION_MISMATCH": 422,

@@ -1,0 +1,36 @@
+{
+  "description": "Liveness/readiness probe used by Cloud Run and the post-deploy smoke check.",
+  "interactions": [
+    {
+      "id": "health.ok",
+      "description": "Firestore reachable",
+      "request": {
+        "method": "GET",
+        "path": "/healthz",
+        "auth": "none"
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "status": "success",
+          "data": {
+            "status": "healthy",
+            "firestore": {
+              "status": "up",
+              "latency_ms": 1.17
+            },
+            "provider": {
+              "status": "up"
+            }
+          },
+          "error": null
+        }
+      },
+      "dynamic": [
+        "data.firestore.latency_ms"
+      ],
+      "consumers": [],
+      "consumer_note": "Called by Cloud Run and deploy smoke checks, not the app."
+    }
+  ]
+}

@@ -1729,7 +1729,7 @@
                 }
               }
             },
-            "description": "Error envelope. `error.code` is one of: CONTENT_NOT_FOUND, SESSION_NOT_FOUND, SOURCE_NOT_ACCESSIBLE, SOURCE_NOT_FOUND"
+            "description": "Error envelope. `error.code` is one of: ACTIVITY_NOT_FOUND, CONTENT_NOT_FOUND, SESSION_NOT_FOUND, SOURCE_NOT_ACCESSIBLE, SOURCE_NOT_FOUND, USER_NOT_FOUND"
           },
           "409": {
             "content": {
@@ -1739,7 +1739,7 @@
                 }
               }
             },
-            "description": "Error envelope. `error.code` is one of: ACTIVE_SESSION_EXISTS, SESSION_ALREADY_TERMINAL, SESSION_NOT_STARTED, SOURCE_ALREADY_ADDED"
+            "description": "Error envelope. `error.code` is one of: ACTIVE_SESSION_EXISTS, SESSION_ALREADY_STARTED, SESSION_ALREADY_TERMINAL, SESSION_NOT_STARTED, SOURCE_ALREADY_ADDED"
           },
           "422": {
             "content": {
@@ -1856,7 +1856,7 @@
                 }
               }
             },
-            "description": "Error envelope. `error.code` is one of: CONTENT_NOT_FOUND, SESSION_NOT_FOUND, SOURCE_NOT_ACCESSIBLE, SOURCE_NOT_FOUND"
+            "description": "Error envelope. `error.code` is one of: ACTIVITY_NOT_FOUND, CONTENT_NOT_FOUND, SESSION_NOT_FOUND, SOURCE_NOT_ACCESSIBLE, SOURCE_NOT_FOUND, USER_NOT_FOUND"
           },
           "409": {
             "content": {
@@ -1866,7 +1866,7 @@
                 }
               }
             },
-            "description": "Error envelope. `error.code` is one of: ACTIVE_SESSION_EXISTS, SESSION_ALREADY_TERMINAL, SESSION_NOT_STARTED, SOURCE_ALREADY_ADDED"
+            "description": "Error envelope. `error.code` is one of: ACTIVE_SESSION_EXISTS, SESSION_ALREADY_STARTED, SESSION_ALREADY_TERMINAL, SESSION_NOT_STARTED, SOURCE_ALREADY_ADDED"
           },
           "422": {
             "content": {
@@ -2050,7 +2050,7 @@
                 }
               }
             },
-            "description": "Error envelope. `error.code` is one of: CONTENT_NOT_FOUND, SESSION_NOT_FOUND, SOURCE_NOT_ACCESSIBLE, SOURCE_NOT_FOUND"
+            "description": "Error envelope. `error.code` is one of: ACTIVITY_NOT_FOUND, CONTENT_NOT_FOUND, SESSION_NOT_FOUND, SOURCE_NOT_ACCESSIBLE, SOURCE_NOT_FOUND, USER_NOT_FOUND"
           },
           "409": {
             "content": {
@@ -2060,7 +2060,7 @@
                 }
               }
             },
-            "description": "Error envelope. `error.code` is one of: ACTIVE_SESSION_EXISTS, SESSION_ALREADY_TERMINAL, SESSION_NOT_STARTED, SOURCE_ALREADY_ADDED"
+            "description": "Error envelope. `error.code` is one of: ACTIVE_SESSION_EXISTS, SESSION_ALREADY_STARTED, SESSION_ALREADY_TERMINAL, SESSION_NOT_STARTED, SOURCE_ALREADY_ADDED"
           },
           "422": {
             "content": {
@@ -2190,7 +2190,7 @@
                 }
               }
             },
-            "description": "Error envelope. `error.code` is one of: CONTENT_NOT_FOUND, SESSION_NOT_FOUND, SOURCE_NOT_ACCESSIBLE, SOURCE_NOT_FOUND"
+            "description": "Error envelope. `error.code` is one of: ACTIVITY_NOT_FOUND, CONTENT_NOT_FOUND, SESSION_NOT_FOUND, SOURCE_NOT_ACCESSIBLE, SOURCE_NOT_FOUND, USER_NOT_FOUND"
           },
           "409": {
             "content": {
@@ -2200,7 +2200,7 @@
                 }
               }
             },
-            "description": "Error envelope. `error.code` is one of: ACTIVE_SESSION_EXISTS, SESSION_ALREADY_TERMINAL, SESSION_NOT_STARTED, SOURCE_ALREADY_ADDED"
+            "description": "Error envelope. `error.code` is one of: ACTIVE_SESSION_EXISTS, SESSION_ALREADY_STARTED, SESSION_ALREADY_TERMINAL, SESSION_NOT_STARTED, SOURCE_ALREADY_ADDED"
           },
           "422": {
             "content": {
@@ -2327,7 +2327,7 @@
                 }
               }
             },
-            "description": "Error envelope. `error.code` is one of: CONTENT_NOT_FOUND, SESSION_NOT_FOUND, SOURCE_NOT_ACCESSIBLE, SOURCE_NOT_FOUND"
+            "description": "Error envelope. `error.code` is one of: ACTIVITY_NOT_FOUND, CONTENT_NOT_FOUND, SESSION_NOT_FOUND, SOURCE_NOT_ACCESSIBLE, SOURCE_NOT_FOUND, USER_NOT_FOUND"
           },
           "409": {
             "content": {
@@ -2337,7 +2337,7 @@
                 }
               }
             },
-            "description": "Error envelope. `error.code` is one of: ACTIVE_SESSION_EXISTS, SESSION_ALREADY_TERMINAL, SESSION_NOT_STARTED, SOURCE_ALREADY_ADDED"
+            "description": "Error envelope. `error.code` is one of: ACTIVE_SESSION_EXISTS, SESSION_ALREADY_STARTED, SESSION_ALREADY_TERMINAL, SESSION_NOT_STARTED, SOURCE_ALREADY_ADDED"
           },
           "422": {
             "content": {
@@ -2464,7 +2464,7 @@
                 }
               }
             },
-            "description": "Error envelope. `error.code` is one of: CONTENT_NOT_FOUND, SESSION_NOT_FOUND, SOURCE_NOT_ACCESSIBLE, SOURCE_NOT_FOUND"
+            "description": "Error envelope. `error.code` is one of: ACTIVITY_NOT_FOUND, CONTENT_NOT_FOUND, SESSION_NOT_FOUND, SOURCE_NOT_ACCESSIBLE, SOURCE_NOT_FOUND, USER_NOT_FOUND"
           },
           "409": {
             "content": {
@@ -2474,7 +2474,7 @@
                 }
               }
             },
-            "description": "Error envelope. `error.code` is one of: ACTIVE_SESSION_EXISTS, SESSION_ALREADY_TERMINAL, SESSION_NOT_STARTED, SOURCE_ALREADY_ADDED"
+            "description": "Error envelope. `error.code` is one of: ACTIVE_SESSION_EXISTS, SESSION_ALREADY_STARTED, SESSION_ALREADY_TERMINAL, SESSION_NOT_STARTED, SOURCE_ALREADY_ADDED"
           },
           "422": {
             "content": {
@@ -2639,7 +2639,7 @@
                 }
               }
             },
-            "description": "Error envelope. `error.code` is one of: CONTENT_NOT_FOUND, SESSION_NOT_FOUND, SOURCE_NOT_ACCESSIBLE, SOURCE_NOT_FOUND"
+            "description": "Error envelope. `error.code` is one of: ACTIVITY_NOT_FOUND, CONTENT_NOT_FOUND, SESSION_NOT_FOUND, SOURCE_NOT_ACCESSIBLE, SOURCE_NOT_FOUND, USER_NOT_FOUND"
           },
           "409": {
             "content": {
@@ -2649,7 +2649,7 @@
                 }
               }
             },
-            "description": "Error envelope. `error.code` is one of: ACTIVE_SESSION_EXISTS, SESSION_ALREADY_TERMINAL, SESSION_NOT_STARTED, SOURCE_ALREADY_ADDED"
+            "description": "Error envelope. `error.code` is one of: ACTIVE_SESSION_EXISTS, SESSION_ALREADY_STARTED, SESSION_ALREADY_TERMINAL, SESSION_NOT_STARTED, SOURCE_ALREADY_ADDED"
           },
           "422": {
             "content": {
@@ -2774,7 +2774,7 @@
                 }
               }
             },
-            "description": "Error envelope. `error.code` is one of: CONTENT_NOT_FOUND, SESSION_NOT_FOUND, SOURCE_NOT_ACCESSIBLE, SOURCE_NOT_FOUND"
+            "description": "Error envelope. `error.code` is one of: ACTIVITY_NOT_FOUND, CONTENT_NOT_FOUND, SESSION_NOT_FOUND, SOURCE_NOT_ACCESSIBLE, SOURCE_NOT_FOUND, USER_NOT_FOUND"
           },
           "409": {
             "content": {
@@ -2784,7 +2784,7 @@
                 }
               }
             },
-            "description": "Error envelope. `error.code` is one of: ACTIVE_SESSION_EXISTS, SESSION_ALREADY_TERMINAL, SESSION_NOT_STARTED, SOURCE_ALREADY_ADDED"
+            "description": "Error envelope. `error.code` is one of: ACTIVE_SESSION_EXISTS, SESSION_ALREADY_STARTED, SESSION_ALREADY_TERMINAL, SESSION_NOT_STARTED, SOURCE_ALREADY_ADDED"
           },
           "422": {
             "content": {
@@ -2901,7 +2901,7 @@
                 }
               }
             },
-            "description": "Error envelope. `error.code` is one of: CONTENT_NOT_FOUND, SESSION_NOT_FOUND, SOURCE_NOT_ACCESSIBLE, SOURCE_NOT_FOUND"
+            "description": "Error envelope. `error.code` is one of: ACTIVITY_NOT_FOUND, CONTENT_NOT_FOUND, SESSION_NOT_FOUND, SOURCE_NOT_ACCESSIBLE, SOURCE_NOT_FOUND, USER_NOT_FOUND"
           },
           "409": {
             "content": {
@@ -2911,7 +2911,7 @@
                 }
               }
             },
-            "description": "Error envelope. `error.code` is one of: ACTIVE_SESSION_EXISTS, SESSION_ALREADY_TERMINAL, SESSION_NOT_STARTED, SOURCE_ALREADY_ADDED"
+            "description": "Error envelope. `error.code` is one of: ACTIVE_SESSION_EXISTS, SESSION_ALREADY_STARTED, SESSION_ALREADY_TERMINAL, SESSION_NOT_STARTED, SOURCE_ALREADY_ADDED"
           },
           "422": {
             "content": {
@@ -3041,7 +3041,7 @@
                 }
               }
             },
-            "description": "Error envelope. `error.code` is one of: CONTENT_NOT_FOUND, SESSION_NOT_FOUND, SOURCE_NOT_ACCESSIBLE, SOURCE_NOT_FOUND"
+            "description": "Error envelope. `error.code` is one of: ACTIVITY_NOT_FOUND, CONTENT_NOT_FOUND, SESSION_NOT_FOUND, SOURCE_NOT_ACCESSIBLE, SOURCE_NOT_FOUND, USER_NOT_FOUND"
           },
           "409": {
             "content": {
@@ -3051,7 +3051,7 @@
                 }
               }
             },
-            "description": "Error envelope. `error.code` is one of: ACTIVE_SESSION_EXISTS, SESSION_ALREADY_TERMINAL, SESSION_NOT_STARTED, SOURCE_ALREADY_ADDED"
+            "description": "Error envelope. `error.code` is one of: ACTIVE_SESSION_EXISTS, SESSION_ALREADY_STARTED, SESSION_ALREADY_TERMINAL, SESSION_NOT_STARTED, SOURCE_ALREADY_ADDED"
           },
           "422": {
             "content": {
@@ -3181,7 +3181,7 @@
                 }
               }
             },
-            "description": "Error envelope. `error.code` is one of: CONTENT_NOT_FOUND, SESSION_NOT_FOUND, SOURCE_NOT_ACCESSIBLE, SOURCE_NOT_FOUND"
+            "description": "Error envelope. `error.code` is one of: ACTIVITY_NOT_FOUND, CONTENT_NOT_FOUND, SESSION_NOT_FOUND, SOURCE_NOT_ACCESSIBLE, SOURCE_NOT_FOUND, USER_NOT_FOUND"
           },
           "409": {
             "content": {
@@ -3191,7 +3191,7 @@
                 }
               }
             },
-            "description": "Error envelope. `error.code` is one of: ACTIVE_SESSION_EXISTS, SESSION_ALREADY_TERMINAL, SESSION_NOT_STARTED, SOURCE_ALREADY_ADDED"
+            "description": "Error envelope. `error.code` is one of: ACTIVE_SESSION_EXISTS, SESSION_ALREADY_STARTED, SESSION_ALREADY_TERMINAL, SESSION_NOT_STARTED, SOURCE_ALREADY_ADDED"
           },
           "422": {
             "content": {
@@ -3338,7 +3338,7 @@
                 }
               }
             },
-            "description": "Error envelope. `error.code` is one of: CONTENT_NOT_FOUND, SESSION_NOT_FOUND, SOURCE_NOT_ACCESSIBLE, SOURCE_NOT_FOUND"
+            "description": "Error envelope. `error.code` is one of: ACTIVITY_NOT_FOUND, CONTENT_NOT_FOUND, SESSION_NOT_FOUND, SOURCE_NOT_ACCESSIBLE, SOURCE_NOT_FOUND, USER_NOT_FOUND"
           },
           "409": {
             "content": {
@@ -3348,7 +3348,7 @@
                 }
               }
             },
-            "description": "Error envelope. `error.code` is one of: ACTIVE_SESSION_EXISTS, SESSION_ALREADY_TERMINAL, SESSION_NOT_STARTED, SOURCE_ALREADY_ADDED"
+            "description": "Error envelope. `error.code` is one of: ACTIVE_SESSION_EXISTS, SESSION_ALREADY_STARTED, SESSION_ALREADY_TERMINAL, SESSION_NOT_STARTED, SOURCE_ALREADY_ADDED"
           },
           "422": {
             "content": {
@@ -3478,7 +3478,7 @@
                 }
               }
             },
-            "description": "Error envelope. `error.code` is one of: CONTENT_NOT_FOUND, SESSION_NOT_FOUND, SOURCE_NOT_ACCESSIBLE, SOURCE_NOT_FOUND"
+            "description": "Error envelope. `error.code` is one of: ACTIVITY_NOT_FOUND, CONTENT_NOT_FOUND, SESSION_NOT_FOUND, SOURCE_NOT_ACCESSIBLE, SOURCE_NOT_FOUND, USER_NOT_FOUND"
           },
           "409": {
             "content": {
@@ -3488,7 +3488,7 @@
                 }
               }
             },
-            "description": "Error envelope. `error.code` is one of: ACTIVE_SESSION_EXISTS, SESSION_ALREADY_TERMINAL, SESSION_NOT_STARTED, SOURCE_ALREADY_ADDED"
+            "description": "Error envelope. `error.code` is one of: ACTIVE_SESSION_EXISTS, SESSION_ALREADY_STARTED, SESSION_ALREADY_TERMINAL, SESSION_NOT_STARTED, SOURCE_ALREADY_ADDED"
           },
           "422": {
             "content": {
@@ -3605,7 +3605,7 @@
                 }
               }
             },
-            "description": "Error envelope. `error.code` is one of: CONTENT_NOT_FOUND, SESSION_NOT_FOUND, SOURCE_NOT_ACCESSIBLE, SOURCE_NOT_FOUND"
+            "description": "Error envelope. `error.code` is one of: ACTIVITY_NOT_FOUND, CONTENT_NOT_FOUND, SESSION_NOT_FOUND, SOURCE_NOT_ACCESSIBLE, SOURCE_NOT_FOUND, USER_NOT_FOUND"
           },
           "409": {
             "content": {
@@ -3615,7 +3615,7 @@
                 }
               }
             },
-            "description": "Error envelope. `error.code` is one of: ACTIVE_SESSION_EXISTS, SESSION_ALREADY_TERMINAL, SESSION_NOT_STARTED, SOURCE_ALREADY_ADDED"
+            "description": "Error envelope. `error.code` is one of: ACTIVE_SESSION_EXISTS, SESSION_ALREADY_STARTED, SESSION_ALREADY_TERMINAL, SESSION_NOT_STARTED, SOURCE_ALREADY_ADDED"
           },
           "422": {
             "content": {
@@ -3740,7 +3740,7 @@
                 }
               }
             },
-            "description": "Error envelope. `error.code` is one of: CONTENT_NOT_FOUND, SESSION_NOT_FOUND, SOURCE_NOT_ACCESSIBLE, SOURCE_NOT_FOUND"
+            "description": "Error envelope. `error.code` is one of: ACTIVITY_NOT_FOUND, CONTENT_NOT_FOUND, SESSION_NOT_FOUND, SOURCE_NOT_ACCESSIBLE, SOURCE_NOT_FOUND, USER_NOT_FOUND"
           },
           "409": {
             "content": {
@@ -3750,7 +3750,7 @@
                 }
               }
             },
-            "description": "Error envelope. `error.code` is one of: ACTIVE_SESSION_EXISTS, SESSION_ALREADY_TERMINAL, SESSION_NOT_STARTED, SOURCE_ALREADY_ADDED"
+            "description": "Error envelope. `error.code` is one of: ACTIVE_SESSION_EXISTS, SESSION_ALREADY_STARTED, SESSION_ALREADY_TERMINAL, SESSION_NOT_STARTED, SOURCE_ALREADY_ADDED"
           },
           "422": {
             "content": {
@@ -3880,7 +3880,7 @@
                 }
               }
             },
-            "description": "Error envelope. `error.code` is one of: CONTENT_NOT_FOUND, SESSION_NOT_FOUND, SOURCE_NOT_ACCESSIBLE, SOURCE_NOT_FOUND"
+            "description": "Error envelope. `error.code` is one of: ACTIVITY_NOT_FOUND, CONTENT_NOT_FOUND, SESSION_NOT_FOUND, SOURCE_NOT_ACCESSIBLE, SOURCE_NOT_FOUND, USER_NOT_FOUND"
           },
           "409": {
             "content": {
@@ -3890,7 +3890,7 @@
                 }
               }
             },
-            "description": "Error envelope. `error.code` is one of: ACTIVE_SESSION_EXISTS, SESSION_ALREADY_TERMINAL, SESSION_NOT_STARTED, SOURCE_ALREADY_ADDED"
+            "description": "Error envelope. `error.code` is one of: ACTIVE_SESSION_EXISTS, SESSION_ALREADY_STARTED, SESSION_ALREADY_TERMINAL, SESSION_NOT_STARTED, SOURCE_ALREADY_ADDED"
           },
           "422": {
             "content": {
@@ -4020,7 +4020,7 @@
                 }
               }
             },
-            "description": "Error envelope. `error.code` is one of: CONTENT_NOT_FOUND, SESSION_NOT_FOUND, SOURCE_NOT_ACCESSIBLE, SOURCE_NOT_FOUND"
+            "description": "Error envelope. `error.code` is one of: ACTIVITY_NOT_FOUND, CONTENT_NOT_FOUND, SESSION_NOT_FOUND, SOURCE_NOT_ACCESSIBLE, SOURCE_NOT_FOUND, USER_NOT_FOUND"
           },
           "409": {
             "content": {
@@ -4030,7 +4030,7 @@
                 }
               }
             },
-            "description": "Error envelope. `error.code` is one of: ACTIVE_SESSION_EXISTS, SESSION_ALREADY_TERMINAL, SESSION_NOT_STARTED, SOURCE_ALREADY_ADDED"
+            "description": "Error envelope. `error.code` is one of: ACTIVE_SESSION_EXISTS, SESSION_ALREADY_STARTED, SESSION_ALREADY_TERMINAL, SESSION_NOT_STARTED, SOURCE_ALREADY_ADDED"
           },
           "422": {
             "content": {
@@ -4147,7 +4147,7 @@
                 }
               }
             },
-            "description": "Error envelope. `error.code` is one of: CONTENT_NOT_FOUND, SESSION_NOT_FOUND, SOURCE_NOT_ACCESSIBLE, SOURCE_NOT_FOUND"
+            "description": "Error envelope. `error.code` is one of: ACTIVITY_NOT_FOUND, CONTENT_NOT_FOUND, SESSION_NOT_FOUND, SOURCE_NOT_ACCESSIBLE, SOURCE_NOT_FOUND, USER_NOT_FOUND"
           },
           "409": {
             "content": {
@@ -4157,7 +4157,7 @@
                 }
               }
             },
-            "description": "Error envelope. `error.code` is one of: ACTIVE_SESSION_EXISTS, SESSION_ALREADY_TERMINAL, SESSION_NOT_STARTED, SOURCE_ALREADY_ADDED"
+            "description": "Error envelope. `error.code` is one of: ACTIVE_SESSION_EXISTS, SESSION_ALREADY_STARTED, SESSION_ALREADY_TERMINAL, SESSION_NOT_STARTED, SOURCE_ALREADY_ADDED"
           },
           "422": {
             "content": {
@@ -4284,7 +4284,7 @@
                 }
               }
             },
-            "description": "Error envelope. `error.code` is one of: CONTENT_NOT_FOUND, SESSION_NOT_FOUND, SOURCE_NOT_ACCESSIBLE, SOURCE_NOT_FOUND"
+            "description": "Error envelope. `error.code` is one of: ACTIVITY_NOT_FOUND, CONTENT_NOT_FOUND, SESSION_NOT_FOUND, SOURCE_NOT_ACCESSIBLE, SOURCE_NOT_FOUND, USER_NOT_FOUND"
           },
           "409": {
             "content": {
@@ -4294,7 +4294,7 @@
                 }
               }
             },
-            "description": "Error envelope. `error.code` is one of: ACTIVE_SESSION_EXISTS, SESSION_ALREADY_TERMINAL, SESSION_NOT_STARTED, SOURCE_ALREADY_ADDED"
+            "description": "Error envelope. `error.code` is one of: ACTIVE_SESSION_EXISTS, SESSION_ALREADY_STARTED, SESSION_ALREADY_TERMINAL, SESSION_NOT_STARTED, SOURCE_ALREADY_ADDED"
           },
           "422": {
             "content": {
