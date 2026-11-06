@@ -1,6 +1,6 @@
 import { store } from '@/store';
 import { useAppSelector } from '@/store/hooks';
-import { apiClient } from '../../core/api/apiClient';
+import { apiClient, ApiError } from '../../core/api/apiClient';
 import { FeedResponse, Source, SyncChunkResponse } from './types';
 import {
   setQueueState,
@@ -13,6 +13,7 @@ import {
 
 export interface QueueActions {
   fetchFeed: (reset?: boolean) => Promise<void>;
+  fetchSources: () => Promise<void>;
   addSource: (urlOrId: string) => Promise<Source | null>;
   startResumableSync: (sourceId: string, itemEstimate?: number | null) => Promise<void>;
   cancelSync: () => void;
@@ -47,31 +48,60 @@ export async function fetchFeed(reset = false): Promise<void> {
         totalUnconsumed: data.total_unconsumed !== null ? data.total_unconsumed : currentUnconsumed,
         isLoadingFeed: false,
         isRefreshingFeed: false,
+        feedError: null,
       })
     );
-  } catch {
-    store.dispatch(setQueueState({ isLoadingFeed: false, isRefreshingFeed: false }));
+  } catch (err: unknown) {
+    // Keep whatever is already loaded (the cached feed stays browsable per SPEC §11.3)
+    // but record why the refresh failed so the screen can say so.
+    store.dispatch(
+      setQueueState({
+        isLoadingFeed: false,
+        isRefreshingFeed: false,
+        feedError: toQueueError(err, 'Failed to load your queue'),
+      })
+    );
   }
 }
 
+/** GET /sources: tells "no sources yet" apart from "sources, but nothing queued". */
+export async function fetchSources(): Promise<void> {
+  try {
+    const data = await apiClient<{ items: Source[] }>('/api/v1/sources');
+    store.dispatch(setQueueState({ sources: data.items }));
+  } catch {
+    // Leave the last known list; feedError already reflects connectivity.
+  }
+}
+
+function toQueueError(err: unknown, fallback: string): { code: string; message: string } {
+  if (err instanceof ApiError) return { code: err.code, message: err.message };
+  return { code: 'UNKNOWN_ERROR', message: err instanceof Error ? err.message : fallback };
+}
+
 export async function addSource(urlOrId: string): Promise<Source | null> {
-  store.dispatch(setQueueState({ isAddingSource: true, addSourceError: null }));
+  store.dispatch(
+    setQueueState({ isAddingSource: true, addSourceError: null, addSourceErrorCode: null })
+  );
   try {
     const data = await apiClient<Source>('/api/v1/sources', {
       method: 'POST',
       body: JSON.stringify({ url_or_id: urlOrId }),
     });
 
-    store.dispatch(setQueueState({ isAddingSource: false }));
+    const known = store.getState().queue.sources ?? [];
+    store.dispatch(setQueueState({ isAddingSource: false, sources: [data, ...known] }));
 
     if (data?.id) {
       startResumableSync(data.id, data.item_count);
     }
 
     return data;
-  } catch (err: any) {
-    const errorMsg = err?.message || 'Failed to add content source';
-    store.dispatch(setQueueState({ addSourceError: errorMsg, isAddingSource: false }));
+  } catch (err: unknown) {
+    const { code, message } = toQueueError(err, 'Failed to add content source');
+    store.dispatch(
+      setQueueState({ addSourceError: message, addSourceErrorCode: code, isAddingSource: false })
+    );
     return null;
   }
 }
@@ -90,6 +120,7 @@ export async function startResumableSync(
         iterationCount: 0,
         isCancelled: false,
         error: null,
+        errorCode: null,
       },
     })
   );
@@ -136,15 +167,16 @@ export async function startResumableSync(
         store.dispatch(setSyncProgress({ isSyncing: false }));
         break;
       }
-    } catch (err: any) {
-      const errorMsg = err?.message || 'Sync chunk failed';
-      store.dispatch(setSyncProgress({ isSyncing: false, error: errorMsg }));
+    } catch (err: unknown) {
+      const { code, message } = toQueueError(err, 'Sync chunk failed');
+      store.dispatch(setSyncProgress({ isSyncing: false, error: message, errorCode: code }));
       break;
     }
   }
 
-  // Refresh feed after sync completes
+  // Refresh feed (and source statuses) after sync completes
   fetchFeed(true);
+  fetchSources();
 }
 
 export function cancelSync(): void {
@@ -171,6 +203,7 @@ export function clearErrors(): void {
 
 const actions: QueueActions = {
   fetchFeed,
+  fetchSources,
   addSource,
   startResumableSync,
   cancelSync,

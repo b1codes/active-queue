@@ -6,7 +6,38 @@ on:
   pull_request:
     branches: [main]
 
+# Least privilege by default; jobs that need more ask for it explicitly.
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Pinned tool versions (one place to bump). Python/Node match backend/Dockerfile and
+  # frontend's Expo toolchain; pnpm comes from frontend/package.json "packageManager".
+  PYTHON_VERSION: "3.12"
+  NODE_VERSION: "22"
+  UV_VERSION: "0.13.2"
+  FIREBASE_TOOLS_VERSION: "15.33.0"
+  TERRAFORM_VERSION: "1.9.0"
+  OPENAPI_TS_VERSION: "7.13.0"
+  OASDIFF_VERSION: "v1.34.1"
+
 jobs:
+  workflows:
+    name: Workflow lint (actionlint)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Run actionlint
+        uses: docker://rhysd/actionlint:1.7.11
+        with:
+          args: -color
+
   backend:
     name: Backend (FastAPI)
     runs-on: ubuntu-latest
@@ -18,46 +49,59 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
+          python-version: ${{ env.PYTHON_VERSION }}
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v3
+        uses: astral-sh/setup-uv@v6
         with:
+          version: ${{ env.UV_VERSION }}
           enable-cache: true
+          cache-dependency-glob: backend/uv.lock
 
-      - name: Install Node.js & Firebase Emulators
+      - name: Set up Node.js (Firebase emulators)
         uses: actions/setup-node@v4
         with:
-          node-version: "22"
+          node-version: ${{ env.NODE_VERSION }}
 
-      - name: Install Firebase CLI
-        run: npm install -g firebase-tools
+      - name: Set up Java (Firestore emulator)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Cache Firebase emulator binaries
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/firebase/emulators
+          key: firebase-emulators-${{ env.FIREBASE_TOOLS_VERSION }}
 
       - name: Install backend dependencies
-        run: |
-          cd backend
-          uv sync --frozen
+        working-directory: backend
+        run: uv sync --frozen
 
-      - name: Run Ruff Lint & Format Checks
+      - name: Ruff lint & format check
+        working-directory: backend
         run: |
-          cd backend
           uv run ruff check app/ tests/
           uv run ruff format --check app/ tests/
 
-      - name: Run Mypy Type Checking
-        run: |
-          cd backend
-          uv run mypy --strict app/
+      - name: Mypy (strict)
+        working-directory: backend
+        run: uv run mypy --strict app/
 
-      - name: Run Pytest Suite & Coverage
+      - name: Pytest (unit + mocked + emulator tiers, random order) with coverage gate
+        # emulators:exec sets FIRESTORE_EMULATOR_HOST / FIREBASE_AUTH_EMULATOR_HOST.
+        # REQUIRE_EMULATOR=1 turns "emulators unreachable" into a failure, not a skip.
+        # pytest-randomly shuffles order and prints the seed for reproduction.
+        # The coverage threshold lives in backend/pyproject.toml ([tool.coverage.report]).
         env:
           ENV: local
           GCP_PROJECT_ID: demo-activequeue-local
-          FIRESTORE_EMULATOR_HOST: localhost:9090
-          FIREBASE_AUTH_EMULATOR_HOST: localhost:9099
+          REQUIRE_EMULATOR: "1"
         run: |
-          cd backend
-          uv run pytest --cov=app/features --cov-fail-under=80 tests/
+          npx -y "firebase-tools@${FIREBASE_TOOLS_VERSION}" emulators:exec \
+            --config firebase.test.json --project demo-activequeue-local --only auth,firestore \
+            "cd backend && uv run pytest --cov"
 
   frontend:
     name: Frontend (React Native Expo)
@@ -67,37 +111,90 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up pnpm
+      - name: Set up pnpm (version from package.json packageManager)
         uses: pnpm/action-setup@v4
         with:
-          version: 11.21.0
+          package_json_file: frontend/package.json
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "22"
-          cache: "pnpm"
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
           cache-dependency-path: frontend/pnpm-lock.yaml
 
       - name: Install frontend dependencies
-        run: |
-          cd frontend
-          pnpm install --frozen-lockfile
+        working-directory: frontend
+        run: pnpm install --frozen-lockfile
 
-      - name: Run ESLint
-        run: |
-          cd frontend
-          pnpm lint
+      - name: ESLint (flat config, typescript-eslint strict, zero warnings)
+        working-directory: frontend
+        run: pnpm lint
 
-      - name: Run TypeScript Type Check
+      - name: Contract types match contracts/openapi.json
+        # The generated types feed src/__tests__/contracts/types.contract.ts, which the
+        # TypeScript step checks against the app's hand-written API types.
+        working-directory: frontend
         run: |
-          cd frontend
-          pnpm typecheck
+          npx -y "openapi-typescript@${OPENAPI_TS_VERSION}" ../contracts/openapi.json \
+            -o src/__tests__/contracts/openapi.gen.ts
+          git diff --exit-code src/__tests__/contracts/openapi.gen.ts || {
+            echo "::error::openapi.gen.ts is stale. Run 'make contracts' and commit the result."
+            exit 1
+          }
 
-      - name: Run Jest Unit Tests
+      - name: TypeScript
+        working-directory: frontend
+        run: pnpm typecheck
+
+      - name: Jest (random order) with coverage gate
+        # Thresholds: frontend/jest.config.js coverageThreshold, measured over every file in
+        # src/ and app/. check-untested-files fails if any file with code was never loaded.
+        working-directory: frontend
         run: |
-          cd frontend
-          pnpm test
+          pnpm test:coverage
+          node scripts/check-untested-files.js coverage/coverage-final.json
+
+  api-breaking:
+    name: API breaking changes (oasdiff)
+    # The installed app can't be updated in lockstep with the API, so a breaking change to
+    # contracts/openapi.json (removed or narrowed response field, new required request
+    # field, removed endpoint) fails the PR. Label the PR `api-breaking-ok` once the
+    # rollout plan is agreed, then re-run this job.
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Diff contracts/openapi.json against the base commit
+        env:
+          EVENT: ${{ github.event_name }}
+          BASE_REF: ${{ github.base_ref }}
+          BEFORE: ${{ github.event.before }}
+          ALLOW_BREAKING: ${{ contains(github.event.pull_request.labels.*.name, 'api-breaking-ok') }}
+        run: |
+          if [ "${EVENT}" = "pull_request" ]; then
+            base="$(git merge-base "origin/${BASE_REF}" HEAD)"
+          else
+            base="${BEFORE}"
+          fi
+          if ! git cat-file -e "${base}:contracts/openapi.json" 2>/dev/null; then
+            echo "::notice::No contracts/openapi.json at base ${base}; nothing to compare."
+            exit 0
+          fi
+          mkdir -p "${RUNNER_TEMP}/specs"
+          git show "${base}:contracts/openapi.json" > "${RUNNER_TEMP}/specs/base.json"
+          cp contracts/openapi.json "${RUNNER_TEMP}/specs/revision.json"
+          fail_on="ERR"
+          if [ "${ALLOW_BREAKING}" = "true" ]; then
+            echo "::warning::api-breaking-ok label set; reporting breaking changes without failing."
+            fail_on=""
+          fi
+          docker run --rm -v "${RUNNER_TEMP}/specs:/specs" "tufin/oasdiff:${OASDIFF_VERSION}" \
+            breaking /specs/base.json /specs/revision.json --format githubactions \
+            ${fail_on:+--fail-on "${fail_on}"}
 
   terraform:
     name: Infrastructure (Terraform)
@@ -110,20 +207,35 @@ jobs:
       - name: Set up Terraform
         uses: hashicorp/setup-terraform@v3
         with:
-          terraform_version: "1.9.0"
+          terraform_version: ${{ env.TERRAFORM_VERSION }}
 
-      - name: Terraform Format Check
-        run: |
-          cd infra
-          terraform fmt -check
+      - name: Terraform format check
+        working-directory: infra
+        run: terraform fmt -check -recursive
 
-      - name: Terraform Init
-        run: |
-          cd infra
-          terraform init -backend=false
+      - name: Terraform init
+        working-directory: infra
+        run: terraform init -backend=false
 
-      - name: Terraform Validate
+      - name: Terraform validate
         # NOTE (SPEC §12.5): `terraform plan` is EXCLUDED until M6 because it requires real GCP credentials.
+        working-directory: infra
+        run: terraform validate
+
+  # Single required status check for branch protection (ClickUp 86bbb7ru0). Add every new
+  # job to `needs`; this fails if any of them failed or was cancelled, and is never skipped.
+  ci-passed:
+    name: CI Passed
+    if: always()
+    needs: [workflows, backend, frontend, api-breaking, terraform]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check required jobs
+        env:
+          RESULTS: ${{ toJSON(needs.*.result) }}
         run: |
-          cd infra
-          terraform validate
+          echo "Job results: ${RESULTS}"
+          if echo "${RESULTS}" | grep -qE '"(failure|cancelled|skipped)"'; then
+            echo "::error::One or more required CI jobs did not succeed."
+            exit 1
+          fi

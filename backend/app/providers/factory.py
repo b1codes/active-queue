@@ -14,8 +14,7 @@ def get_provider(provider_name: str | None = None) -> ContentProvider:
     target_provider = (provider_name or settings.content_provider).lower()
     if target_provider == "fixture":
         return FixtureProvider()
-    elif target_provider == "youtube":
+    if target_provider == "youtube":
         return YouTubeProvider()
-    else:
-        # Fallback to FixtureProvider for unknown/dev provider names
-        return FixtureProvider()
+    # Fallback to FixtureProvider for unknown/dev provider names
+    return FixtureProvider()

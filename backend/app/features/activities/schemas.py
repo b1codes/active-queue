@@ -1,11 +1,10 @@
 from __future__ import annotations
 
-from pydantic import BaseModel
-
+from app.core.envelopes import ResponseSchema
 from app.features.activities.models import Activity, TimeBlock
 
 
-class ActivitySchema(BaseModel):
+class ActivitySchema(ResponseSchema):
     """API response schema for an Activity per SPEC §9.5."""
 
     id: str
@@ -34,13 +33,13 @@ class ActivitySchema(BaseModel):
         )
 
 
-class ActivityListResponse(BaseModel):
+class ActivityListResponse(ResponseSchema):
     """API response envelope content for GET /activities list."""
 
     activities: list[ActivitySchema]
 
 
-class TimeBlockSchema(BaseModel):
+class TimeBlockSchema(ResponseSchema):
     """API response schema for a TimeBlock per SPEC §5.3 & §9.5."""
 
     id: str
@@ -59,7 +58,7 @@ class TimeBlockSchema(BaseModel):
         )
 
 
-class TimeBlockListResponse(BaseModel):
+class TimeBlockListResponse(ResponseSchema):
     """API response envelope content for GET /activities/time-blocks list."""
 
     time_blocks: list[TimeBlockSchema]

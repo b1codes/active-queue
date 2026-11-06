@@ -103,7 +103,14 @@ interface QueueSkeletonListProps {
 
 export const QueueSkeletonList: React.FC<QueueSkeletonListProps> = memo(({ count = 4 }) => {
   return (
-    <View style={styles.skeletonContainer}>
+    // One announced element instead of ~20 unlabelled placeholder views (SPEC §11.4).
+    <View
+      style={styles.skeletonContainer}
+      accessible={true}
+      accessibilityRole="progressbar"
+      accessibilityLabel="Loading your queue"
+      accessibilityState={{ busy: true }}
+    >
       {Array.from({ length: count }).map((_, index) => (
         <View key={index} style={styles.skeletonRow}>
           <ChromaticPulse style={styles.skeletonThumbnail} />

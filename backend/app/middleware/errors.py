@@ -61,7 +61,7 @@ class ErrorHandlingMiddleware(BaseHTTPMiddleware):
             return JSONResponse(status_code=500, content=envelope.model_dump())
 
 
-async def validation_error_handler(request: Request, exc: RequestValidationError) -> JSONResponse:
+async def validation_error_handler(_request: Request, exc: RequestValidationError) -> JSONResponse:
     """FastAPI RequestValidationError handler returning standard house error envelope."""
     details: list[ErrorDetail] = []
     for err in exc.errors():
@@ -83,7 +83,7 @@ async def validation_error_handler(request: Request, exc: RequestValidationError
     return JSONResponse(status_code=400, content=envelope.model_dump())
 
 
-async def http_exception_handler(request: Request, exc: HTTPException) -> JSONResponse:
+async def http_exception_handler(_request: Request, exc: HTTPException) -> JSONResponse:
     """Starlette/FastAPI HTTPException handler returning standard house error envelope."""
     code = "HTTP_ERROR"
     if exc.status_code == 401:

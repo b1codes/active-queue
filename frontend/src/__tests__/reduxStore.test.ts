@@ -1,12 +1,24 @@
-import { store } from '../store';
+import { createAppStore, resetUserScopedState, store } from '../store';
 import { setAuthState, clearError } from '../features/auth/authSlice';
 import { setQueueState, setSyncProgress, cancelSync, hideFeedItemOptimistic } from '../features/queue/queueSlice';
 import { setSessionFromServer, skipTrackerStep, advanceStep, clearSession } from '../features/sessions/sessionSlice';
 
 describe('Redux Store & Slices', () => {
+  describe('resetUserScopedState', () => {
+    it('resets queue and session but keeps auth', () => {
+      const fresh = createAppStore();
+      fresh.dispatch(setAuthState({ idToken: 'keep-me' }));
+      fresh.dispatch(setQueueState({ totalUnconsumed: 5 }));
+      fresh.dispatch(resetUserScopedState());
+      expect(fresh.getState().auth.idToken).toBe('keep-me');
+      expect(fresh.getState().queue.totalUnconsumed).toBeNull();
+    });
+  });
+
   describe('Auth Slice', () => {
     it('handles initial auth state', () => {
-      const state = store.getState().auth;
+      // A fresh store, not the shared singleton other tests mutate (order-independent).
+      const state = createAppStore().getState().auth;
       expect(state.user).toBeNull();
       expect(state.idToken).toBeNull();
       expect(state.isAuthenticated).toBe(false);

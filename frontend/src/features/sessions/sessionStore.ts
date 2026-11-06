@@ -1,6 +1,16 @@
 import { store } from '@/store';
 import { useAppSelector } from '@/store/hooks';
-import { createSession, startSession, getActiveSession, Session, CreateSessionInput } from './sessionApi';
+import { ApiError } from '@/core/api/apiClient';
+import {
+  abandonSession,
+  completeSession,
+  createSession,
+  CreateSessionInput,
+  discardSession,
+  getActiveSession,
+  Session,
+  startSession,
+} from './sessionApi';
 import { launchTrackerApp } from './deepLinks';
 import {
   setSessionState,
@@ -16,6 +26,9 @@ export type { ChecklistStep };
 
 export interface SessionStoreActions {
   createNewSession: (input: CreateSessionInput) => Promise<Session | null>;
+  completeCurrentSession: () => Promise<Session | null>;
+  abandonCurrentSession: () => Promise<Session | null>;
+  discardCurrentSession: () => Promise<boolean>;
   startCurrentSession: (trackerId: string, externalId?: string) => Promise<boolean>;
   skipTrackerStep: () => void;
   advanceStep: () => void;
@@ -42,8 +55,24 @@ export async function checkActiveSession(): Promise<Session | null> {
   }
 }
 
+function failure(err: unknown, fallback: string) {
+  const code = err instanceof ApiError ? err.code : 'UNKNOWN_ERROR';
+  const conflict =
+    err instanceof ApiError && err.code === 'ACTIVE_SESSION_EXISTS'
+      ? err.details.find((d) => d.field === 'active_session_id')?.issue ?? null
+      : null;
+  return setSessionState({
+    isLoading: false,
+    error: err instanceof Error ? err.message : fallback,
+    errorCode: code,
+    conflictSessionId: conflict,
+  });
+}
+
 export async function createNewSession(input: CreateSessionInput): Promise<Session | null> {
-  store.dispatch(setSessionState({ isLoading: true, error: null }));
+  store.dispatch(
+    setSessionState({ isLoading: true, error: null, errorCode: null, conflictSessionId: null })
+  );
   try {
     const session = await createSession(input);
     store.dispatch(
@@ -56,9 +85,50 @@ export async function createNewSession(input: CreateSessionInput): Promise<Sessi
     );
     return session;
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : 'Failed to create session';
-    store.dispatch(setSessionState({ isLoading: false, error: msg }));
+    store.dispatch(failure(err, 'Failed to create session'));
     return null;
+  }
+}
+
+async function terminalTransition(
+  call: (id: string) => Promise<Session>,
+  fallback: string
+): Promise<Session | null> {
+  const { currentSession, isLoading } = store.getState().session;
+  // Ignore double taps while a transition is in flight (the server is idempotent too).
+  if (!currentSession || isLoading) return null;
+  store.dispatch(setSessionState({ isLoading: true, error: null, errorCode: null }));
+  try {
+    const finished = await call(currentSession.id);
+    store.dispatch(clearSessionAction());
+    return finished;
+  } catch (err: unknown) {
+    store.dispatch(failure(err, fallback));
+    return null;
+  }
+}
+
+/** Step 4 "Mark Complete" (SPEC §6.2, §7.1). Consumes the content server-side. */
+export function completeCurrentSession(): Promise<Session | null> {
+  return terminalTransition(completeSession, 'Failed to complete session');
+}
+
+export function abandonCurrentSession(): Promise<Session | null> {
+  return terminalTransition(abandonSession, 'Failed to abandon session');
+}
+
+/** Hard delete; only valid before the session is started (SPEC §7.1). */
+export async function discardCurrentSession(): Promise<boolean> {
+  const { currentSession, isLoading } = store.getState().session;
+  if (!currentSession || isLoading) return false;
+  store.dispatch(setSessionState({ isLoading: true, error: null, errorCode: null }));
+  try {
+    await discardSession(currentSession.id);
+    store.dispatch(clearSessionAction());
+    return true;
+  } catch (err: unknown) {
+    store.dispatch(failure(err, 'Failed to discard session'));
+    return false;
   }
 }
 
@@ -87,9 +157,12 @@ export async function startCurrentSession(
     const launchRes = await launchTrackerApp(mediaProvider, externalId);
 
     if (!launchRes.success) {
-      // Do NOT transition session state on launch failure per subtask instruction
+      // The checklist stays on step 2 so the user can retry the launch (SPEC §6.3), but
+      // the server has already recorded the start, so mirror that: a retry is an
+      // idempotent re-start, and Mark Complete must not be told the session is pending.
       store.dispatch(
         setSessionState({
+          currentSession: updatedSession,
           isLoading: false,
           mediaError: launchRes.error || 'Failed to launch media app. Please open manually.',
         })
@@ -119,6 +192,9 @@ export function clearSession(): void {
 
 const actions: SessionStoreActions = {
   createNewSession,
+  completeCurrentSession,
+  abandonCurrentSession,
+  discardCurrentSession,
   startCurrentSession,
   skipTrackerStep,
   advanceStep,

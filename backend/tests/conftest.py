@@ -48,3 +48,12 @@ def reset_rate_limiter() -> None:
     from app.middleware.ratelimit import _limiter
 
     _limiter.reset()
+
+
+@pytest.fixture(autouse=True)
+def reset_health_provider_cache(monkeypatch: pytest.MonkeyPatch) -> None:
+    """/healthz caches provider reachability for 60s in a module global; never share it."""
+    monkeypatch.setattr(
+        "app.features.health.router._provider_reachability_cache",
+        {"status": "unknown", "checked_at": 0.0},
+    )

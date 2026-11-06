@@ -40,6 +40,10 @@ EDGE_CASE_ITEMS = {
 }
 
 
+# Entries the real API would drop from videos.list.
+UNAVAILABLE_EXTERNAL_IDS = frozenset({"vid_private_10", "vid_deleted_20"})
+
+
 def _generate_fixture_items(count: int) -> list[RawContentItem]:
     """Generate deterministically reproducible raw content items for testing."""
     items: list[RawContentItem] = []
@@ -195,7 +199,14 @@ class FixtureProvider(ContentProvider):
                 offset = 0
 
         end_offset = min(offset + max_results, len(items_corpus))
-        page_items = items_corpus[offset:end_offset]
+        # Mirror YouTube: private/deleted entries occupy playlist slots but are absent
+        # from videos.list, so the provider omits them (SPEC §12.3). Live streams (P0D)
+        # are still returned, with duration 0.
+        page_items = [
+            item
+            for item in items_corpus[offset:end_offset]
+            if item.external_id not in UNAVAILABLE_EXTERNAL_IDS
+        ]
 
         next_token = str(end_offset) if end_offset < len(items_corpus) else None
 

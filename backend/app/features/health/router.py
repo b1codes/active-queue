@@ -8,12 +8,30 @@ from fastapi import APIRouter
 from fastapi.responses import JSONResponse
 
 from app.core.config import settings
-from app.core.envelopes import ErrorBody, ErrorEnvelope, SuccessEnvelope
+from app.core.envelopes import ErrorBody, ErrorEnvelope, ResponseSchema, SuccessEnvelope
 from app.core.firestore import get_firestore_client
 
 logger = structlog.get_logger(__name__)
 
 router = APIRouter(tags=["health"])
+
+
+class FirestoreHealth(ResponseSchema):
+    status: str
+    latency_ms: float
+
+
+class ProviderHealth(ResponseSchema):
+    status: str
+
+
+class HealthData(ResponseSchema):
+    """Payload of a healthy GET /healthz response (documents the wire shape in OpenAPI)."""
+
+    status: str
+    firestore: FirestoreHealth
+    provider: ProviderHealth
+
 
 # Cached provider reachability check (refreshed at most once per minute per SPEC §9.8)
 _provider_reachability_cache: dict[str, Any] = {
@@ -39,12 +57,7 @@ async def _get_provider_status() -> dict[str, str]:
 
     # Perform reachability check based on configured content_provider
     status = "up"
-    try:
-        if settings.content_provider == "fixture":
-            status = "up"
-        elif settings.content_provider == "youtube":
-            status = "up" if settings.youtube_api_key else "degraded"
-    except Exception:
+    if settings.content_provider == "youtube" and not settings.youtube_api_key:
         status = "degraded"
 
     _provider_reachability_cache = {
@@ -54,7 +67,11 @@ async def _get_provider_status() -> dict[str, str]:
     return {"status": status}
 
 
-@router.get("/healthz")
+@router.get(
+    "/healthz",
+    response_model=SuccessEnvelope[HealthData],
+    responses={503: {"model": ErrorEnvelope, "description": "Firestore is unreachable"}},
+)
 async def health_check() -> JSONResponse:
     """GET /healthz health check endpoint per SPEC §9.8 & §14.3.
 
@@ -83,7 +100,7 @@ async def health_check() -> JSONResponse:
         is_healthy = True
         logger.info("health_check_passed", firestore_latency_ms=latency_ms)
     except Exception:
-        logger.error("health_check_failed", exc_info=True)
+        logger.exception("health_check_failed")
 
     # Provider check is non-critical — reports status but NEVER fails health check
     provider_status = await _get_provider_status()

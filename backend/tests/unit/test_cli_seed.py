@@ -54,9 +54,9 @@ async def test_clear_collections() -> None:
 
     await clear_collections(mock_db, quiet=True)
 
-    assert mock_coll.get.call_count == 6  # 6 collections cleared
-    assert mock_batch.delete.call_count == 12  # 2 docs x 6 collections
-    assert mock_batch.commit.call_count == 6
+    assert mock_coll.get.call_count == 7  # 7 collections cleared
+    assert mock_batch.delete.call_count == 14  # 2 docs x 7 collections
+    assert mock_batch.commit.call_count == 7
 
 
 @pytest.mark.asyncio

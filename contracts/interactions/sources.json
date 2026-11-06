@@ -1,0 +1,272 @@
+{
+  "description": "Content sources and resumable sync (SPEC §9.3, §9.4).",
+  "interactions": [
+    {
+      "id": "sources.list",
+      "description": "Sources for the signed-in user",
+      "states": [
+        "alice has a synced small playlist"
+      ],
+      "request": {
+        "method": "GET",
+        "path": "/api/v1/sources"
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "status": "success",
+          "data": {
+            "items": [
+              {
+                "id": "src_1",
+                "user_id": "uid_alice",
+                "provider": "fixture",
+                "external_source_id": "fixture-small-playlist",
+                "title": "Small Fixture Fitness Playlist",
+                "description": "A small test playlist with 15 workout videos",
+                "item_count": 15,
+                "thumbnail_url": "https://img.youtube.com/vi/fx_vid_0001/hqdefault.jpg",
+                "status": "active",
+                "last_sync_at": "2026-01-01T00:00:00Z",
+                "created_at": "2026-01-01T00:00:00Z"
+              }
+            ]
+          },
+          "error": null
+        }
+      },
+      "dynamic": [
+        "data.items[*].created_at",
+        "data.items[*].last_sync_at"
+      ],
+      "consumers": [
+        "fetchSources"
+      ]
+    },
+    {
+      "id": "sources.create",
+      "description": "Add a playlist by ID",
+      "request": {
+        "method": "POST",
+        "path": "/api/v1/sources",
+        "body": {
+          "url_or_id": "fixture-small-playlist"
+        }
+      },
+      "response": {
+        "status": 201,
+        "body": {
+          "status": "success",
+          "data": {
+            "id": "uid_alice_fixture_fixture-small-playlist",
+            "user_id": "uid_alice",
+            "provider": "fixture",
+            "external_source_id": "fixture-small-playlist",
+            "title": "Small Fixture Fitness Playlist",
+            "description": "A small test playlist with 15 workout videos",
+            "item_count": 15,
+            "thumbnail_url": "https://img.youtube.com/vi/fx_vid_0001/hqdefault.jpg",
+            "status": "active",
+            "last_sync_at": null,
+            "created_at": "2026-01-01T00:00:00Z"
+          },
+          "error": null
+        }
+      },
+      "dynamic": [
+        "data.created_at"
+      ],
+      "consumers": [
+        "addSource"
+      ]
+    },
+    {
+      "id": "sources.create.duplicate",
+      "description": "Adding the same playlist twice",
+      "states": [
+        "alice has a synced small playlist"
+      ],
+      "request": {
+        "method": "POST",
+        "path": "/api/v1/sources",
+        "body": {
+          "url_or_id": "fixture-small-playlist"
+        }
+      },
+      "response": {
+        "status": 409,
+        "body": {
+          "status": "error",
+          "data": null,
+          "error": {
+            "code": "SOURCE_ALREADY_ADDED",
+            "message": "Source has already been added to your account",
+            "details": [
+              {
+                "field": "source_id",
+                "issue": "src_1"
+              }
+            ]
+          }
+        }
+      },
+      "consumers": [
+        "addSource.error"
+      ]
+    },
+    {
+      "id": "sources.create.unsupported",
+      "description": "Watch Later is rejected with a dedicated code",
+      "request": {
+        "method": "POST",
+        "path": "/api/v1/sources",
+        "body": {
+          "url_or_id": "https://www.youtube.com/playlist?list=WL"
+        }
+      },
+      "response": {
+        "status": 422,
+        "body": {
+          "status": "error",
+          "data": null,
+          "error": {
+            "code": "SOURCE_UNSUPPORTED",
+            "message": "Watch Later (WL), Liked Videos (LL), and History (HL) system playlists are restricted by YouTube API and cannot be synced.",
+            "details": []
+          }
+        }
+      },
+      "consumers": [
+        "addSource.error"
+      ]
+    },
+    {
+      "id": "sources.create.unparseable",
+      "description": "Text that is not a playlist URL or ID",
+      "request": {
+        "method": "POST",
+        "path": "/api/v1/sources",
+        "body": {
+          "url_or_id": "not a playlist"
+        }
+      },
+      "response": {
+        "status": 422,
+        "body": {
+          "status": "error",
+          "data": null,
+          "error": {
+            "code": "SOURCE_URL_UNPARSEABLE",
+            "message": "Unable to parse playlist ID from URL 'not a playlist'",
+            "details": []
+          }
+        }
+      },
+      "consumers": [
+        "addSource.error"
+      ]
+    },
+    {
+      "id": "sources.create.quota",
+      "description": "Provider quota exhausted while fetching metadata",
+      "request": {
+        "method": "POST",
+        "path": "/api/v1/sources",
+        "body": {
+          "url_or_id": "fixture-quota-exceeded"
+        }
+      },
+      "response": {
+        "status": 503,
+        "body": {
+          "status": "error",
+          "data": null,
+          "error": {
+            "code": "PROVIDER_QUOTA_EXCEEDED",
+            "message": "YouTube API quota exceeded (fixture test trigger)",
+            "details": []
+          }
+        }
+      },
+      "consumers": [
+        "addSource.error"
+      ]
+    },
+    {
+      "id": "sources.sync.chunk",
+      "description": "Process one sync chunk",
+      "states": [
+        "alice has an unsynced small playlist"
+      ],
+      "request": {
+        "method": "POST",
+        "path": "/api/v1/sources/src_1/sync"
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "status": "success",
+          "data": {
+            "source_id": "src_1",
+            "status": "active",
+            "items_synced": 14,
+            "has_more": false,
+            "next_page_token": null,
+            "message": "Full sync complete"
+          },
+          "error": null
+        }
+      },
+      "consumers": [
+        "startResumableSync"
+      ]
+    },
+    {
+      "id": "sources.sync.not_found",
+      "description": "Sync a source that does not exist",
+      "request": {
+        "method": "POST",
+        "path": "/api/v1/sources/src_missing/sync"
+      },
+      "response": {
+        "status": 404,
+        "body": {
+          "status": "error",
+          "data": null,
+          "error": {
+            "code": "SOURCE_NOT_FOUND",
+            "message": "Source 'src_missing' not found",
+            "details": []
+          }
+        }
+      },
+      "consumers": [
+        "startResumableSync.error"
+      ]
+    },
+    {
+      "id": "sources.delete",
+      "description": "Remove a source",
+      "states": [
+        "alice has a synced small playlist"
+      ],
+      "request": {
+        "method": "DELETE",
+        "path": "/api/v1/sources/src_1"
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "status": "success",
+          "data": {
+            "source_id": "src_1",
+            "deleted": true
+          },
+          "error": null
+        }
+      },
+      "consumers": [],
+      "consumer_note": "Not called by the app yet; provider-verified only."
+    }
+  ]
+}

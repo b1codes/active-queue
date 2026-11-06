@@ -1,0 +1,279 @@
+{
+  "description": "Unconsumed feed (SPEC §9.2).",
+  "interactions": [
+    {
+      "id": "feed.first_page",
+      "description": "First page of the feed",
+      "states": [
+        "alice has a synced small playlist"
+      ],
+      "request": {
+        "method": "GET",
+        "path": "/api/v1/content/feed?limit=20"
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "status": "success",
+          "data": {
+            "items": [
+              {
+                "id": "uid_alice_fx:fx_vid_0015",
+                "content_id": "fx:fx_vid_0015",
+                "source_id": "src_1",
+                "title": "Fixture Workout Video #15 — High Intensity Cardio",
+                "provider": "fixture",
+                "external_id": "fx_vid_0015",
+                "duration_seconds": 2700,
+                "duration_label": "45m 0s",
+                "published_at": "2026-01-01T00:00:00Z",
+                "thumbnail_url": "https://img.youtube.com/vi/fx_vid_0015/hqdefault.jpg",
+                "video_url": "https://www.youtube.com/watch?v=fx_vid_0015",
+                "consumed": false
+              },
+              {
+                "id": "uid_alice_fx:fx_vid_0014",
+                "content_id": "fx:fx_vid_0014",
+                "source_id": "src_1",
+                "title": "Fixture Workout Video #14 — High Intensity Cardio",
+                "provider": "fixture",
+                "external_id": "fx_vid_0014",
+                "duration_seconds": 2100,
+                "duration_label": "35m 0s",
+                "published_at": "2026-01-01T00:00:00Z",
+                "thumbnail_url": "https://img.youtube.com/vi/fx_vid_0014/hqdefault.jpg",
+                "video_url": "https://www.youtube.com/watch?v=fx_vid_0014",
+                "consumed": false
+              },
+              {
+                "id": "uid_alice_fx:fx_vid_0013",
+                "content_id": "fx:fx_vid_0013",
+                "source_id": "src_1",
+                "title": "Fixture Workout Video #13 — High Intensity Cardio",
+                "provider": "fixture",
+                "external_id": "fx_vid_0013",
+                "duration_seconds": 1500,
+                "duration_label": "25m 0s",
+                "published_at": "2026-01-01T00:00:00Z",
+                "thumbnail_url": "https://img.youtube.com/vi/fx_vid_0013/hqdefault.jpg",
+                "video_url": "https://www.youtube.com/watch?v=fx_vid_0013",
+                "consumed": false
+              },
+              {
+                "id": "uid_alice_fx:fx_vid_0012",
+                "content_id": "fx:fx_vid_0012",
+                "source_id": "src_1",
+                "title": "Fixture Workout Video #12 — High Intensity Cardio",
+                "provider": "fixture",
+                "external_id": "fx_vid_0012",
+                "duration_seconds": 900,
+                "duration_label": "15m 0s",
+                "published_at": "2026-01-01T00:00:00Z",
+                "thumbnail_url": "https://img.youtube.com/vi/fx_vid_0012/hqdefault.jpg",
+                "video_url": "https://www.youtube.com/watch?v=fx_vid_0012",
+                "consumed": false
+              },
+              {
+                "id": "uid_alice_fx:fx_vid_0010",
+                "content_id": "fx:fx_vid_0010",
+                "source_id": "src_1",
+                "title": "Fixture Workout Video #10 — High Intensity Cardio",
+                "provider": "fixture",
+                "external_id": "fx_vid_0010",
+                "duration_seconds": 2700,
+                "duration_label": "45m 0s",
+                "published_at": "2026-01-01T00:00:00Z",
+                "thumbnail_url": "https://img.youtube.com/vi/fx_vid_0010/hqdefault.jpg",
+                "video_url": "https://www.youtube.com/watch?v=fx_vid_0010",
+                "consumed": false
+              },
+              {
+                "id": "uid_alice_fx:fx_vid_0009",
+                "content_id": "fx:fx_vid_0009",
+                "source_id": "src_1",
+                "title": "Fixture Workout Video #9 — High Intensity Cardio",
+                "provider": "fixture",
+                "external_id": "fx_vid_0009",
+                "duration_seconds": 2100,
+                "duration_label": "35m 0s",
+                "published_at": "2026-01-01T00:00:00Z",
+                "thumbnail_url": "https://img.youtube.com/vi/fx_vid_0009/hqdefault.jpg",
+                "video_url": "https://www.youtube.com/watch?v=fx_vid_0009",
+                "consumed": false
+              },
+              {
+                "id": "uid_alice_fx:fx_vid_0008",
+                "content_id": "fx:fx_vid_0008",
+                "source_id": "src_1",
+                "title": "Fixture Workout Video #8 — High Intensity Cardio",
+                "provider": "fixture",
+                "external_id": "fx_vid_0008",
+                "duration_seconds": 1500,
+                "duration_label": "25m 0s",
+                "published_at": "2026-01-01T00:00:00Z",
+                "thumbnail_url": "https://img.youtube.com/vi/fx_vid_0008/hqdefault.jpg",
+                "video_url": "https://www.youtube.com/watch?v=fx_vid_0008",
+                "consumed": false
+              },
+              {
+                "id": "uid_alice_fx:fx_vid_0007",
+                "content_id": "fx:fx_vid_0007",
+                "source_id": "src_1",
+                "title": "Fixture Workout Video #7 — High Intensity Cardio",
+                "provider": "fixture",
+                "external_id": "fx_vid_0007",
+                "duration_seconds": 900,
+                "duration_label": "15m 0s",
+                "published_at": "2026-01-01T00:00:00Z",
+                "thumbnail_url": "https://img.youtube.com/vi/fx_vid_0007/hqdefault.jpg",
+                "video_url": "https://www.youtube.com/watch?v=fx_vid_0007",
+                "consumed": false
+              },
+              {
+                "id": "uid_alice_fx:fx_vid_0006",
+                "content_id": "fx:fx_vid_0006",
+                "source_id": "src_1",
+                "title": "Fixture Workout Video #6 — High Intensity Cardio",
+                "provider": "fixture",
+                "external_id": "fx_vid_0006",
+                "duration_seconds": 300,
+                "duration_label": "5m 0s",
+                "published_at": "2026-01-01T00:00:00Z",
+                "thumbnail_url": "https://img.youtube.com/vi/fx_vid_0006/hqdefault.jpg",
+                "video_url": "https://www.youtube.com/watch?v=fx_vid_0006",
+                "consumed": false
+              },
+              {
+                "id": "uid_alice_fx:fx_vid_0005",
+                "content_id": "fx:fx_vid_0005",
+                "source_id": "src_1",
+                "title": "Fixture Workout Video #5 — High Intensity Cardio",
+                "provider": "fixture",
+                "external_id": "fx_vid_0005",
+                "duration_seconds": 2700,
+                "duration_label": "45m 0s",
+                "published_at": "2026-01-01T00:00:00Z",
+                "thumbnail_url": "https://img.youtube.com/vi/fx_vid_0005/hqdefault.jpg",
+                "video_url": "https://www.youtube.com/watch?v=fx_vid_0005",
+                "consumed": false
+              },
+              {
+                "id": "uid_alice_fx:fx_vid_0004",
+                "content_id": "fx:fx_vid_0004",
+                "source_id": "src_1",
+                "title": "Fixture Workout Video #4 — High Intensity Cardio",
+                "provider": "fixture",
+                "external_id": "fx_vid_0004",
+                "duration_seconds": 2100,
+                "duration_label": "35m 0s",
+                "published_at": "2026-01-01T00:00:00Z",
+                "thumbnail_url": "https://img.youtube.com/vi/fx_vid_0004/hqdefault.jpg",
+                "video_url": "https://www.youtube.com/watch?v=fx_vid_0004",
+                "consumed": false
+              },
+              {
+                "id": "uid_alice_fx:fx_vid_0003",
+                "content_id": "fx:fx_vid_0003",
+                "source_id": "src_1",
+                "title": "Fixture Workout Video #3 — High Intensity Cardio",
+                "provider": "fixture",
+                "external_id": "fx_vid_0003",
+                "duration_seconds": 1500,
+                "duration_label": "25m 0s",
+                "published_at": "2026-01-01T00:00:00Z",
+                "thumbnail_url": "https://img.youtube.com/vi/fx_vid_0003/hqdefault.jpg",
+                "video_url": "https://www.youtube.com/watch?v=fx_vid_0003",
+                "consumed": false
+              },
+              {
+                "id": "uid_alice_fx:fx_vid_0002",
+                "content_id": "fx:fx_vid_0002",
+                "source_id": "src_1",
+                "title": "Fixture Workout Video #2 — High Intensity Cardio",
+                "provider": "fixture",
+                "external_id": "fx_vid_0002",
+                "duration_seconds": 900,
+                "duration_label": "15m 0s",
+                "published_at": "2026-01-01T00:00:00Z",
+                "thumbnail_url": "https://img.youtube.com/vi/fx_vid_0002/hqdefault.jpg",
+                "video_url": "https://www.youtube.com/watch?v=fx_vid_0002",
+                "consumed": false
+              },
+              {
+                "id": "uid_alice_fx:fx_vid_0001",
+                "content_id": "fx:fx_vid_0001",
+                "source_id": "src_1",
+                "title": "Fixture Workout Video #1 — High Intensity Cardio",
+                "provider": "fixture",
+                "external_id": "fx_vid_0001",
+                "duration_seconds": 300,
+                "duration_label": "5m 0s",
+                "published_at": "2026-01-01T00:00:00Z",
+                "thumbnail_url": "https://img.youtube.com/vi/fx_vid_0001/hqdefault.jpg",
+                "video_url": "https://www.youtube.com/watch?v=fx_vid_0001",
+                "consumed": false
+              }
+            ],
+            "next_cursor": null,
+            "total_unconsumed": 14
+          },
+          "error": null
+        }
+      },
+      "dynamic": [
+        "data.items[*].published_at"
+      ],
+      "consumers": [
+        "fetchFeed"
+      ]
+    },
+    {
+      "id": "feed.empty",
+      "description": "No sources yet",
+      "request": {
+        "method": "GET",
+        "path": "/api/v1/content/feed?limit=20"
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "status": "success",
+          "data": {
+            "items": [],
+            "next_cursor": null,
+            "total_unconsumed": 0
+          },
+          "error": null
+        }
+      },
+      "consumers": [
+        "fetchFeed"
+      ]
+    },
+    {
+      "id": "feed.hide",
+      "description": "Hide an item consumed outside a workout",
+      "states": [
+        "alice has a synced small playlist"
+      ],
+      "request": {
+        "method": "POST",
+        "path": "/api/v1/content/feed/fx%3Afx_vid_0002/hide"
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "status": "success",
+          "data": {
+            "content_id": "fx:fx_vid_0002",
+            "hidden": true
+          },
+          "error": null
+        }
+      },
+      "consumers": [
+        "hideFeedItem"
+      ]
+    }
+  ]
+}

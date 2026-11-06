@@ -4,11 +4,12 @@ from datetime import datetime
 
 from pydantic import BaseModel, Field, field_validator
 
+from app.core.envelopes import ResponseSchema
 from app.core.sanitizer import sanitize_string_list, sanitize_text
 from app.features.users.models import User, UserAuthorization, UserPreferences
 
 
-class UserAuthorizationSchema(BaseModel):
+class UserAuthorizationSchema(ResponseSchema):
     """API schema for UserAuthorization response."""
 
     uid: str
@@ -28,7 +29,7 @@ class UserAuthorizationSchema(BaseModel):
         )
 
 
-class UserSchema(BaseModel):
+class UserSchema(ResponseSchema):
     """API schema for User response."""
 
     uid: str
@@ -52,7 +53,7 @@ class UserSchema(BaseModel):
         )
 
 
-class UserMeData(BaseModel):
+class UserMeData(ResponseSchema):
     """Payload for GET /api/v1/users/me endpoint."""
 
     user: UserSchema

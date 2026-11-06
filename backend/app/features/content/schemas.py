@@ -5,7 +5,8 @@ from typing import Literal
 
 from pydantic import BaseModel, Field, field_validator
 
-from app.core.sanitizer import sanitize_identifier, sanitize_text
+from app.core.envelopes import ResponseSchema
+from app.core.sanitizer import sanitize_document_id, sanitize_text
 from app.features.activities.schemas import ActivitySchema
 from app.features.content.models import Source
 
@@ -55,7 +56,7 @@ class CreateSourceRequest(BaseModel):
         return sanitized
 
 
-class SourceSchema(BaseModel):
+class SourceSchema(ResponseSchema):
     """API response schema for a content source per SPEC §9.3."""
 
     id: str
@@ -88,13 +89,27 @@ class SourceSchema(BaseModel):
         )
 
 
-class SourceListResponse(BaseModel):
+class SourceListResponse(ResponseSchema):
     """API response payload for GET /sources list."""
 
     items: list[SourceSchema]
 
 
-class SyncResponse(BaseModel):
+class DeleteSourceResponse(ResponseSchema):
+    """API response payload for DELETE /sources/{source_id}."""
+
+    source_id: str
+    deleted: bool
+
+
+class HideFeedItemResponse(ResponseSchema):
+    """API response payload for POST /content/feed/{content_id}/hide."""
+
+    content_id: str
+    hidden: bool
+
+
+class SyncResponse(ResponseSchema):
     """API response payload for POST /sources/{source_id}/sync per SPEC §9.4."""
 
     source_id: str
@@ -105,7 +120,7 @@ class SyncResponse(BaseModel):
     message: str | None = None
 
 
-class FeedItemSchema(BaseModel):
+class FeedItemSchema(ResponseSchema):
     """API response schema for an enriched feed item per SPEC §9.2."""
 
     id: str
@@ -122,7 +137,7 @@ class FeedItemSchema(BaseModel):
     consumed: bool = False
 
 
-class FeedResponse(BaseModel):
+class FeedResponse(ResponseSchema):
     """API response payload for GET /feed per SPEC §9.2."""
 
     items: list[FeedItemSchema]
@@ -143,13 +158,13 @@ class ContentMatchRequest(BaseModel):
     @field_validator("content_id")
     @classmethod
     def sanitize_content_id(cls, v: str) -> str:
-        sanitized = sanitize_identifier(v, max_length=200)
+        sanitized = sanitize_document_id(v, max_length=200)
         if not sanitized:
             raise ValueError("content_id must not be empty or contain invalid characters")
         return sanitized
 
 
-class ContentMatchResponse(BaseModel):
+class ContentMatchResponse(ResponseSchema):
     """Response payload for POST /content/match per SPEC §9.6."""
 
     content_id: str
@@ -172,7 +187,7 @@ class TimeMatchRequest(BaseModel):
     )
 
 
-class TimeMatchResponse(BaseModel):
+class TimeMatchResponse(ResponseSchema):
     """Response payload for POST /content/match-time per SPEC §9.6."""
 
     target_duration_seconds: int

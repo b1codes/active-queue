@@ -31,11 +31,37 @@ export async function createSession(input: CreateSessionInput): Promise<Session>
 }
 
 export async function startSession(sessionId: string): Promise<Session> {
-  return apiClient<Session>(`/api/v1/sessions/${sessionId}/start`, {
+  return apiClient<Session>(`/api/v1/sessions/${encodeURIComponent(sessionId)}/start`, {
     method: 'POST',
   });
 }
 
 export async function getActiveSession(): Promise<Session | null> {
   return apiClient<Session | null>('/api/v1/sessions/active');
+}
+
+export interface SessionListResponse {
+  items: Session[];
+  next_cursor: string | null;
+}
+
+export async function completeSession(sessionId: string): Promise<Session> {
+  return apiClient<Session>(`/api/v1/sessions/${encodeURIComponent(sessionId)}/complete`, {
+    method: 'POST',
+  });
+}
+
+export async function abandonSession(sessionId: string): Promise<Session> {
+  return apiClient<Session>(`/api/v1/sessions/${encodeURIComponent(sessionId)}/abandon`, {
+    method: 'POST',
+  });
+}
+
+export async function discardSession(sessionId: string): Promise<void> {
+  await apiClient(`/api/v1/sessions/${encodeURIComponent(sessionId)}`, { method: 'DELETE' });
+}
+
+export async function listSessions(cursor?: string | null): Promise<SessionListResponse> {
+  const query = cursor ? `&cursor=${encodeURIComponent(cursor)}` : '';
+  return apiClient<SessionListResponse>(`/api/v1/sessions?limit=20${query}`);
 }

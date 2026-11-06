@@ -1,0 +1,23 @@
+{
+  "iss": "https://securetoken.google.com/activequeue-prod",
+  "aud": "activequeue-prod",
+  "auth_time": 1793750000,
+  "iat": 1793750000,
+  "exp": 1793753600,
+  "user_id": "AppleUid0000000000000000002",
+  "sub": "AppleUid0000000000000000002",
+  "name": "Jordan Rivera",
+  "email": "jordan@example.com",
+  "email_verified": true,
+  "firebase": {
+    "identities": {
+      "apple.com": [
+        "001234.9f8e7d6c5b4a.0456"
+      ],
+      "email": [
+        "jordan@example.com"
+      ]
+    },
+    "sign_in_provider": "apple.com"
+  }
+}

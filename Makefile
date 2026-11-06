@@ -15,7 +15,7 @@ RESET   := \033[0m
         storybook storybook-ios storybook-android \
         docker-up docker-down docker-build emulators emulators-stop \
         seed-db seed \
-        test test-backend test-frontend \
+        check contracts test test-backend test-backend-fast test-emulator test-frontend \
         lint lint-backend lint-frontend \
         typecheck typecheck-backend typecheck-frontend \
         format format-backend \
@@ -48,9 +48,13 @@ help:
 	@echo "  $(GREEN)seed-db$(RESET)         Seed local Firestore and Auth emulators with mock test data"
 	@echo "  $(GREEN)seed$(RESET)            Alias for seed-db"
 	@echo ""
+	@echo "  $(GREEN)check$(RESET)             Run every CI gate locally (lint, types, tests, coverage)"
 	@echo "  $(GREEN)test$(RESET)              Run all unit tests (backend + frontend)"
-	@echo "  $(GREEN)test-backend$(RESET)      Run pytest suite with coverage in backend"
+	@echo "  $(GREEN)test-backend$(RESET)      Full pytest suite on test emulators + 95% coverage gate"
+	@echo "  $(GREEN)test-backend-fast$(RESET) Unit + mocked integration tests only (no emulators)"
+	@echo "  $(GREEN)test-emulator$(RESET)     Start test emulators (9190/9199) in the foreground"
 	@echo "  $(GREEN)test-frontend$(RESET)     Run Jest test suite in frontend"
+	@echo "  $(GREEN)contracts$(RESET)         Regenerate API contract files after an API change"
 	@echo ""
 	@echo "  $(GREEN)lint$(RESET)              Run linting & typechecking across full stack"
 	@echo "  $(GREEN)lint-backend$(RESET)      Run ruff lint on backend"
@@ -181,15 +185,57 @@ seed: seed-db
 ## test: Run tests for both backend and frontend
 test: test-backend test-frontend
 
-## test-backend: Run pytest suite on backend with coverage report
-test-backend:
-	@echo "$(BLUE)Running backend pytest test suite...$(RESET)"
-	cd backend && uv run pytest
+## check: The same gates CI enforces (see docs/testing.md). Run before pushing.
+check:
+	@echo "$(BLUE)[1/6] Backend lint & format$(RESET)"
+	cd backend && uv run ruff check app tests && uv run ruff format --check app tests
+	@echo "$(BLUE)[2/6] Backend types (mypy --strict)$(RESET)"
+	cd backend && uv run mypy --strict app
+	@echo "$(BLUE)[3/6] Backend tests on test emulators + coverage gate$(RESET)"
+	$(MAKE) test-backend
+	@echo "$(BLUE)[4/6] Frontend contract types, lint & types$(RESET)"
+	cd frontend && npx -y openapi-typescript@$(OPENAPI_TS_VERSION) ../contracts/openapi.json \
+		-o src/__tests__/contracts/openapi.gen.ts && git diff --exit-code src/__tests__/contracts/openapi.gen.ts
+	cd frontend && pnpm lint && pnpm typecheck
+	@echo "$(BLUE)[5/6] Frontend tests + coverage gate + untested-file check$(RESET)"
+	cd frontend && pnpm test:coverage && node scripts/check-untested-files.js coverage/coverage-final.json
+	@echo "$(BLUE)[6/6] Workflow lint (actionlint, via Docker)$(RESET)"
+	docker run --rm -v "$(CURDIR):/repo" -w /repo rhysd/actionlint:1.7.11 -color
+	@echo "$(GREEN)All CI gates passed locally.$(RESET)"
 
-## test-frontend: Run Jest test suite on frontend
+# Test emulators use firebase.test.json (Firestore 9190, Auth 9199) so a test run never
+# wipes the dev emulators started by `make local`. Requires Java 21+.
+FIREBASE_TOOLS  := npx -y firebase-tools@15.33.0
+OPENAPI_TS_VERSION := 7.13.0
+TEST_EMULATORS  := --config firebase.test.json --project demo-activequeue-local --only auth,firestore
+
+## test-backend: Full backend suite (unit + mocked + emulator tiers) with the coverage gate
+test-backend:
+	@echo "$(BLUE)Running backend pytest suite against the test emulators...$(RESET)"
+	$(FIREBASE_TOOLS) emulators:exec $(TEST_EMULATORS) \
+		"cd backend && REQUIRE_EMULATOR=1 uv run pytest --cov"
+
+## test-backend-fast: Unit + mocked integration tiers only (no emulators, no coverage gate)
+test-backend-fast:
+	cd backend && uv run pytest tests/unit tests/integration tests/contract
+
+## test-emulator: Run the test emulators in the foreground (for iterating on tests/emulator)
+test-emulator:
+	$(FIREBASE_TOOLS) emulators:start $(TEST_EMULATORS)
+
+## contracts: Regenerate contracts/openapi.json and the frontend's generated contract types
+## after an intentional API change. Re-record interaction examples with
+## `UPDATE_CONTRACTS=1 make test-backend`.
+contracts:
+	@echo "$(BLUE)Regenerating API contract files...$(RESET)"
+	cd backend && UPDATE_CONTRACTS=1 uv run pytest -p no:randomly tests/contract/test_openapi_snapshot.py
+	cd frontend && npx -y openapi-typescript@$(OPENAPI_TS_VERSION) ../contracts/openapi.json \
+		-o src/__tests__/contracts/openapi.gen.ts
+
+## test-frontend: Run Jest test suite on frontend (random order, coverage gate)
 test-frontend:
 	@echo "$(BLUE)Running frontend Jest test suite...$(RESET)"
-	cd frontend && pnpm test
+	cd frontend && pnpm test:coverage
 
 # ==============================================================================
 # LINTING & TYPE CHECKING
@@ -201,7 +247,7 @@ lint: lint-backend lint-frontend typecheck
 ## lint-backend: Run ruff linter on backend
 lint-backend:
 	@echo "$(BLUE)Linting backend with ruff...$(RESET)"
-	cd backend && uv run ruff check .
+	cd backend && uv run ruff check app tests
 
 ## lint-frontend: Run eslint on frontend
 lint-frontend:
@@ -214,7 +260,7 @@ typecheck: typecheck-backend typecheck-frontend
 ## typecheck-backend: Run mypy typechecker on backend
 typecheck-backend:
 	@echo "$(BLUE)Typechecking backend with mypy...$(RESET)"
-	cd backend && uv run mypy app
+	cd backend && uv run mypy --strict app
 
 ## typecheck-frontend: Run TypeScript compiler on frontend
 typecheck-frontend:
