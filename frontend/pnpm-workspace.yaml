@@ -13,7 +13,7 @@ overrides:
   'postcss@>=8.0.0 <8.5.23': ^8.5.23
 # Reviewed advisories CI's `pnpm audit --audit-level high` may skip, with no fix inside
 # the major version the parent package accepts. Each needs a reason, and is tracked in
-# ClickUp until upstream moves. Do not add an entry without one.
+# ClickUp (86bcxrv01) until upstream moves. Do not add an entry without one.
 auditConfig:
   ignoreGhsas:
     # image-size 1.x via metro: build-time only, parses images we commit. Fix is 2.0.3.

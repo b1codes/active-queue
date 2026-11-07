@@ -124,5 +124,9 @@ def test_prod_refuses_debug() -> None:
 
 
 @pytest.mark.parametrize("env", ["dev", "staging"])
-def test_debug_is_allowed_in_non_prod_deployed_envs(env: str) -> None:
+def test_debug_is_allowed_in_non_prod_deployed_envs(
+    env: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    for var in _EMULATOR_VARS:
+        monkeypatch.delenv(var, raising=False)
     assert Settings(env=env, debug=True).debug is True  # type: ignore[arg-type]
