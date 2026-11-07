@@ -10,8 +10,8 @@ ActiveQueue deploys a containerized Python 3.12 FastAPI backend to Google Cloud 
 
 ### Key Security Boundaries (SPEC §4.9 & §10.3)
 1. **Client Never Touches Firestore Directly**: All database access flows through the FastAPI backend using the `google-cloud-firestore` AsyncClient / Firebase Admin SDK.
-2. **Deny-All / Owner-Only Client Rules**: [`infra/firestore.rules`](file:///Users/brandonlamer-connolly/code/active-queue/infra/firestore.rules) enforces strict document ownership. Admin SDK bypasses security rules server-side. Even if client Firebase API keys are exposed, raw Firestore access yields zero data.
-3. **Emulator Host Unset Assertion**: [`backend/app/core/config.py`](file:///Users/brandonlamer-connolly/code/active-queue/backend/app/core/config.py) asserts that both `FIRESTORE_EMULATOR_HOST` and `FIREBASE_AUTH_EMULATOR_HOST` are strictly `None` when `env == "prod"` to prevent auth bypass vulnerabilities.
+2. **Deny-All Client Rules**: [`firestore.rules`](../../firestore.rules), the file `firebase.json` deploys, denies every client read and write. The Admin SDK bypasses security rules server-side, so even if the client Firebase API keys leak, raw Firestore access yields zero data. `make test-firestore-rules` proves this on the emulator, and fails if a second rules file appears in the repo.
+3. **Emulator Host Unset Assertion**: [`backend/app/core/config.py`](../../backend/app/core/config.py) asserts that both `FIRESTORE_EMULATOR_HOST` and `FIREBASE_AUTH_EMULATOR_HOST` are unset in every deployed env (`dev`, `staging`, `prod`) to prevent auth bypass vulnerabilities.
 
 ---
 

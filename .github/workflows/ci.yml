@@ -155,6 +155,49 @@ jobs:
           pnpm test:coverage
           node scripts/check-untested-files.js coverage/coverage-final.json
 
+  firestore-rules:
+    name: Firestore security rules
+    # Loads the rules firebase.json deploys into the emulator and checks that every client
+    # read and write is denied (SPEC §4.9), including for owners and forged admin claims.
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up pnpm (version from package.json packageManager)
+        uses: pnpm/action-setup@v4
+        with:
+          package_json_file: firestore-rules/package.json
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+          cache-dependency-path: firestore-rules/pnpm-lock.yaml
+
+      - name: Set up Java (Firestore emulator)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Cache Firebase emulator binaries
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/firebase/emulators
+          key: firebase-emulators-${{ env.FIREBASE_TOOLS_VERSION }}
+
+      - name: Install rules test dependencies
+        working-directory: firestore-rules
+        run: pnpm install --frozen-lockfile
+
+      - name: Rules tests on the Firestore emulator
+        run: |
+          npx -y "firebase-tools@${FIREBASE_TOOLS_VERSION}" emulators:exec \
+            --config firebase.test.json --project demo-activequeue-local --only firestore \
+            "cd firestore-rules && node --test --test-reporter=spec rules.test.mjs"
+
   api-breaking:
     name: API breaking changes (oasdiff)
     # The installed app can't be updated in lockstep with the API, so a breaking change to
@@ -227,7 +270,7 @@ jobs:
   ci-passed:
     name: CI Passed
     if: always()
-    needs: [workflows, backend, frontend, api-breaking, terraform]
+    needs: [workflows, backend, frontend, firestore-rules, api-breaking, terraform]
     runs-on: ubuntu-latest
     steps:
       - name: Check required jobs

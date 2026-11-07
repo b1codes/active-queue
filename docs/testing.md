@@ -19,6 +19,7 @@ Run `make check` before pushing. It runs the same gates as CI (`.github/workflow
 | API breaking-change diff of `contracts/openapi.json` vs the PR base (oasdiff) | `api-breaking` job in `ci.yml` | CI only |
 | Third-party contracts (YouTube, Firebase Auth) against recorded data, one `ContentProvider` contract for both providers | `contracts/third_party/`, `backend/tests/contract/`, `backend/tests/unit/providers/test_provider_contract.py` | `make test-backend` |
 | Third-party contracts against the real services (nightly, about 8 YouTube quota units) | `.github/workflows/contracts-nightly.yml`, `backend/tests/contract/thirdparty/` | `LIVE_CONTRACTS=1 uv run pytest tests/contract/thirdparty` |
+| Firestore security rules deny all client access (SPEC §4.9), one rules file in the repo | `firestore-rules/rules.test.mjs` | `make test-firestore-rules` |
 | Terraform fmt / validate | `infra/` | CI only |
 
 `CI Passed` is the single aggregate check to mark as required in branch protection.

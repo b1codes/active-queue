@@ -16,6 +16,7 @@ RESET   := \033[0m
         docker-up docker-down docker-build emulators emulators-stop \
         seed-db seed \
         check contracts test test-backend test-backend-fast test-emulator test-frontend \
+        test-firestore-rules \
         lint lint-backend lint-frontend \
         typecheck typecheck-backend typecheck-frontend \
         format format-backend \
@@ -54,6 +55,7 @@ help:
 	@echo "  $(GREEN)test-backend-fast$(RESET) Unit + mocked integration tests only (no emulators)"
 	@echo "  $(GREEN)test-emulator$(RESET)     Start test emulators (9190/9199) in the foreground"
 	@echo "  $(GREEN)test-frontend$(RESET)     Run Jest test suite in frontend"
+	@echo "  $(GREEN)test-firestore-rules$(RESET) Test the deployed Firestore rules on the emulator"
 	@echo "  $(GREEN)contracts$(RESET)         Regenerate API contract files after an API change"
 	@echo ""
 	@echo "  $(GREEN)lint$(RESET)              Run linting & typechecking across full stack"
@@ -187,19 +189,21 @@ test: test-backend test-frontend
 
 ## check: The same gates CI enforces (see docs/testing.md). Run before pushing.
 check:
-	@echo "$(BLUE)[1/6] Backend lint & format$(RESET)"
+	@echo "$(BLUE)[1/7] Backend lint & format$(RESET)"
 	cd backend && uv run ruff check app tests && uv run ruff format --check app tests
-	@echo "$(BLUE)[2/6] Backend types (mypy --strict)$(RESET)"
+	@echo "$(BLUE)[2/7] Backend types (mypy --strict)$(RESET)"
 	cd backend && uv run mypy --strict app
-	@echo "$(BLUE)[3/6] Backend tests on test emulators + coverage gate$(RESET)"
+	@echo "$(BLUE)[3/7] Backend tests on test emulators + coverage gate$(RESET)"
 	$(MAKE) test-backend
-	@echo "$(BLUE)[4/6] Frontend contract types, lint & types$(RESET)"
+	@echo "$(BLUE)[4/7] Frontend contract types, lint & types$(RESET)"
 	cd frontend && npx -y openapi-typescript@$(OPENAPI_TS_VERSION) ../contracts/openapi.json \
 		-o src/__tests__/contracts/openapi.gen.ts && git diff --exit-code src/__tests__/contracts/openapi.gen.ts
 	cd frontend && pnpm lint && pnpm typecheck
-	@echo "$(BLUE)[5/6] Frontend tests + coverage gate + untested-file check$(RESET)"
+	@echo "$(BLUE)[5/7] Frontend tests + coverage gate + untested-file check$(RESET)"
 	cd frontend && pnpm test:coverage && node scripts/check-untested-files.js coverage/coverage-final.json
-	@echo "$(BLUE)[6/6] Workflow lint (actionlint, via Docker)$(RESET)"
+	@echo "$(BLUE)[6/7] Firestore security rules$(RESET)"
+	$(MAKE) test-firestore-rules
+	@echo "$(BLUE)[7/7] Workflow lint (actionlint, via Docker)$(RESET)"
 	docker run --rm -v "$(CURDIR):/repo" -w /repo rhysd/actionlint:1.7.11 -color
 	@echo "$(GREEN)All CI gates passed locally.$(RESET)"
 
@@ -218,6 +222,13 @@ test-backend:
 ## test-backend-fast: Unit + mocked integration tiers only (no emulators, no coverage gate)
 test-backend-fast:
 	cd backend && uv run pytest tests/unit tests/integration tests/contract
+
+## test-firestore-rules: Load the deployed firestore.rules into the Firestore emulator and
+## check that every client read and write is denied (SPEC §4.9).
+test-firestore-rules:
+	cd firestore-rules && npx -y pnpm@11.22.0 install --frozen-lockfile
+	$(FIREBASE_TOOLS) emulators:exec --config firebase.test.json --project demo-activequeue-local \
+		--only firestore "cd firestore-rules && node --test --test-reporter=spec rules.test.mjs"
 
 ## test-emulator: Run the test emulators in the foreground (for iterating on tests/emulator)
 test-emulator:
