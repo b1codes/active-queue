@@ -51,6 +51,10 @@ def parse_content_id(content_id: str) -> tuple[str, str]:
     return provider, external_id
 
 
+# Shown when a provider title is empty, or is entirely markup that sanitizes to nothing.
+UNTITLED = "Untitled"
+
+
 class PlaylistMetadata(BaseModel):
     """Metadata for a content playlist or channel per SPEC §8.4."""
 
@@ -63,7 +67,8 @@ class PlaylistMetadata(BaseModel):
     @field_validator("title")
     @classmethod
     def sanitize_title(cls, v: str) -> str:
-        return sanitize_text(v, max_length=500) or v.strip()
+        # Never fall back to the raw value: a title that is all markup stays out.
+        return sanitize_text(v, max_length=500) or UNTITLED
 
     @field_validator("description")
     @classmethod
@@ -93,7 +98,8 @@ class RawContentItem(BaseModel):
     @field_validator("title")
     @classmethod
     def sanitize_title(cls, v: str) -> str:
-        return sanitize_text(v, max_length=500) or v.strip()
+        # Never fall back to the raw value: a title that is all markup stays out.
+        return sanitize_text(v, max_length=500) or UNTITLED
 
     @field_validator("thumbnail_url", "video_url")
     @classmethod

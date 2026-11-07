@@ -21,26 +21,30 @@ DANGEROUS_SCHEME_RE = re.compile(r"^\s*(javascript|data|vbscript|file):", re.IGN
 PATH_TRAVERSAL_RE = re.compile(r"\.\.[/\\]")
 
 
+def _strip_markup_once(text: str) -> str:
+    cleaned = SCRIPT_TAG_RE.sub("", text)
+    cleaned = CONTROL_CHAR_RE.sub("", cleaned)
+    cleaned = HTML_TAG_RE.sub("", cleaned)
+    return DANGEROUS_SCHEME_RE.sub("", cleaned).strip()
+
+
 def sanitize_text(text: str | None, max_length: int | None = None) -> str | None:
-    """Sanitize free-text input by stripping control chars, null bytes, HTML tags, and trailing spaces."""
+    """Sanitize free text: strip control chars, HTML tags, and leading dangerous schemes.
+
+    The passes repeat until nothing changes. A single pass can be defeated by nesting,
+    because removing one construct can assemble another: "jav<b>ascript:javascript:x"
+    loses its tag and then one scheme, which leaves "javascript:x". Every pass that
+    changes anything makes the string shorter, so the loop terminates. The result is
+    idempotent, so re-sanitizing stored data never changes it again.
+    """
     if text is None:
         return None
 
     cleaned = text.strip()
-    if not cleaned:
-        return ""
-
-    # Strip script/style/iframe tags and their content
-    cleaned = SCRIPT_TAG_RE.sub("", cleaned)
-
-    # Strip null bytes and control characters
-    cleaned = CONTROL_CHAR_RE.sub("", cleaned)
-
-    # Strip remaining HTML tags
-    cleaned = HTML_TAG_RE.sub("", cleaned)
-
-    # Remove inline dangerous script protocols if present
-    cleaned = DANGEROUS_SCHEME_RE.sub("", cleaned)
+    previous = None
+    while cleaned != previous:
+        previous = cleaned
+        cleaned = _strip_markup_once(cleaned)
 
     if max_length is not None and len(cleaned) > max_length:
         cleaned = cleaned[:max_length]
@@ -58,16 +62,18 @@ def sanitize_url(url: str | None, max_length: int = 2048) -> str | None:
         return None
 
     # Strip control chars and null bytes
-    cleaned = CONTROL_CHAR_RE.sub("", cleaned)
-
-    if len(cleaned) > max_length:
+    cleaned = CONTROL_CHAR_RE.sub("", cleaned).strip()
+    if not cleaned or len(cleaned) > max_length:
         return None
 
     # Reject dangerous schemes
     if DANGEROUS_SCHEME_RE.search(cleaned):
         return None
 
-    parsed = urlparse(cleaned)
+    try:
+        parsed = urlparse(cleaned)
+    except ValueError:  # e.g. "http://[" (unterminated IPv6 literal)
+        return None
     if parsed.scheme and parsed.scheme.lower() not in ("http", "https"):
         return None
 
