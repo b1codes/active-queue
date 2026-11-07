@@ -116,6 +116,14 @@ resource "google_cloud_run_v2_service" "api_service" {
         value = var.content_provider
       }
 
+      # Cloud Run's front end appends the caller's address to X-Forwarded-For; trust
+      # exactly that one hop for the per-IP rate-limit guard (client-supplied entries
+      # to its left are ignored).
+      env {
+        name  = "TRUSTED_PROXY_HOPS"
+        value = "1"
+      }
+
       env {
         name = "YOUTUBE_API_KEY"
         value_source {

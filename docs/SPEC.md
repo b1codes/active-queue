@@ -915,6 +915,8 @@ No cache or disk checks: this service has neither.
 
 Per-user limits: **60 requests/minute** general, **10/minute** on `POST /sources/{id}/sync`.
 
+Per-user limits are keyed by the uid of a **verified** token. They are enforced by a dependency that runs right after token verification, never from claims decoded out of an unverified token, since anyone could forge those to dodge a limit or spend another user's budget. In front of everything except `/healthz` sits a coarse per-IP flood guard (`rate_limit_ip`, 300/minute), which never looks at the token. The client IP is read from `X-Forwarded-For` only as far as `trusted_proxy_hops` allows (1 on Cloud Run). Authenticated responses carry the per-user values in the `X-RateLimit-*` headers, and unauthenticated ones carry the per-IP values.
+
 v1 uses an **instance-local** fixed-window limiter. Cloud Run runs multiple instances, so the effective limit is `instances × 60` — the headers are therefore approximate. This is a documented v1 compromise (§14.4): an accurate distributed limiter needs a Firestore or Redis counter write per request, which would roughly double the cost and latency of every call to protect against a threat v1 does not yet face. Cloud Armor edge rate limiting is the v1.1 hardening.
 
 ### 10.3 Configuration

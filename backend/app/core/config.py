@@ -33,6 +33,12 @@ class Settings(BaseSettings):
     rate_limit_sync: int = 10
     rate_limit_heavy: int = 30
     rate_limit_window_seconds: int = 60
+    # Per-IP flood guard, applied before any token work. Generous because carrier-grade
+    # NAT puts many legitimate users behind one address; per-user limits do the real work.
+    rate_limit_ip: int = 300
+    # How many proxies in front of the app append to X-Forwarded-For. Cloud Run's front
+    # end appends the caller's address, so 1 there; 0 locally (use the TCP peer).
+    trusted_proxy_hops: int = 0
     debug: bool = False
     log_level: str = "INFO"
 

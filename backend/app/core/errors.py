@@ -43,12 +43,14 @@ class AppError(Exception):
         message: str,
         status_code: int = 400,
         details: list[ErrorDetail] | None = None,
+        headers: dict[str, str] | None = None,
     ) -> None:
         super().__init__(message)
         self.code = code
         self.message = message
         self.status_code = ERROR_CODES.get(code, status_code)
         self.details = details or []
+        self.headers = headers or {}
 
 
 class ValidationError(AppError):
@@ -77,8 +79,14 @@ class ConflictError(AppError):
 
 
 class RateLimitError(AppError):
-    def __init__(self, code: str, message: str, details: list[ErrorDetail] | None = None) -> None:
-        super().__init__(code, message, 429, details)
+    def __init__(
+        self,
+        code: str,
+        message: str,
+        details: list[ErrorDetail] | None = None,
+        headers: dict[str, str] | None = None,
+    ) -> None:
+        super().__init__(code, message, 429, details, headers)
 
 
 class ProviderError(AppError):

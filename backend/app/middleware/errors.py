@@ -48,6 +48,7 @@ class ErrorHandlingMiddleware(BaseHTTPMiddleware):
             return JSONResponse(
                 status_code=exc.status_code,
                 content=envelope.model_dump(),
+                headers=exc.headers,
             )
         except Exception:
             # Log full exception internally but NEVER expose to client

@@ -1,22 +1,21 @@
 from __future__ import annotations
 
-import base64
-import contextlib
-import json
 import time
 from typing import TYPE_CHECKING
 
 import structlog
+from fastapi import Depends, Request
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import JSONResponse
 
 from app.core.config import settings
 from app.core.envelopes import ErrorBody, ErrorEnvelope
+from app.core.errors import RateLimitError
+from app.core.security import AuthenticatedUser, get_current_user
 
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable
 
-    from starlette.requests import Request
     from starlette.responses import Response
 
 logger = structlog.get_logger(__name__)
@@ -51,45 +50,20 @@ def _get_endpoint_category(method: str, path: str) -> str:
     return "general"
 
 
-def _extract_identity(request: Request) -> tuple[str, str]:
-    """Safely extract user identifier (uid or IP) and role for rate limiting context."""
-    uid = getattr(request.state, "uid", None)
-    role = getattr(request.state, "role", None)
-    has_auth_header = False
+def client_ip(request: Request) -> str:
+    """The caller's IP, reading X-Forwarded-For only as far as trusted proxies vouch for it.
 
-    auth_header = request.headers.get("Authorization") or request.headers.get("authorization")
-    if auth_header and auth_header.startswith("Bearer "):
-        has_auth_header = True
-        if not uid:
-            token = auth_header[7:].strip()
-            parts = token.split(".")
-            if len(parts) == 3:
-                with contextlib.suppress(ValueError, TypeError):
-                    payload_b64 = parts[1]
-                    rem = len(payload_b64) % 4
-                    if rem:
-                        payload_b64 += "=" * (4 - rem)
-                    payload_bytes = base64.urlsafe_b64decode(payload_b64)
-                    claims = json.loads(payload_bytes)
-                    if isinstance(claims, dict):
-                        extracted_uid = (
-                            claims.get("uid") or claims.get("user_id") or claims.get("sub")
-                        )
-                        if extracted_uid and isinstance(extracted_uid, str):
-                            uid = extracted_uid
-                        if not role and claims.get("role") and isinstance(claims.get("role"), str):
-                            role = claims.get("role")
-
-    if uid:
-        request.state.uid = uid
-        user_role = role or "user"
-        request.state.role = user_role
-        return f"uid:{uid}", user_role
-
-    client_ip = request.client.host if (request.client and request.client.host) else "anonymous"
-    user_role = role or ("user" if has_auth_header else "anonymous")
-    request.state.role = user_role
-    return f"ip:{client_ip}", user_role
+    With trusted_proxy_hops = N, the Nth entry from the right of X-Forwarded-For is the
+    address our own edge saw. Anything further left was supplied by the client and is
+    never trusted. 0 (local dev, tests) uses the TCP peer address.
+    """
+    hops = settings.trusted_proxy_hops
+    if hops > 0:
+        forwarded = request.headers.get("X-Forwarded-For", "")
+        entries = [e.strip() for e in forwarded.split(",") if e.strip()]
+        if len(entries) >= hops:
+            return entries[-hops]
+    return request.client.host if (request.client and request.client.host) else "unknown"
 
 
 class FixedWindowRateLimiter:
@@ -183,67 +157,101 @@ class FixedWindowRateLimiter:
 _limiter = FixedWindowRateLimiter()
 
 
-class RateLimitMiddleware(BaseHTTPMiddleware):
-    """Rate limiting middleware enforcing per-endpoint and per-role request limits.
+def _rate_limit_headers(limit: int, remaining: int, reset_seconds: int) -> dict[str, str]:
+    return {
+        "X-RateLimit-Limit": str(limit),
+        "X-RateLimit-Remaining": str(remaining),
+        "X-RateLimit-Reset": str(reset_seconds),
+    }
 
-    Emits standard rate limit response headers per house API standard:
-    - X-RateLimit-Limit
-    - X-RateLimit-Remaining
-    - X-RateLimit-Reset
-    - Retry-After (on HTTP 429)
+
+async def enforce_user_rate_limit(
+    request: Request,
+    user: AuthenticatedUser = Depends(get_current_user),
+) -> None:
+    """Per-user limits (SPEC §10.2), keyed by the uid of a *verified* token.
+
+    Registered on every authenticated router, so it runs after get_current_user has
+    verified the token. Keying on unverified claims would let anyone forge a token to
+    dodge their own limit, or to burn another user's budget by naming their uid.
+    v1 has a single role (SPEC §3.3), so every verified user gets the "user" tier.
+    """
+    category = _get_endpoint_category(request.method, request.url.path)
+    allowed, limit, remaining, reset_seconds = _limiter.check_and_increment(
+        identifier=f"uid:{user.uid}", role="user", category=category
+    )
+    request.state.rate_limit_headers = _rate_limit_headers(limit, remaining, reset_seconds)
+    if not allowed:
+        logger.warning(
+            "rate_limit_exceeded",
+            identifier=f"uid:{user.uid}",
+            path=request.url.path,
+            method=request.method,
+            category=category,
+            limit=limit,
+            reset_seconds=reset_seconds,
+        )
+        raise RateLimitError(
+            code="RATE_LIMITED",
+            message=(
+                f"Rate limit of {limit} requests per minute exceeded for '{category}' "
+                f"endpoints. Please try again in {reset_seconds} seconds."
+            ),
+            headers={"Retry-After": str(reset_seconds)},
+        )
+
+
+class RateLimitMiddleware(BaseHTTPMiddleware):
+    """Per-IP flood guard in front of everything except /healthz.
+
+    It never looks inside the Authorization header: the coarse per-IP budget
+    (rate_limit_ip) caps what any one address can send, verified or not, before any token
+    work happens. Per-user limits are enforced by enforce_user_rate_limit after
+    verification, and their values are the X-RateLimit-* headers authenticated
+    responses carry. Unauthenticated responses carry the per-IP values.
     """
 
     async def dispatch(
         self, request: Request, call_next: Callable[[Request], Awaitable[Response]]
     ) -> Response:
         path = request.url.path
-        method = request.method
-
-        category = _get_endpoint_category(method, path)
-
-        # Exclude health check from rate limiting
-        if category == "health":
+        if _get_endpoint_category(request.method, path) == "health":
             return await call_next(request)
 
-        identifier, role = _extract_identity(request)
-        is_sync_endpoint = category == "sync"
-
+        ip = client_ip(request)
         allowed, limit, remaining, reset_seconds = _limiter.check_and_increment(
-            identifier=identifier,
-            is_sync_endpoint=is_sync_endpoint,
-            role=role,
-            category=category,
+            identifier=f"ip:{ip}",
+            role="anonymous",
+            category="ip",
+            custom_limit=settings.rate_limit_ip,
         )
+        ip_headers = _rate_limit_headers(limit, remaining, reset_seconds)
 
         if not allowed:
             logger.warning(
-                "rate_limit_exceeded",
-                identifier=identifier,
+                "ip_rate_limit_exceeded",
+                identifier=f"ip:{ip}",
                 path=path,
-                method=method,
-                category=category,
+                method=request.method,
                 limit=limit,
                 reset_seconds=reset_seconds,
-                role=role,
             )
             envelope = ErrorEnvelope(
                 error=ErrorBody(
                     code="RATE_LIMITED",
-                    message=f"Rate limit of {limit} requests per minute exceeded for '{category}' endpoints. Please try again in {reset_seconds} seconds.",
+                    message=(
+                        f"Rate limit of {limit} requests per minute exceeded for this "
+                        f"address. Please try again in {reset_seconds} seconds."
+                    ),
                 )
             )
-            err_response = JSONResponse(
+            return JSONResponse(
                 status_code=429,
                 content=envelope.model_dump(),
-                headers={"Retry-After": str(reset_seconds)},
+                headers={"Retry-After": str(reset_seconds), **ip_headers},
             )
-            err_response.headers["X-RateLimit-Limit"] = str(limit)
-            err_response.headers["X-RateLimit-Remaining"] = str(remaining)
-            err_response.headers["X-RateLimit-Reset"] = str(reset_seconds)
-            return err_response
 
         response = await call_next(request)
-        response.headers["X-RateLimit-Limit"] = str(limit)
-        response.headers["X-RateLimit-Remaining"] = str(remaining)
-        response.headers["X-RateLimit-Reset"] = str(reset_seconds)
+        user_headers: dict[str, str] | None = getattr(request.state, "rate_limit_headers", None)
+        response.headers.update(user_headers or ip_headers)
         return response
