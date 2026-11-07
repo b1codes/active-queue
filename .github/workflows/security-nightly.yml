@@ -1,0 +1,43 @@
+name: Security (nightly DAST)
+
+# OWASP ZAP API scan against staging, driven by the OpenAPI document staging itself
+# serves, so the scan always covers the deployed routes. Requests are unauthenticated:
+# the scan probes the auth boundary, error envelopes, headers and information leaks.
+#
+# Needs the repository variable STAGING_API_URL (e.g. https://api-staging.example.com).
+# Until staging exists (SPEC §15, M6) the job reports a notice and passes.
+on:
+  schedule:
+    - cron: "41 7 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  zap:
+    name: OWASP ZAP API scan (staging)
+    runs-on: ubuntu-latest
+    env:
+      STAGING_API_URL: ${{ vars.STAGING_API_URL }}
+    steps:
+      - name: Skip until staging is configured
+        if: env.STAGING_API_URL == ''
+        run: echo "::notice::STAGING_API_URL is not set; skipping the ZAP scan."
+
+      - name: Checkout repository
+        if: env.STAGING_API_URL != ''
+        uses: actions/checkout@v4
+
+      - name: ZAP API scan
+        if: env.STAGING_API_URL != ''
+        uses: zaproxy/action-api-scan@v0.10.0
+        with:
+          target: ${{ env.STAGING_API_URL }}/openapi.json
+          format: openapi
+          rules_file_name: .zap/api-scan-rules.tsv
+          # Fail on WARN-level alerts and above. Tune noisy rules in the rules file,
+          # each with a reason.
+          fail_action: true
+          allow_issue_writing: false
+          artifact_name: zap-api-scan

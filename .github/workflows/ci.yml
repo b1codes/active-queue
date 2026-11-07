@@ -24,6 +24,8 @@ env:
   TERRAFORM_VERSION: "1.9.0"
   OPENAPI_TS_VERSION: "7.13.0"
   OASDIFF_VERSION: "v1.34.1"
+  PIP_AUDIT_VERSION: "2.10.0"
+  GITLEAKS_VERSION: "v8.30.1"
 
 jobs:
   workflows:
@@ -198,6 +200,55 @@ jobs:
             --config firebase.test.json --project demo-activequeue-local --only firestore \
             "cd firestore-rules && node --test --test-reporter=spec rules.test.mjs"
 
+  security-scans:
+    name: Dependency & secret scans
+    # Fails on known-vulnerable dependencies (high and above for npm, any for Python) and
+    # on committed secrets. Reviewed exceptions live next to the lockfiles:
+    # frontend/pnpm-workspace.yaml auditConfig.ignoreGhsas and .gitleaks.toml allowlists.
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository (full history for the secret scan)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          version: ${{ env.UV_VERSION }}
+
+      - name: pip-audit (backend lockfile, hashed)
+        working-directory: backend
+        run: |
+          uv export --frozen --no-emit-project --format requirements-txt \
+            -o "${RUNNER_TEMP}/requirements.txt"
+          uvx "pip-audit@${PIP_AUDIT_VERSION}" -r "${RUNNER_TEMP}/requirements.txt" \
+            --require-hashes --disable-pip --progress-spinner off
+
+      - name: Set up pnpm (version from package.json packageManager)
+        uses: pnpm/action-setup@v4
+        with:
+          package_json_file: frontend/package.json
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: pnpm audit (frontend)
+        working-directory: frontend
+        run: pnpm audit --audit-level high
+
+      - name: pnpm audit (Firestore rules tests)
+        working-directory: firestore-rules
+        run: pnpm audit --audit-level high
+
+      - name: gitleaks (entire git history)
+        run: |
+          docker run --rm -v "${GITHUB_WORKSPACE}:/repo" \
+            "ghcr.io/gitleaks/gitleaks:${GITLEAKS_VERSION}" \
+            git /repo --config /repo/.gitleaks.toml --redact --no-banner
+
   api-breaking:
     name: API breaking changes (oasdiff)
     # The installed app can't be updated in lockstep with the API, so a breaking change to
@@ -270,7 +321,7 @@ jobs:
   ci-passed:
     name: CI Passed
     if: always()
-    needs: [workflows, backend, frontend, firestore-rules, api-breaking, terraform]
+    needs: [workflows, backend, frontend, firestore-rules, security-scans, api-breaking, terraform]
     runs-on: ubuntu-latest
     steps:
       - name: Check required jobs

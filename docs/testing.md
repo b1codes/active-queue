@@ -21,6 +21,9 @@ Run `make check` before pushing. It runs the same gates as CI (`.github/workflow
 | Third-party contracts against the real services (nightly, about 8 YouTube quota units) | `.github/workflows/contracts-nightly.yml`, `backend/tests/contract/thirdparty/` | `LIVE_CONTRACTS=1 uv run pytest tests/contract/thirdparty` |
 | Firestore security rules deny all client access (SPEC §4.9), one rules file in the repo | `firestore-rules/rules.test.mjs` | `make test-firestore-rules` |
 | Terraform fmt / validate | `infra/` | CI only |
+| Dependency audit (pip-audit, pnpm audit at high+) and gitleaks over full history | `security-scans` job in `ci.yml` | see [Security tests](#security-tests) |
+| CodeQL (Python, TypeScript, Actions; security-extended) | `.github/workflows/codeql.yml` | CI only |
+| OWASP ZAP API scan against staging (nightly) | `.github/workflows/security-nightly.yml` | CI only |
 
 `CI Passed` is the single aggregate check to mark as required in branch protection.
 `scripts/deploy.sh` refuses to deploy a commit without a successful CI run on a push.
@@ -49,3 +52,33 @@ After an intentional API change:
    `dynamic` paths and placeholders (`uid_alice`, `src_1`, `sess_1`) are preserved.
 3. Review the diff, then run `make test-frontend`. If the app can't handle the new response,
    the consumer suite fails here, before a user sees it.
+
+## Security tests
+
+| What | Where |
+|------|-------|
+| Every operation (from the OpenAPI inventory) needs a token. A second user gets 404 on every owned ID and never sees the first user's identifiers. The first user's documents stay unchanged. Unclassified new routes fail. | `backend/tests/emulator/test_authz_matrix.py` |
+| ID tokens checked by the Admin SDK in production mode with locally signed tokens: expired, wrong aud/iss, alg=none, HS256 key confusion, wrong or unknown key, tampered payload, future iat, bad sub, non-Bearer credentials | `backend/tests/integration/test_token_verification.py` |
+| Revoked tokens and deleted users get 401, Firebase-disabled users get 403 (cached per uid for 60 s). Run against real Auth-emulator accounts. | `backend/tests/emulator/test_auth_emulator.py`, `test_token_verification.py` |
+| Deployed envs refuse emulator hosts, and only `local` defaults to them | `backend/tests/unit/test_config.py` |
+| Rate limits keyed on verified uids. Forged tokens can't dodge a limit, drain a victim's budget, or raise their tier. Per-IP flood guard, X-Forwarded-For hop trust, burst behavior. | `backend/tests/integration/test_ratelimit_middleware.py` |
+| Hypothesis fuzzing of the sanitizers, request models and provider models (unit), plus hostile path IDs, source URLs and preference bodies through the API (emulators) | `backend/tests/unit/test_sanitizer_properties.py`, `backend/tests/emulator/test_input_fuzz_emulator.py` |
+| Firestore rules deny every client operation, and only one rules file exists | `firestore-rules/rules.test.mjs` |
+
+Running the scans locally:
+
+```sh
+# Python dependencies
+cd backend && uv export --frozen --no-emit-project --format requirements-txt -o /tmp/req.txt \
+  && uvx pip-audit@2.10.0 -r /tmp/req.txt --require-hashes --disable-pip
+# npm dependencies (no install needed; reads the lockfile)
+(cd frontend && pnpm audit --audit-level high) && (cd firestore-rules && pnpm audit --audit-level high)
+# Secrets, whole history
+docker run --rm -v "$PWD:/repo" ghcr.io/gitleaks/gitleaks:v8.30.1 git /repo --config /repo/.gitleaks.toml --redact
+```
+
+Exceptions are reviewed, kept next to what they exempt, and need a written reason:
+`auditConfig.ignoreGhsas` in `frontend/pnpm-workspace.yaml`, `[[allowlists]]` in
+`.gitleaks.toml`, and `.zap/api-scan-rules.tsv`. Dependabot (`.github/dependabot.yml`)
+opens grouped weekly updates. Expo SDK packages are excluded because they move together
+via `npx expo install --fix`.
