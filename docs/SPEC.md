@@ -921,8 +921,8 @@ v1 uses an **instance-local** fixed-window limiter. Cloud Run runs multiple inst
 |---------|--------|-----------------------|
 | `env` | Env | `local` \| `dev` \| `staging` \| `prod` |
 | `gcp_project_id` | Env | `activequeue-local` (placeholder until GCP exists) |
-| `firestore_emulator_host` | Env; **non-prod only** | `localhost:8080` |
-| `firebase_auth_emulator_host` | Env; **non-prod only** | `localhost:9099` |
+| `firestore_emulator_host` | Env; **`local` only** | `localhost:9090` when `env == "local"`, otherwise unset |
+| `firebase_auth_emulator_host` | Env; **`local` only** | `localhost:9099` when `env == "local"`, otherwise unset |
 | `content_provider` | Env | `fixture` \| `youtube` — see §8.4 |
 | `youtube_api_key` | Secret Manager → env at deploy | unset while `content_provider="fixture"` |
 | `max_items_per_source` | Default | `5000` (YouTube's own playlist cap) |
@@ -932,7 +932,7 @@ v1 uses an **instance-local** fixed-window limiter. Cloud Run runs multiple inst
 | `full_walk_interval_days` | Default | `7` |
 | `auth_cache_ttl_seconds` | Default | `60` |
 
-Startup asserts that **both emulator hosts are unset when `env == "prod"`.** A `FIRESTORE_EMULATOR_HOST` leaking into production would silently point the service at a nonexistent database and return empty results rather than errors — a failure mode that looks exactly like data loss. A leaked `FIREBASE_AUTH_EMULATOR_HOST` is worse: the Admin SDK stops verifying token signatures, so **any forged token is accepted**. That one is a full authentication bypass, and it is the single most important assertion in the codebase.
+Startup asserts that **both emulator hosts are unset in every deployed env (`dev`, `staging`, `prod`)**, since all three are internet-facing Cloud Run services. The localhost defaults apply only when `env == "local"`. A `FIRESTORE_EMULATOR_HOST` leaking into production would silently point the service at a nonexistent database and return empty results rather than errors — a failure mode that looks exactly like data loss. A leaked `FIREBASE_AUTH_EMULATOR_HOST` is worse: the Admin SDK stops verifying token signatures, so **any forged token is accepted**. That one is a full authentication bypass, and it is the single most important assertion in the codebase.
 
 ### 10.4 Local development without GCP
 

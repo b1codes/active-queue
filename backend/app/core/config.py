@@ -4,6 +4,9 @@ from typing import Any, Literal
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+LOCAL_FIRESTORE_EMULATOR_HOST = "localhost:9090"
+LOCAL_AUTH_EMULATOR_HOST = "localhost:9099"
+
 
 class Settings(BaseSettings):
     """Single source of truth for application settings loaded via pydantic-settings.
@@ -13,8 +16,11 @@ class Settings(BaseSettings):
 
     env: Literal["local", "dev", "staging", "prod"] = "local"
     gcp_project_id: str = "demo-activequeue-local"
-    firestore_emulator_host: str | None = "localhost:9090"
-    firebase_auth_emulator_host: str | None = "localhost:9099"
+    # Emulator hosts default to the dev emulators only when env == "local" (see
+    # model_post_init). Every deployed env defaults to None, so a Cloud Run service that
+    # sets ENV but no emulator variables talks to real Firestore and verifies signatures.
+    firestore_emulator_host: str | None = None
+    firebase_auth_emulator_host: str | None = None
     content_provider: Literal["fixture", "youtube"] = "fixture"
     youtube_api_key: str | None = None
     max_items_per_source: int = 5000
@@ -35,27 +41,38 @@ class Settings(BaseSettings):
     )
 
     def model_post_init(self, __context: Any) -> None:
-        """Asserts that emulator hosts are completely UNSET when env == 'prod'.
+        """Default the emulator hosts for local dev, and refuse them in any deployed env.
 
         CRITICAL SECURITY ASSERTION (SPEC §10.3):
-        - A leaked FIRESTORE_EMULATOR_HOST in production silently returns empty results
-          instead of errors — a failure mode that looks like data loss.
-        - A leaked FIREBASE_AUTH_EMULATOR_HOST in production causes Firebase Admin SDK
-          to stop verifying signatures, accepting ANY forged token — a full auth bypass.
+        - A leaked FIRESTORE_EMULATOR_HOST silently returns empty results instead of
+          errors, a failure mode that looks like data loss.
+        - A leaked FIREBASE_AUTH_EMULATOR_HOST makes the Firebase Admin SDK stop
+          verifying signatures, so ANY forged token is accepted: a full auth bypass.
+
+        dev, staging and prod are all internet-facing Cloud Run services, so the
+        assertion covers every env except "local". The localhost defaults apply only
+        when env == "local" and the host was not passed explicitly (an explicit None
+        keeps the emulator off).
         """
-        if self.env == "prod":
-            if self.firestore_emulator_host is not None:
-                msg = (
-                    "CRITICAL SECURITY GUARDRAIL: FIRESTORE_EMULATOR_HOST must be UNSET "
-                    "when env == 'prod'. Leaked emulator host causes silent data loss."
-                )
-                raise ValueError(msg)
-            if self.firebase_auth_emulator_host is not None:
-                msg = (
-                    "CRITICAL SECURITY GUARDRAIL: FIREBASE_AUTH_EMULATOR_HOST must be UNSET "
-                    "when env == 'prod'. Leaked emulator host allows full auth bypass."
-                )
-                raise ValueError(msg)
+        if self.env == "local":
+            if "firestore_emulator_host" not in self.model_fields_set:
+                self.firestore_emulator_host = LOCAL_FIRESTORE_EMULATOR_HOST
+            if "firebase_auth_emulator_host" not in self.model_fields_set:
+                self.firebase_auth_emulator_host = LOCAL_AUTH_EMULATOR_HOST
+            return
+
+        if self.firestore_emulator_host is not None:
+            msg = (
+                "CRITICAL SECURITY GUARDRAIL: FIRESTORE_EMULATOR_HOST must be UNSET "
+                f"when env == '{self.env}'. Leaked emulator host causes silent data loss."
+            )
+            raise ValueError(msg)
+        if self.firebase_auth_emulator_host is not None:
+            msg = (
+                "CRITICAL SECURITY GUARDRAIL: FIREBASE_AUTH_EMULATOR_HOST must be UNSET "
+                f"when env == '{self.env}'. Leaked emulator host allows full auth bypass."
+            )
+            raise ValueError(msg)
 
 
 settings = Settings()
