@@ -3,3 +3,26 @@ allowBuilds:
   esbuild: true
   protobufjs: true
   unrs-resolver: true
+minimumReleaseAgeExclude:
+  - decode-uri-component@0.4.3
+  - deepmerge@4.3.2
+# Security patches that upstream pins below the fixed version, within the same major
+# (ClickUp 86bcxrv01). Remove each once the parent package ships the fix on its own.
+overrides:
+  'image-size@>=1.1.0 <1.2.1': ^1.2.1
+  'postcss@>=8.0.0 <8.5.23': ^8.5.23
+# Reviewed advisories CI's `pnpm audit --audit-level high` may skip, with no fix inside
+# the major version the parent package accepts. Each needs a reason, and is tracked in
+# ClickUp until upstream moves. Do not add an entry without one.
+auditConfig:
+  ignoreGhsas:
+    # image-size 1.x via metro: build-time only, parses images we commit. Fix is 2.0.3.
+    - GHSA-5p2g-fcmc-qvqq
+    - GHSA-w3rx-r6r6-pgpr
+    # @grpc/grpc-js via firebase > @firebase/firestore (pinned ~1.9). Node-only transport;
+    # React Native uses WebChannel and the app never imports Firestore (SPEC §2.2).
+    - GHSA-m9gg-hp2v-232j
+    # decode-uri-component 0.2.x via @react-navigation/core > query-string. Fix (0.5.1)
+    # is ESM-only and cannot load from query-string's CommonJS require. Impact is a
+    # quadratic-time parse of a deep-link query string on the user's own device.
+    - GHSA-qr28-fpjm-wq7f
