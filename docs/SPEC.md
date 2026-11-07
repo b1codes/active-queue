@@ -174,6 +174,10 @@ Per `.claude/context/007_identity-platform-guide.md`.
 3. Client sends: Authorization: Bearer <ID token>
 4. Backend middleware calls firebase_admin.auth.verify_id_token(token).
    → Validates RS256 signature, iss, aud, exp. Never hand-rolled.
+   → Then checks the Firebase user record (cached per uid for auth_cache_ttl_seconds):
+     a deleted user or a token issued before revoke_refresh_tokens → 401
+     AUTH_TOKEN_INVALID; a disabled user → 403 ACCOUNT_DISABLED. A transient
+     Identity Toolkit failure fails open, since the token itself is already verified.
 5. Backend extracts `sub` (the uid) and resolves authorization (§3.2).
 6. On 401 with code AUTH_TOKEN_EXPIRED, the client force-refreshes
    (getIdToken(true)) and retries the request exactly once.

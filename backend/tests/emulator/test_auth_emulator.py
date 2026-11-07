@@ -9,7 +9,9 @@ import time
 from typing import TYPE_CHECKING, Any
 
 import pytest
+from firebase_admin import auth as firebase_auth
 
+from app.core.security import account_status_cache
 from app.features.users.cache import auth_cache
 
 if TYPE_CHECKING:
@@ -212,3 +214,48 @@ async def test_preferences_validation(
     resp = await api.patch("/api/v1/users/me/preferences", json=body, headers=alice.headers)
     assert resp.status_code == 400
     assert resp.json()["error"]["code"] == "VALIDATION_FAILED"
+
+
+# ---------------------------------------------------------------------------
+# Revocation and Firebase-side disabling against real Auth-emulator user records
+# ---------------------------------------------------------------------------
+
+
+async def test_revoked_token_is_401(
+    api: AsyncClient, db: FirestoreAsyncClient, alice: EmulatorUser
+) -> None:
+    assert (await api.get("/api/v1/sessions", headers=alice.headers)).status_code == 200
+
+    # validSince has one-second granularity; the revoke must land after the token's iat.
+    await asyncio.sleep(1.1)
+    firebase_auth.revoke_refresh_tokens(alice.uid)
+    account_status_cache.clear()  # the 60s TTL bounds staleness; skip the wait
+
+    resp = await api.get("/api/v1/sessions", headers=alice.headers)
+    assert resp.status_code == 401, resp.text
+    assert resp.json()["error"]["code"] == "AUTH_TOKEN_INVALID"
+
+
+async def test_firebase_disabled_user_is_403(
+    api: AsyncClient, db: FirestoreAsyncClient, alice: EmulatorUser
+) -> None:
+    """Disabling in Firebase Auth (not user_authorization) also locks the account out."""
+    assert (await api.get("/api/v1/users/me", headers=alice.headers)).status_code == 200
+
+    firebase_auth.update_user(alice.uid, disabled=True)
+    account_status_cache.clear()
+
+    for path in ("/api/v1/users/me", "/api/v1/sessions"):
+        resp = await api.get(path, headers=alice.headers)
+        assert resp.status_code == 403, resp.text
+        assert resp.json()["error"]["code"] == "ACCOUNT_DISABLED"
+
+
+async def test_deleted_firebase_user_is_401(
+    api: AsyncClient, db: FirestoreAsyncClient, alice: EmulatorUser
+) -> None:
+    firebase_auth.delete_user(alice.uid)
+
+    resp = await api.get("/api/v1/sessions", headers=alice.headers)
+    assert resp.status_code == 401, resp.text
+    assert resp.json()["error"]["code"] == "AUTH_TOKEN_INVALID"

@@ -29,6 +29,7 @@ from google.cloud.firestore import AsyncClient as FirestoreAsyncClient
 from httpx import ASGITransport, AsyncClient
 
 from app.core.config import settings
+from app.core.security import account_status_cache
 from app.features.users.cache import auth_cache
 from app.main import app
 
@@ -100,12 +101,14 @@ async def db(monkeypatch: pytest.MonkeyPatch) -> AsyncGenerator[FirestoreAsyncCl
 
     _reset_emulators()
     auth_cache.clear()
+    account_status_cache.clear()
 
     client = FirestoreAsyncClient(project=PROJECT_ID)
     monkeypatch.setattr("app.core.firestore._client", client)
     yield client
     client.close()  # type: ignore[no-untyped-call]
     auth_cache.clear()
+    account_status_cache.clear()
 
 
 @dataclass
