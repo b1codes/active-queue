@@ -1,7 +1,8 @@
 name: CodeQL
 
 # Static analysis for security bugs in the backend (Python), the app (TypeScript), and
-# these workflows. Alerts land in the repository's code scanning tab. Weekly runs pick up
+# these workflows. Third-party actions are pinned to commit SHAs (actions/unpinned-tag);
+# Dependabot keeps the pins current. Alerts land in the repository's code scanning tab. Weekly runs pick up
 # new CodeQL queries against unchanged code.
 on:
   push:
@@ -40,9 +41,12 @@ jobs:
           build-mode: none
           queries: security-extended
           config: |
+            # Test code (fixtures, placeholder-matching regexes) isn't shipped; scan the app.
             paths-ignore:
               - "**/node_modules"
-              - "**/__tests__/contracts/openapi.gen.ts"
+              - "**/__tests__/**"
+              - "backend/tests/**"
+              - "firestore-rules/**"
 
       - name: Analyze
         uses: github/codeql-action/analyze@v4

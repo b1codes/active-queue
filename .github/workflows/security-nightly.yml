@@ -31,7 +31,7 @@ jobs:
 
       - name: ZAP API scan
         if: env.STAGING_API_URL != ''
-        uses: zaproxy/action-api-scan@v0.10.0
+        uses: zaproxy/action-api-scan@5158fe4d9d8fcc75ea204db81317cce7f9e5453d  # v0.10.0
         with:
           target: ${{ env.STAGING_API_URL }}/openapi.json
           format: openapi
