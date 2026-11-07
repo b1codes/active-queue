@@ -67,6 +67,9 @@ class Settings(BaseSettings):
                 self.firebase_auth_emulator_host = LOCAL_AUTH_EMULATOR_HOST
             return
 
+        if self.env == "prod" and self.debug:
+            msg = "DEBUG must be false when env == 'prod' (verbose console logs, DEBUG level)."
+            raise ValueError(msg)
         if self.firestore_emulator_host is not None:
             msg = (
                 "CRITICAL SECURITY GUARDRAIL: FIRESTORE_EMULATOR_HOST must be UNSET "

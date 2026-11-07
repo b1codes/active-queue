@@ -116,3 +116,13 @@ def test_local_env_honours_an_explicit_none() -> None:
 
     assert s.firestore_emulator_host is None
     assert s.firebase_auth_emulator_host is None
+
+
+def test_prod_refuses_debug() -> None:
+    with pytest.raises((ValueError, ValidationError), match="DEBUG must be false"):
+        Settings(env="prod", debug=True)
+
+
+@pytest.mark.parametrize("env", ["dev", "staging"])
+def test_debug_is_allowed_in_non_prod_deployed_envs(env: str) -> None:
+    assert Settings(env=env, debug=True).debug is True  # type: ignore[arg-type]
