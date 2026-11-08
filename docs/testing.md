@@ -11,6 +11,8 @@ Run `make check` before pushing. It runs the same gates as CI (`.github/workflow
 | ESLint 9 flat config + typescript-eslint strict, zero warnings | `frontend/eslint.config.js` | `make lint-frontend` |
 | tsc --noEmit | `frontend/tsconfig.json` | `make typecheck-frontend` |
 | Jest, random order, coverage over every file in `src/` + `app/` | `frontend/jest.config.js` `coverageThreshold` | `make test-frontend` |
+| Release build config: production `eas.json` sets every variable the app reads and none it doesn't, HTTPS API, Terraform's prod project and auth domain; `app.json` declares every scheme `canOpenURL` probes, installed plugins, existing assets | `frontend/src/__tests__/config/buildConfig.test.ts` | `make test-frontend` |
+| expo-doctor (SDK-compatible versions, config) | `frontend` job in `ci.yml` | part of `make check` |
 | No source file with code left untested | `frontend/scripts/check-untested-files.js` | part of `make check` |
 | Workflow lint | actionlint 1.7.11 (Docker) | part of `make check` |
 | API contract: OpenAPI snapshot, interaction examples, error-code registry | `contracts/`, `backend/tests/contract/` | `make test-backend` |

@@ -199,7 +199,7 @@ check:
 	@echo "$(BLUE)[4/7] Frontend contract types, lint & types$(RESET)"
 	cd frontend && npx -y openapi-typescript@$(OPENAPI_TS_VERSION) ../contracts/openapi.json \
 		-o src/__tests__/contracts/openapi.gen.ts && git diff --exit-code src/__tests__/contracts/openapi.gen.ts
-	cd frontend && pnpm lint && pnpm typecheck
+	cd frontend && pnpm lint && pnpm typecheck && npx -y expo-doctor@1.17.11
 	@echo "$(BLUE)[5/7] Frontend tests + coverage gate + untested-file check$(RESET)"
 	cd frontend && pnpm test:coverage && node scripts/check-untested-files.js coverage/coverage-final.json
 	@echo "$(BLUE)[6/7] Firestore security rules$(RESET)"
