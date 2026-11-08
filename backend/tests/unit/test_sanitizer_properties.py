@@ -191,6 +191,9 @@ def test_sanitize_document_id_returns_a_legal_id_or_rejects(identifier: str) -> 
 
 @FUZZ
 @given(identifier=hostile_text)
+@example(identifier="....///")
+@example(identifier="..././")
+@example(identifier="...\\.\\")
 def test_sanitize_identifier_strips_traversal(identifier: str) -> None:
     out = sanitize_identifier(identifier)
     if out is None:

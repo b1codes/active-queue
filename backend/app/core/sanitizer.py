@@ -92,8 +92,11 @@ def sanitize_identifier(identifier: str | None, max_length: int = 200) -> str | 
     # Strip control chars
     cleaned = CONTROL_CHAR_RE.sub("", cleaned)
 
-    # Strip path traversal elements
-    cleaned = PATH_TRAVERSAL_RE.sub("", cleaned)
+    # Strip path traversal elements until none are left: one pass turns "....//" into "../".
+    previous = None
+    while cleaned != previous:
+        previous = cleaned
+        cleaned = PATH_TRAVERSAL_RE.sub("", cleaned)
 
     if len(cleaned) > max_length:
         cleaned = cleaned[:max_length]
