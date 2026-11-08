@@ -26,12 +26,15 @@ import firebase_admin
 import httpx
 import pytest
 from google.cloud.firestore import AsyncClient as FirestoreAsyncClient
+from google.cloud.firestore_v1.base_aggregation import BaseAggregationQuery
+from google.cloud.firestore_v1.base_query import BaseQuery
 from httpx import ASGITransport, AsyncClient
 
 from app.core.config import settings
 from app.core.security import account_status_cache
 from app.features.users.cache import auth_cache
 from app.main import app
+from tests.firestore_indexes import IndexReport, load_indexes
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator, Awaitable, Callable
@@ -74,6 +77,85 @@ def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item
             )
 
 
+# ---------------------------------------------------------------------------
+# Composite-index check (see tests/firestore_indexes.py)
+# ---------------------------------------------------------------------------
+# The emulator serves any query, but production Firestore rejects one that no declared
+# index can serve. Every query the app runs while the `db` fixture is active is checked
+# against firestore.indexes.json; a test whose query production would reject fails.
+
+INDEX_REPORT = IndexReport(load_indexes())
+_QUERIES_SEEN = 0
+_DESELECTED: list[pytest.Item] = []
+
+
+def _record_query(structured_query: Any, where: str, errors: list[str]) -> None:
+    global _QUERIES_SEEN
+    _QUERIES_SEEN += 1
+    error = INDEX_REPORT.record(structured_query, where)
+    if error:
+        errors.append(error)
+
+
+def _install_index_check(monkeypatch: pytest.MonkeyPatch, nodeid: str) -> list[str]:
+    errors: list[str] = []
+    query_prep = BaseQuery._prep_stream
+    aggregation_prep = BaseAggregationQuery._prep_stream
+
+    def checked_query_prep(self: BaseQuery, *args: Any, **kwargs: Any) -> Any:
+        _record_query(self._to_protobuf(), nodeid, errors)
+        return query_prep(self, *args, **kwargs)
+
+    def checked_aggregation_prep(self: BaseAggregationQuery, *args: Any, **kwargs: Any) -> Any:
+        _record_query(self._nested_query._to_protobuf(), nodeid, errors)
+        return aggregation_prep(self, *args, **kwargs)
+
+    monkeypatch.setattr(BaseQuery, "_prep_stream", checked_query_prep)
+    monkeypatch.setattr(BaseAggregationQuery, "_prep_stream", checked_aggregation_prep)
+    return errors
+
+
+def pytest_deselected(items: list[pytest.Item]) -> None:
+    _DESELECTED.extend(items)
+
+
+def _whole_tier_selected(config: pytest.Config) -> bool:
+    """True when the run collected every emulator test (no -k, -m, --lf or node IDs)."""
+    if _DESELECTED or any("::" in a for a in config.args):
+        return False
+    if config.option.keyword or config.option.markexpr or config.option.lf:
+        return False
+    here = os.path.dirname(os.path.abspath(__file__))
+    return any(here.startswith(os.path.abspath(a)) for a in config.args)
+
+
+def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
+    """When the whole tier ran and passed, every declared index must have served a query.
+
+    An index no query uses is either dead weight (Firestore bills index writes) or a sign
+    that the emulator tier no longer exercises the query that needs it.
+    """
+    if not _REACHABLE or exitstatus != 0 or not _whole_tier_selected(session.config):
+        return
+    problems: list[str] = []
+    if _QUERIES_SEEN == 0:
+        problems.append(
+            "the index check saw no queries; the Firestore SDK hook in "
+            "tests/emulator/conftest.py no longer fires"
+        )
+    problems += [
+        f"unused index in firestore.indexes.json: {i.collection} {list(i.fields)}"
+        for i in INDEX_REPORT.unused()
+    ]
+    if problems:
+        reporter = session.config.pluginmanager.get_plugin("terminalreporter")
+        if reporter is not None:
+            reporter.write_sep("=", "Firestore index check failed", red=True)
+            for p in problems:
+                reporter.write_line(p)
+        session.exitstatus = pytest.ExitCode.TESTS_FAILED
+
+
 def _reset_emulators() -> None:
     httpx.delete(
         f"http://{FIRESTORE_HOST}/emulator/v1/projects/{PROJECT_ID}/databases/(default)/documents",
@@ -86,8 +168,14 @@ def _reset_emulators() -> None:
 
 
 @pytest.fixture
-async def db(monkeypatch: pytest.MonkeyPatch) -> AsyncGenerator[FirestoreAsyncClient]:
-    """Real Firestore AsyncClient pointed at a freshly wiped emulator."""
+async def db(
+    monkeypatch: pytest.MonkeyPatch, request: pytest.FixtureRequest
+) -> AsyncGenerator[FirestoreAsyncClient]:
+    """Real Firestore AsyncClient pointed at a freshly wiped emulator.
+
+    Every query run while it is active is checked against firestore.indexes.json.
+    """
+    index_errors = _install_index_check(monkeypatch, request.node.nodeid)
     monkeypatch.setenv("FIRESTORE_EMULATOR_HOST", FIRESTORE_HOST)
     monkeypatch.setenv("FIREBASE_AUTH_EMULATOR_HOST", AUTH_HOST)
     monkeypatch.setattr(settings, "firestore_emulator_host", FIRESTORE_HOST)
@@ -109,6 +197,8 @@ async def db(monkeypatch: pytest.MonkeyPatch) -> AsyncGenerator[FirestoreAsyncCl
     client.close()  # type: ignore[no-untyped-call]
     auth_cache.clear()
     account_status_cache.clear()
+    if index_errors:
+        pytest.fail("\n\n".join(dict.fromkeys(index_errors)), pytrace=False)
 
 
 @dataclass

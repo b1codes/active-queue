@@ -355,15 +355,17 @@ The join between a user and a cached content item, denormalized so the feed can 
 
 ### 4.8 Composite indexes
 
-Firestore requires these to be declared in `firestore.indexes.json`; a missing index is a runtime failure, not a slow query.
+Firestore requires these to be declared in `firestore.indexes.json`; a missing index is a runtime failure, not a slow query. The emulator serves every query regardless, so the emulator test tier checks each query it runs against `firestore.indexes.json` and fails on a query production would reject, or on an index no query uses (`backend/tests/firestore_indexes.py`).
 
 | Collection | Fields | Serves |
 |------------|--------|--------|
-| `feed_items` | `user_id` ASC, `consumed` ASC, `duration_seconds` ASC | Feed with duration range filter |
-| `feed_items` | `user_id` ASC, `consumed` ASC, `added_at` DESC | Feed, default ordering |
+| `feed_items` | `user_id` ASC, `consumed` ASC, `duration_seconds` ASC | Duration match candidates |
+| `feed_items` | `user_id` ASC, `consumed` ASC, `published_at` DESC | Feed, default ordering |
 | `sessions` | `user_id` ASC, `created_at` DESC | History |
-| `sessions` | `user_id` ASC, `status` ASC, `created_at` DESC | Active-session lookup |
-| `content_sources` | `user_id` ASC, `created_at` ASC | Source list |
+| `sessions` | `user_id` ASC, `status` ASC, `created_at` DESC | History filtered by status |
+| `sources` | `user_id` ASC, `updated_at` DESC | Source list |
+
+The active-session lookup (`user_id ==`, `status in [...]`, no sort) and the unconsumed feed count need no composite index: Firestore merges single-field indexes for equality-only queries.
 
 ### 4.9 Security rules
 
