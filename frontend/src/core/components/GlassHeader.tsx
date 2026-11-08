@@ -2,8 +2,9 @@ import React, { memo, useCallback, useState } from 'react';
 import { LayoutChangeEvent, StyleSheet, View, ViewStyle } from 'react-native';
 import { Text } from './Text';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { colors, spacing, typography } from '../theme';
+import { colors, fontScale, spacing, typography } from '../theme';
 import { LiquidGlassSurface } from './LiquidGlassSurface';
+import { useGlassTier } from '../hooks/useGlassTier';
 
 /**
  * Height of the header's own content (title row + vertical padding) before the top safe-area
@@ -71,6 +72,9 @@ export const GlassHeader: React.FC<GlassHeaderProps> = memo(({
   onHeightChange,
 }) => {
   const insets = useSafeAreaInsets();
+  // Tier 1's native material keeps text legible with real blur and vibrancy. Tier 3 has
+  // neither, so it gets a scrim (see colors.glassScrim).
+  const tier = useGlassTier();
 
   const handleLayout = useCallback(
     (e: LayoutChangeEvent) => {
@@ -81,18 +85,27 @@ export const GlassHeader: React.FC<GlassHeaderProps> = memo(({
 
   return (
     <View style={[styles.wrapper, style]} onLayout={handleLayout}>
-      <LiquidGlassSurface blurRadius={20} specularEdge="none" style={styles.blurView}>
+      <LiquidGlassSurface
+        blurRadius={20}
+        specularEdge="none"
+        style={tier === 1 ? styles.blurView : styles.blurViewScrim}
+      >
         <View style={[styles.contentContainer, { paddingTop: insets.top + spacing.md }]}>
           <View style={styles.headerRow}>
             <View style={styles.titleContainer}>
               <View style={styles.titleRow}>
-                <Text style={styles.title} numberOfLines={1} maxFontSizeMultiplier={1.5}>
+                <Text
+                  style={styles.title}
+                  numberOfLines={1}
+                  maxFontSizeMultiplier={fontScale.compact}
+                  accessibilityRole="header"
+                >
                   {title}
                 </Text>
                 {leftComponent}
               </View>
               {subtitle ? (
-                <Text style={styles.subtitle} numberOfLines={1} maxFontSizeMultiplier={1.5}>
+                <Text style={styles.subtitle} numberOfLines={1} maxFontSizeMultiplier={fontScale.compact}>
                   {subtitle}
                 </Text>
               ) : null}
@@ -121,6 +134,10 @@ const styles = StyleSheet.create({
     zIndex: 10,
   },
   blurView: {
+    width: '100%',
+  },
+  blurViewScrim: {
+    backgroundColor: colors.glassScrim,
     width: '100%',
   },
   contentContainer: {

@@ -1,8 +1,9 @@
-import React, { useEffect, useState } from 'react';
-import { AccessibilityInfo, StyleSheet, TouchableOpacity, View } from 'react-native';
+import React from 'react';
+import { StyleSheet, TouchableOpacity, View } from 'react-native';
 import { Text } from '../Text';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, rounded, spacing, typography } from '../../theme';
+import { useReduceMotion } from '../../hooks/useAccessibilitySettings';
 
 interface ActiveSessionBannerProps {
   sessionId: string;
@@ -17,23 +18,7 @@ export const ActiveSessionBanner: React.FC<ActiveSessionBannerProps> = ({
   durationSeconds,
   onResumePress,
 }) => {
-  const [reduceMotion, setReduceMotion] = useState(false);
-
-  useEffect(() => {
-    let isMounted = true;
-    AccessibilityInfo.isReduceMotionEnabled().then((enabled) => {
-      if (isMounted) setReduceMotion(enabled);
-    });
-
-    const subscription = AccessibilityInfo.addEventListener('reduceMotionChanged', (enabled) => {
-      if (isMounted) setReduceMotion(enabled);
-    });
-
-    return () => {
-      isMounted = false;
-      subscription.remove();
-    };
-  }, []);
+  const reduceMotion = useReduceMotion();
 
   const safeDuration = durationSeconds && durationSeconds > 0 ? Math.round(durationSeconds / 60) : 0;
   const durationLabel = safeDuration > 0 ? `${safeDuration}m` : '';

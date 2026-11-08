@@ -12,6 +12,7 @@ import {
 } from '@shopify/react-native-skia';
 import { colors } from '../theme';
 import { useGlassTier } from '../hooks/useGlassTier';
+import { useReduceTransparency } from '../hooks/useAccessibilitySettings';
 
 // 160% Saturation Matrix for Liquid Glass vibrancy, per llc-react/react-native-glass.md §3
 const SATURATE_160_MATRIX = [
@@ -64,6 +65,7 @@ interface LiquidGlassSurfaceProps {
 export const LiquidGlassSurface: React.FC<LiquidGlassSurfaceProps> = memo(
   ({ children, borderRadius = 0, blurRadius = 20, style, specularEdge = 'full', testID }) => {
     const tier = useGlassTier();
+    const reduceTransparency = useReduceTransparency();
     const [size, setSize] = useState({ width: 0, height: 0 });
 
     useEffect(() => {
@@ -85,6 +87,16 @@ export const LiquidGlassSurface: React.FC<LiquidGlassSurfaceProps> = memo(
       const { width, height } = e.nativeEvent.layout;
       setSize({ width, height });
     };
+
+    // Reduce Transparency: an opaque surface on every tier. The native material would go
+    // opaque by itself, but the Tier 3 tint would not, so neither is left to chance.
+    if (reduceTransparency) {
+      return (
+        <View testID={testID} style={[styles.container, { borderRadius }, style, styles.solid]}>
+          {children}
+        </View>
+      );
+    }
 
     // Tier 1 — native OS material. No Canvas, no measured layout: UIKit composites the
     // blur, vibrancy and edge highlight itself, so the Skia work below is pure overhead
@@ -158,5 +170,8 @@ const styles = StyleSheet.create({
   container: {
     overflow: 'hidden',
     position: 'relative',
+  },
+  solid: {
+    backgroundColor: colors.glassSolid,
   },
 });

@@ -31,6 +31,12 @@ export const colors = {
   heatCoreInk: '#FF5147',
   thermalGlowDefault: 'rgba(255, 149, 0, 0.35)',
   modalOverlayBg: 'rgba(12, 9, 9, 0.70)',
+  // Behind the Tier 3 glass header. Tier 3 is a 5% tint with no real blur, so without this
+  // the header's text sits directly on whatever scrolls beneath it: its subtitle fell to
+  // 1.5:1 over a Heat Core button. 0.82 keeps both header lines at AA over pure white.
+  glassScrim: 'rgba(12, 9, 9, 0.82)',
+  // What every glass surface becomes under Reduce Transparency.
+  glassSolid: '#1A1615',
   bannerAlertBg: 'rgba(255, 149, 0, 0.08)',
   bannerAlertEdge: 'rgba(255, 149, 0, 0.25)',
 
