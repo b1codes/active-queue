@@ -239,6 +239,7 @@ test-container:
 	$(HADOLINT) < backend/Dockerfile
 	$(HADOLINT) < docker/firebase/Dockerfile
 	docker build -t activequeue-api:local backend
+	mkdir -p "$(HOME)/.cache/trivy"
 	$(TRIVY) image --scanners vuln --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 activequeue-api:local
 	$(FIREBASE_TOOLS) emulators:exec $(TEST_EMULATORS) "scripts/container-smoke.sh activequeue-api:local"
 

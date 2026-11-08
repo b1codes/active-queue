@@ -330,7 +330,10 @@ jobs:
           restore-keys: trivy-db-${{ env.TRIVY_VERSION }}-
 
       - name: Trivy image scan (fixable HIGH and CRITICAL fail)
+        # Create the cache dir first: a missing bind-mount source is created root-owned,
+        # which would leave ~/.cache unwritable for the Firebase emulator download below.
         run: |
+          mkdir -p "${HOME}/.cache/trivy"
           docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
             -v "${HOME}/.cache/trivy:/root/.cache/trivy" \
             "aquasec/trivy:${TRIVY_VERSION}" image --scanners vuln \
