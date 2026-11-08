@@ -58,7 +58,8 @@ updates:
       day: monday
 
   - package-ecosystem: terraform
-    directory: /infra
+    # Each root has its own lock file; /infra itself has no configuration.
+    directories: ["/infra/environments/*", "/infra/modules/*"]
     schedule:
       interval: weekly
       day: monday

@@ -28,6 +28,7 @@ env:
   GITLEAKS_VERSION: "v8.30.1"
   HADOLINT_VERSION: "v2.14.0"
   TRIVY_VERSION: "0.69.3"
+  TFLINT_VERSION: "v0.61.0"
 
 jobs:
   workflows:
@@ -362,6 +363,9 @@ jobs:
 
   terraform:
     name: Infrastructure (Terraform)
+    # Every root and the module, not just infra/: `terraform validate` isn't recursive.
+    # `plan` still needs GCP credentials (SPEC §12.5); `terraform test` with a mocked
+    # provider checks the module's behavior without them.
     runs-on: ubuntu-latest
 
     steps:
@@ -372,19 +376,47 @@ jobs:
         uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd  # v3.1.2
         with:
           terraform_version: ${{ env.TERRAFORM_VERSION }}
+          terraform_wrapper: false
 
       - name: Terraform format check
         working-directory: infra
         run: terraform fmt -check -recursive
 
-      - name: Terraform init
+      - name: Terraform init + validate (each environment, locked providers)
         working-directory: infra
-        run: terraform init -backend=false
+        run: |
+          for env in dev staging prod; do
+            echo "::group::${env}"
+            terraform -chdir="environments/${env}" init -backend=false -input=false -lockfile=readonly
+            terraform -chdir="environments/${env}" validate
+            echo "::endgroup::"
+          done
 
-      - name: Terraform validate
-        # NOTE (SPEC §12.5): `terraform plan` is EXCLUDED until M6 because it requires real GCP credentials.
-        working-directory: infra
-        run: terraform validate
+      - name: Terraform test (module, mocked Google provider)
+        working-directory: infra/modules/activequeue_app
+        run: |
+          terraform init -backend=false -input=false
+          terraform test
+
+      - name: tflint (recursive, Google ruleset)
+        env:
+          GITHUB_TOKEN: ${{ github.token }}  # plugin download rate limit
+        run: |
+          mkdir -p "${RUNNER_TEMP}/tflint-plugins"
+          tflint() {
+            docker run --rm -v "${GITHUB_WORKSPACE}/infra:/data" -w /data \
+              -v "${RUNNER_TEMP}/tflint-plugins:/plugins" -e TFLINT_PLUGIN_DIR=/plugins \
+              -e GITHUB_TOKEN "ghcr.io/terraform-linters/tflint:${TFLINT_VERSION}" "$@"
+          }
+          tflint --init --config /data/.tflint.hcl
+          tflint --recursive --config /data/.tflint.hcl --format compact
+
+      - name: Trivy config scan (Terraform + Dockerfiles)
+        run: |
+          docker run --rm -v "${GITHUB_WORKSPACE}:/repo:ro" "aquasec/trivy:${TRIVY_VERSION}" \
+            config --exit-code 1 --severity HIGH,CRITICAL \
+            --skip-dirs /repo/frontend/node_modules --skip-dirs /repo/firestore-rules/node_modules \
+            /repo
 
   # Single required status check for branch protection (ClickUp 86bbb7ru0). Add every new
   # job to `needs`; this fails if any of them failed or was cancelled, and is never skipped.

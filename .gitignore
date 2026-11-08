@@ -191,4 +191,7 @@ override.tf
 override.tf.json
 *_override.tf
 *_override.tf.json
-.terraform.lock.hcl
+# Provider lock files are committed for the environment roots (HashiCorp's guidance), so
+# every plan and apply uses the same provider build. Modules don't need one.
+infra/modules/**/.terraform.lock.hcl
+*.tfplan
