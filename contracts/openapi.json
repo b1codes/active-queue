@@ -4358,9 +4358,41 @@
         ]
       }
     },
+    "/health": {
+      "get": {
+        "description": "GET /health (and /healthz) health check endpoint per SPEC \u00a79.8 & \u00a714.3.\n\nEvaluates Firestore connectivity by reading a sentinel document (critical).\nEvaluates provider reachability (non-critical, cached max once per minute).\n\nReturns:\n- 200 OK when Firestore is reachable (even if provider is degraded/offline).\n- 503 Service Unavailable when Firestore is unreachable.\n\nThe provider check MUST NEVER fail the endpoint: failing health during a YouTube\noutage would cause Cloud Run to cycle healthy instances, converting a partial\ndegradation into a full outage.",
+        "operationId": "health_check_health_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessEnvelope_HealthData_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Firestore is unreachable"
+          }
+        },
+        "summary": "Health Check",
+        "tags": [
+          "health"
+        ]
+      }
+    },
     "/healthz": {
       "get": {
-        "description": "GET /healthz health check endpoint per SPEC \u00a79.8 & \u00a714.3.\n\nEvaluates Firestore connectivity by reading a sentinel document (critical).\nEvaluates provider reachability (non-critical, cached max once per minute).\n\nReturns:\n- 200 OK when Firestore is reachable (even if provider is degraded/offline).\n- 503 Service Unavailable when Firestore is unreachable.\n\nThe provider check MUST NEVER fail the endpoint: failing health during a YouTube\noutage would cause Cloud Run to cycle healthy instances, converting a partial\ndegradation into a full outage.",
+        "description": "GET /health (and /healthz) health check endpoint per SPEC \u00a79.8 & \u00a714.3.\n\nEvaluates Firestore connectivity by reading a sentinel document (critical).\nEvaluates provider reachability (non-critical, cached max once per minute).\n\nReturns:\n- 200 OK when Firestore is reachable (even if provider is degraded/offline).\n- 503 Service Unavailable when Firestore is unreachable.\n\nThe provider check MUST NEVER fail the endpoint: failing health during a YouTube\noutage would cause Cloud Run to cycle healthy instances, converting a partial\ndegradation into a full outage.",
         "operationId": "health_check_healthz_get",
         "responses": {
           "200": {

@@ -68,10 +68,11 @@ async def test_authenticated_responses_carry_the_per_user_budget(api: AsyncClien
     assert int(resp.headers["X-RateLimit-Reset"]) >= 1
 
 
+@pytest.mark.parametrize("path", ["/health", "/healthz"])
 async def test_health_endpoint_bypasses_rate_limit(
-    api: AsyncClient, mock_firestore_client: MagicMock
+    api: AsyncClient, mock_firestore_client: MagicMock, path: str
 ) -> None:
-    resp = await api.get("/healthz")
+    resp = await api.get(path)
     assert resp.status_code == 200
     assert "X-RateLimit-Limit" not in resp.headers
 

@@ -354,6 +354,37 @@ export interface paths {
         patch: operations["update_current_user_preferences_api_v1_users_me_preferences_patch"];
         trace?: never;
     };
+    "/health": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Health Check
+         * @description GET /health (and /healthz) health check endpoint per SPEC §9.8 & §14.3.
+         *
+         *     Evaluates Firestore connectivity by reading a sentinel document (critical).
+         *     Evaluates provider reachability (non-critical, cached max once per minute).
+         *
+         *     Returns:
+         *     - 200 OK when Firestore is reachable (even if provider is degraded/offline).
+         *     - 503 Service Unavailable when Firestore is unreachable.
+         *
+         *     The provider check MUST NEVER fail the endpoint: failing health during a YouTube
+         *     outage would cause Cloud Run to cycle healthy instances, converting a partial
+         *     degradation into a full outage.
+         */
+        get: operations["health_check_health_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/healthz": {
         parameters: {
             query?: never;
@@ -363,7 +394,7 @@ export interface paths {
         };
         /**
          * Health Check
-         * @description GET /healthz health check endpoint per SPEC §9.8 & §14.3.
+         * @description GET /health (and /healthz) health check endpoint per SPEC §9.8 & §14.3.
          *
          *     Evaluates Firestore connectivity by reading a sentinel document (critical).
          *     Evaluates provider reachability (non-critical, cached max once per minute).
@@ -3244,6 +3275,35 @@ export interface operations {
                 };
             };
             /** @description Error envelope. `error.code` is one of: PROVIDER_QUOTA_EXCEEDED, PROVIDER_UNAVAILABLE */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    health_check_health_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SuccessEnvelope_HealthData_"];
+                };
+            };
+            /** @description Firestore is unreachable */
             503: {
                 headers: {
                     [name: string]: unknown;

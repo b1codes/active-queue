@@ -39,7 +39,7 @@ ROLE_LIMIT_MULTIPLIERS: dict[str, float] = {
 
 def _get_endpoint_category(method: str, path: str) -> str:
     """Categorize API endpoints into health, sync, heavy, or general rate limit buckets."""
-    if path == "/healthz":
+    if path in ("/health", "/healthz"):
         return "health"
     if method == "POST" and path.endswith("/sync"):
         return "sync"
@@ -202,7 +202,7 @@ async def enforce_user_rate_limit(
 
 
 class RateLimitMiddleware(BaseHTTPMiddleware):
-    """Per-IP flood guard in front of everything except /healthz.
+    """Per-IP flood guard in front of everything except /health and /healthz.
 
     It never looks inside the Authorization header: the coarse per-IP budget
     (rate_limit_ip) caps what any one address can send, verified or not, before any token

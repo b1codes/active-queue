@@ -112,7 +112,7 @@ MATRIX: dict[tuple[str, str], Op] = {
     ),
 }
 
-PUBLIC = {("GET", "/healthz")}
+PUBLIC = {("GET", "/health"), ("GET", "/healthz")}
 
 
 def _inventory() -> set[tuple[str, str]]:

@@ -212,7 +212,7 @@ One role: `member`. The `role` field exists because the standard requires it and
 
 ### 3.4 Public routes
 
-Only `GET /api/v1/healthz` is unauthenticated. Everything else requires a valid token.
+Only `GET /health` and its alias `GET /healthz` are unauthenticated. Everything else requires a valid token.
 
 ---
 
@@ -691,7 +691,7 @@ All authenticated responses carry `X-RateLimit-Limit`, `X-RateLimit-Remaining`, 
 
 | Method | Path | Purpose |
 |--------|------|---------|
-| GET | `/healthz` | Health contract (§9.8). Unauthenticated |
+| GET | `/health`, `/healthz` | Health contract (§9.8). Unauthenticated |
 | GET | `/me` | Current user profile + preferences |
 | PATCH | `/me/preferences` | Partial preferences update |
 | GET | `/sources` | List content sources |
@@ -883,9 +883,9 @@ Effects run in a **single Firestore transaction**: update the session, set `feed
 
 This table mirrors `ERROR_CODES` in `backend/app/core/errors.py`. The contract suite (`backend/tests/contract/`) fails if the backend raises a code that isn't registered there, or if a contract example's status disagrees with it.
 
-### 9.8 `GET /healthz`
+### 9.8 `GET /health` (alias `/healthz`)
 
-Per the house contract, adapted to this stack (§14.3):
+Per the house contract, adapted to this stack (§14.3). Cloud Run reserves URL paths ending in `z`: a request for `/healthz` to a `run.app` URL gets a Google 404 and never reaches the container. External callers, such as the post-deploy smoke check and uptime monitors, use `/health`. Cloud Run's own startup and liveness probes connect to the container directly, so they can use either path.
 
 | Check | Critical | Method |
 |-------|:--------:|--------|

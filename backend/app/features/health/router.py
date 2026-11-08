@@ -67,13 +67,25 @@ async def _get_provider_status() -> dict[str, str]:
     return {"status": status}
 
 
+# Cloud Run reserves URL paths ending in "z": a request for /healthz to a run.app URL gets
+# a Google 404 and never reaches the container. External callers (the post-deploy smoke
+# check, uptime monitors) use /health. /healthz stays for Cloud Run's own probes, which
+# connect to the container directly, and for local tooling.
+HEALTH_PATHS = ("/health", "/healthz")
+
+
+@router.get(
+    "/health",
+    response_model=SuccessEnvelope[HealthData],
+    responses={503: {"model": ErrorEnvelope, "description": "Firestore is unreachable"}},
+)
 @router.get(
     "/healthz",
     response_model=SuccessEnvelope[HealthData],
     responses={503: {"model": ErrorEnvelope, "description": "Firestore is unreachable"}},
 )
 async def health_check() -> JSONResponse:
-    """GET /healthz health check endpoint per SPEC §9.8 & §14.3.
+    """GET /health (and /healthz) health check endpoint per SPEC §9.8 & §14.3.
 
     Evaluates Firestore connectivity by reading a sentinel document (critical).
     Evaluates provider reachability (non-critical, cached max once per minute).
