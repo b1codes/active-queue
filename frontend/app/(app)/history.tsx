@@ -10,7 +10,7 @@ import { Text } from '@/core/components/Text';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { GlassHeader, useGlassHeaderHeight } from '@/core/components';
-import { colors, rounded, spacing, typography } from '@/core/theme';
+import { colors, fontScale, rounded, spacing, typography } from '@/core/theme';
 import { listSessions, type Session } from '@/features/sessions/sessionApi';
 
 const STATUS_META: Record<Session['status'], { label: string; icon: string; color: string }> = {
@@ -73,9 +73,13 @@ export default function HistoryScreen() {
         onEndReachedThreshold={0.5}
         ListHeaderComponent={
           error ? (
-            <View style={styles.sessionCard} accessible={true} accessibilityRole="alert">
-              <Text style={styles.cardTitle}>Couldn&apos;t load history</Text>
-              <Text style={styles.cardMeta}>{error}</Text>
+            <View style={styles.sessionCard}>
+              <Text style={styles.cardTitle} accessibilityRole="header">
+                Couldn&apos;t load history
+              </Text>
+              <Text style={styles.cardMeta} accessibilityRole="alert">
+                {error}
+              </Text>
               <TouchableOpacity
                 style={[styles.primaryButton, { marginTop: spacing.sm }]}
                 onPress={() => load(true, null)}
@@ -107,7 +111,9 @@ export default function HistoryScreen() {
                   <Text style={[styles.verifiedText, { color: meta.color }]}>{meta.label}</Text>
                 </View>
                 <View style={styles.durationPill}>
-                  <Text style={styles.durationText}>{formatDuration(item.duration_seconds)}</Text>
+                  <Text style={styles.durationText} maxFontSizeMultiplier={fontScale.compact}>
+                    {formatDuration(item.duration_seconds)}
+                  </Text>
                 </View>
               </View>
               <Text style={styles.cardTitle}>{item.activity_id}</Text>
@@ -120,7 +126,7 @@ export default function HistoryScreen() {
         ListEmptyComponent={
           isLoading || error ? null : (
             <View style={styles.emptyContainer}>
-              <View style={styles.iconCircle}>
+              <View style={styles.iconCircle} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
                 <Ionicons name="stats-chart-outline" size={32} color={colors.inkFaint} />
               </View>
               <Text style={styles.emptyTitle}>No Sessions Yet</Text>
@@ -212,7 +218,7 @@ const styles = StyleSheet.create({
   durationPill: {
     backgroundColor: colors.strata,
     borderRadius: rounded.pill,
-    height: 24,
+    minHeight: 24,
     paddingHorizontal: 10,
     justifyContent: 'center',
     alignItems: 'center',

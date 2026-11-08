@@ -83,7 +83,7 @@ interface ThermalGlowTouchableProps {
   accessibilityRole?: 'button' | 'link' | 'tab' | 'checkbox' | 'radio';
   accessibilityLabel?: string;
   accessibilityHint?: string;
-  accessibilityState?: { selected?: boolean; disabled?: boolean };
+  accessibilityState?: { selected?: boolean; disabled?: boolean; busy?: boolean; checked?: boolean };
 }
 
 /**

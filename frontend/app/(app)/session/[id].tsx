@@ -123,12 +123,10 @@ export default function SessionHandoffScreen() {
 
   if (!currentSession || currentSession.id !== routeSessionId) {
     return (
-      <View
-        style={[styles.container, styles.centered, { paddingHorizontal: spacing.lg }]}
-        accessible={true}
-        accessibilityRole="alert"
-      >
-        <Text style={styles.title}>Session not found</Text>
+      <View style={[styles.container, styles.centered, { paddingHorizontal: spacing.lg }]}>
+        <Text style={styles.title} accessibilityRole="header">
+          Session not found
+        </Text>
         <Text style={styles.subtitle}>
           This session has ended or belongs to another account.
         </Text>
@@ -169,7 +167,9 @@ export default function SessionHandoffScreen() {
     >
       <View style={styles.cardWrapper}>
         <View style={styles.header}>
-          <Text style={styles.title}>Workout Handoff</Text>
+          <Text style={styles.title} accessibilityRole="header">
+            Workout Handoff
+          </Text>
           <Text style={styles.subtitle}>
             Guided 4-step setup for your active workout session
           </Text>
@@ -188,12 +188,15 @@ export default function SessionHandoffScreen() {
         )}
 
         {/* Step 1 Card: Tracker Handoff */}
-        <View
-          style={[styles.stepCard, currentStep === 1 && styles.activeStepCard]}
-          accessible={true}
-          accessibilityLabel={`Step 1 of 4: Start Activity Tracker. ${currentStep > 1 ? 'Completed or skipped' : 'Active step'}`}
-        >
-          <View style={styles.stepHeader}>
+        <View style={[styles.stepCard, currentStep === 1 && styles.activeStepCard]}>
+          {/* The step summary sits on the header, not the card: an accessible card would hide
+              the step's buttons from VoiceOver. */}
+          <View
+            style={styles.stepHeader}
+            accessible={true}
+            accessibilityRole="header"
+            accessibilityLabel={`Step 1 of 4: Start Activity Tracker. ${currentStep > 1 ? 'Completed or skipped' : 'Active step'}`}
+          >
             <Text style={styles.stepNumber}>1</Text>
             <Text style={styles.stepTitle}>Start Activity Tracker</Text>
           </View>
@@ -232,19 +235,24 @@ export default function SessionHandoffScreen() {
           )}
           {currentStep > 1 && (
             <View style={styles.completedBadgeRow}>
-              <Ionicons name="checkmark-circle" size={16} color={colors.signalVerified} />
+              <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+                <Ionicons name="checkmark-circle" size={16} color={colors.signalVerified} />
+              </View>
               <Text style={styles.completedBadge}>Completed / Skipped</Text>
             </View>
           )}
         </View>
 
         {/* Step 2 Card: Media Launch & Server Start */}
-        <View
-          style={[styles.stepCard, currentStep === 2 && styles.activeStepCard]}
-          accessible={true}
-          accessibilityLabel={`Step 2 of 4: Launch Media and Start Session. ${currentStep > 2 ? 'Session Started' : currentStep === 2 ? 'Active step' : 'Pending'}`}
-        >
-          <View style={styles.stepHeader}>
+        <View style={[styles.stepCard, currentStep === 2 && styles.activeStepCard]}>
+          {/* The step summary sits on the header, not the card: an accessible card would hide
+              the step's buttons from VoiceOver. */}
+          <View
+            style={styles.stepHeader}
+            accessible={true}
+            accessibilityRole="header"
+            accessibilityLabel={`Step 2 of 4: Launch Media and Start Session. ${currentStep > 2 ? 'Session Started' : currentStep === 2 ? 'Active step' : 'Pending'}`}
+          >
             <Text style={styles.stepNumber}>2</Text>
             <Text style={styles.stepTitle}>Launch Media & Start Session</Text>
           </View>
@@ -277,6 +285,7 @@ export default function SessionHandoffScreen() {
               accessibilityRole="button"
               accessibilityLabel="Launch Media and Start Workout Session"
               accessibilityHint="Launches target media player app and starts session timestamp on server"
+              accessibilityState={{ disabled: isLoading, busy: isLoading }}
             >
               {isLoading ? (
                 <ActivityIndicator color={colors.void} />
@@ -287,19 +296,22 @@ export default function SessionHandoffScreen() {
           )}
           {currentStep > 2 && (
             <View style={styles.completedBadgeRow}>
-              <Ionicons name="checkmark-circle" size={16} color={colors.signalVerified} />
+              <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+                <Ionicons name="checkmark-circle" size={16} color={colors.signalVerified} />
+              </View>
               <Text style={styles.completedBadge}>Session Started</Text>
             </View>
           )}
         </View>
 
         {/* Step 3 Card: Session Target End Time */}
-        <View
-          style={[styles.stepCard, currentStep === 3 && styles.activeStepCard]}
-          accessible={true}
-          accessibilityLabel={`Step 3 of 4: Session In Progress. ${currentStep === 3 ? `Target end time is ${formatTargetEndTime()}` : 'Pending step 2 completion'}`}
-        >
-          <View style={styles.stepHeader}>
+        <View style={[styles.stepCard, currentStep === 3 && styles.activeStepCard]}>
+          <View
+            style={styles.stepHeader}
+            accessible={true}
+            accessibilityRole="header"
+            accessibilityLabel={`Step 3 of 4: Session In Progress. ${currentStep === 3 ? `Target end time is ${formatTargetEndTime()}` : 'Pending step 2 completion'}`}
+          >
             <Text style={styles.stepNumber}>3</Text>
             <Text style={styles.stepTitle}>Session In Progress</Text>
           </View>
@@ -328,11 +340,13 @@ export default function SessionHandoffScreen() {
         </View>
 
         {/* Step 4 Card: Mark Complete (SPEC §6.2) */}
-        <View
-          style={[styles.stepCard, currentStep === 3 && styles.activeStepCard]}
-          accessible={false}
-        >
-          <View style={styles.stepHeader}>
+        <View style={[styles.stepCard, currentStep === 3 && styles.activeStepCard]}>
+          <View
+            style={styles.stepHeader}
+            accessible={true}
+            accessibilityRole="header"
+            accessibilityLabel="Step 4 of 4: Mark Complete"
+          >
             <Text style={styles.stepNumber}>4</Text>
             <Text style={styles.stepTitle}>Mark Complete</Text>
           </View>

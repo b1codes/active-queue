@@ -40,7 +40,8 @@ export default function SettingsScreen() {
         <View style={styles.card}>
           <Text style={styles.cardSectionTitle}>Account profile</Text>
 
-          <View style={styles.infoRow}>
+          {/* One element per row, so VoiceOver reads "User ID (UID), u-123" together. */}
+          <View style={styles.infoRow} accessible={true}>
             <Ionicons name="person-circle-outline" size={24} color={colors.ink} />
             <View style={styles.infoTextContainer}>
               <Text style={styles.infoLabel}>User ID (UID)</Text>
@@ -52,7 +53,7 @@ export default function SettingsScreen() {
 
           <View style={styles.divider} />
 
-          <View style={styles.infoRow}>
+          <View style={styles.infoRow} accessible={true}>
             <Ionicons name="mail-outline" size={22} color={colors.inkSecondary} />
             <View style={styles.infoTextContainer}>
               <Text style={styles.infoLabel}>Email address</Text>

@@ -81,8 +81,10 @@ export default function MatchScreen() {
       ) : null}
 
       {loadError ? (
-        <View accessible={true} accessibilityRole="alert">
-          <Text style={styles.errorText}>{loadError}</Text>
+        <View>
+          <Text style={styles.errorText} accessibilityRole="alert">
+            {loadError}
+          </Text>
           <TouchableOpacity
             style={styles.secondaryButton}
             onPress={load}
@@ -130,8 +132,8 @@ export default function MatchScreen() {
           </View>
 
           {error ? (
-            <View accessible={true} accessibilityRole="alert" style={styles.errorBox}>
-              <Text style={styles.errorText}>
+            <View style={styles.errorBox}>
+              <Text style={styles.errorText} accessibilityRole="alert">
                 {errorCode === 'ACTIVE_SESSION_EXISTS'
                   ? 'You already have a session in progress.'
                   : error}
@@ -162,7 +164,7 @@ export default function MatchScreen() {
             accessible={true}
             accessibilityRole="button"
             accessibilityLabel="Start session"
-            accessibilityState={{ disabled: !selected || isLoading }}
+            accessibilityState={{ disabled: !selected || isLoading, busy: isLoading }}
           >
             {isLoading ? (
               <ActivityIndicator color={colors.void} />

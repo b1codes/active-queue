@@ -116,6 +116,7 @@ export default function SignInScreen() {
             accessibilityRole="button"
             accessibilityLabel="Sign in"
             accessibilityHint="Double tap to authenticate and access your queue"
+            accessibilityState={{ busy: isLoading }}
           >
             {isLoading ? (
               <ActivityIndicator color={colors.void} size="small" />

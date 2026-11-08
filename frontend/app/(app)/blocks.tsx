@@ -11,7 +11,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { GlassHeader, useGlassHeaderHeight, ThermalGlowTouchable } from '@/core/components';
 import { NoDurationMatchState } from '@/core/components/states';
-import { colors, rounded, spacing, typography } from '@/core/theme';
+import { colors, fontScale, rounded, spacing, typography } from '@/core/theme';
 import {
   listActivities,
   listTimeBlocks,
@@ -119,9 +119,13 @@ export default function BlocksScreen() {
         showsVerticalScrollIndicator={false}
       >
         {catalogError ? (
-          <View style={styles.emptyCard} accessible={true} accessibilityRole="alert">
-            <Text style={styles.emptyTitle}>Couldn&apos;t load time blocks</Text>
-            <Text style={styles.emptyBody}>{catalogError}</Text>
+          <View style={styles.emptyCard}>
+            <Text style={styles.emptyTitle} accessibilityRole="header">
+              Couldn&apos;t load time blocks
+            </Text>
+            <Text style={styles.emptyBody} accessibilityRole="alert">
+              {catalogError}
+            </Text>
             <TouchableOpacity
               style={styles.secondaryButton}
               onPress={loadCatalog}
@@ -213,8 +217,8 @@ export default function BlocksScreen() {
             <Text style={styles.sectionTitle}>Matched Media</Text>
 
             {createError ? (
-              <View accessible={true} accessibilityRole="alert">
-                <Text style={styles.emptyBody}>
+              <View>
+                <Text style={styles.emptyBody} accessibilityRole="alert">
                   {errorCode === 'ACTIVE_SESSION_EXISTS'
                     ? 'You already have a session in progress.'
                     : createError}
@@ -241,13 +245,17 @@ export default function BlocksScreen() {
               <View style={styles.matchCard}>
                 <View style={styles.matchHeader}>
                   <View style={styles.matchBadge}>
-                    <Ionicons name="sparkles" size={14} color={colors.heatCore} />
+                    <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+                      <Ionicons name="sparkles" size={14} color={colors.heatCore} />
+                    </View>
                     <Text style={styles.matchBadgeText}>
                       {match?.window_type === 'fallback' ? 'Slightly shorter' : 'Fits'} {tabular(selectedDuration)}
                     </Text>
                   </View>
                   <View style={styles.durationPillMatched}>
-                    <Text style={styles.durationTextMatched}>{topItem.duration_label}</Text>
+                    <Text style={styles.durationTextMatched} maxFontSizeMultiplier={fontScale.compact}>
+                      {topItem.duration_label}
+                    </Text>
                   </View>
                 </View>
 
@@ -352,7 +360,7 @@ const styles = StyleSheet.create({
   durationButton: {
     borderRadius: rounded.sm,
     borderWidth: 1,
-    height: 48,
+    minHeight: 48,
     paddingHorizontal: spacing.md,
     justifyContent: 'center',
     alignItems: 'center',
@@ -376,14 +384,14 @@ const styles = StyleSheet.create({
     color: colors.inkSecondary,
   },
   durationButtonTextSelected: {
-    color: colors.heatCore,
+    color: colors.heatCoreInk,
     fontWeight: '700',
   },
   chipRow: {
     gap: spacing.xs,
   },
   chip: {
-    height: 36,
+    minHeight: 44,
     borderRadius: rounded.pill,
     paddingHorizontal: spacing.md,
     flexDirection: 'row',
@@ -437,7 +445,7 @@ const styles = StyleSheet.create({
   durationPillMatched: {
     backgroundColor: colors.heatCore,
     borderRadius: rounded.pill,
-    height: 24,
+    minHeight: 24,
     paddingHorizontal: 10,
     justifyContent: 'center',
     alignItems: 'center',
