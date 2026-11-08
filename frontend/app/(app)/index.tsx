@@ -4,10 +4,10 @@ import {
   FlatList,
   Platform,
   StyleSheet,
-  Text,
   TouchableOpacity,
   View,
 } from 'react-native';
+import { Text } from '@/core/components/Text';
 import { useRouter } from 'expo-router';
 import {
   ActiveSessionBanner,

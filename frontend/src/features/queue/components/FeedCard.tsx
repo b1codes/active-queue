@@ -3,10 +3,10 @@ import {
   Alert,
   Image,
   StyleSheet,
-  Text,
   TouchableOpacity,
   View,
 } from 'react-native';
+import { Text } from '../../../core/components/Text';
 import { Ionicons } from '@expo/vector-icons';
 import { ThermalGlowTouchable } from '../../../core/components';
 import { colors, rounded, spacing, typography } from '../../../core/theme';

@@ -4,13 +4,13 @@ import {
   KeyboardAvoidingView,
   Platform,
   StyleSheet,
-  Text,
   TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { ThermalGlowTouchable } from "@/core/components";
+import { Text } from "@/core/components/Text";
 import { colors, rounded, spacing, typography } from "@/core/theme";
 import { useAuthStore } from "@/features/auth/authStore";
 import { isDevToolsEnabled } from "@/core/config/devTools";

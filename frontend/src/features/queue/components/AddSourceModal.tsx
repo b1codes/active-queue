@@ -5,11 +5,11 @@ import {
   Modal,
   Platform,
   StyleSheet,
-  Text,
   TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
+import { Text } from '../../../core/components/Text';
 import { LiquidGlassSurface } from '../../../core/components';
 import { WatchLaterRejectedState } from '../../../core/components/states';
 import { colors, rounded, spacing, typography } from '../../../core/theme';

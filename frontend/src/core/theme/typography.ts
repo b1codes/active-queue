@@ -43,6 +43,23 @@ export const fontFamilies = {
 } as const;
 
 /**
+ * Dynamic Type ceilings, passed as `maxFontSizeMultiplier`. Every piece of text in the app
+ * scales with the iOS text size setting up to one of these, enforced by the shared `Text`
+ * component and the accessibility suite.
+ *
+ * - `max` (2.0) is the default for all text. It takes body copy through Accessibility Size 2
+ *   (body 17pt -> 34pt). Past that, single words in a 390pt-wide column start breaking
+ *   mid-word, which is less readable than stopping the growth.
+ * - `compact` (1.5) is for chrome that sits in a fixed-height row and would otherwise clip:
+ *   the glass header, duration pills, badges, and chips. 1.5x is the largest
+ *   non-accessibility size (xxxLarge, 23pt body) plus headroom.
+ */
+export const fontScale = {
+  max: 2,
+  compact: 1.5,
+} as const;
+
+/**
  * Typography Tokens per DESIGN.md §3
  * Precision-tuned for dark ground legibility (#0C0909) with optical contrast compensation.
  */

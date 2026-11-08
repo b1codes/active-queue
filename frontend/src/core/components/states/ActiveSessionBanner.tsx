@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { AccessibilityInfo, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { AccessibilityInfo, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Text } from '../Text';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, rounded, spacing, typography } from '../../theme';
 
