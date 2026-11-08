@@ -1,0 +1,15 @@
+# Ruff for scripts/ (CI `terraform` job). Same rules as the backend; the tests here use
+# stdlib unittest, so they can run on any machine with python3 and no installs.
+extend = "../backend/pyproject.toml"
+
+[lint.per-file-ignores]
+"tests/*.py" = [
+  "PT009",  # unittest assertions (no pytest here)
+  "PT027",
+  "S101",   # module-level assert on the import spec
+  "PT018",
+  "S105",   # fake tokens
+  "S603",   # subprocess with fixed argv
+  "S607",   # git / bash from PATH
+  "PLW1510",
+]

@@ -29,6 +29,8 @@ env:
   HADOLINT_VERSION: "v2.14.0"
   TRIVY_VERSION: "0.69.3"
   TFLINT_VERSION: "v0.61.0"
+  SHELLCHECK_VERSION: "v0.10.0"
+  RUFF_VERSION: "0.16.2"
 
 jobs:
   workflows:
@@ -365,7 +367,7 @@ jobs:
             "scripts/container-smoke.sh activequeue-api:ci"
 
   terraform:
-    name: Infrastructure (Terraform)
+    name: Infrastructure (Terraform, deploy script)
     # Every root and the module, not just infra/: `terraform validate` isn't recursive.
     # `plan` still needs GCP credentials (SPEC §12.5); `terraform test` with a mocked
     # provider checks the module's behavior without them.
@@ -413,6 +415,16 @@ jobs:
           }
           tflint --init --config /data/.tflint.hcl
           tflint --recursive --config /data/.tflint.hcl --format compact
+
+      - name: Deploy script and smoke check tests (stdlib unittest, stubbed gcloud)
+        run: python3 -m unittest discover -s scripts/tests -v
+
+      - name: Lint scripts (shellcheck, Ruff)
+        run: |
+          docker run --rm -v "${GITHUB_WORKSPACE}:/mnt" -w /mnt \
+            "koalaman/shellcheck:${SHELLCHECK_VERSION}" scripts/*.sh
+          pipx run "ruff==${RUFF_VERSION}" check scripts
+          pipx run "ruff==${RUFF_VERSION}" format --check scripts
 
       - name: Trivy config scan (Terraform + Dockerfiles)
         run: |

@@ -76,7 +76,8 @@ def request(
         with urllib.request.urlopen(req, timeout=15) as resp:  # noqa: S310 - URL is ours
             status, raw = resp.status, resp.read()
     except urllib.error.HTTPError as exc:
-        status, raw = exc.code, exc.read()
+        with exc:
+            status, raw = exc.code, exc.read()
     try:
         payload = json.loads(raw) if raw else {}
     except json.JSONDecodeError:

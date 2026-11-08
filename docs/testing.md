@@ -23,13 +23,16 @@ Run `make check` before pushing. It runs the same gates as CI (`.github/workflow
 | Every query the emulator tier runs is served by an index in `firestore.indexes.json` (the emulator never enforces this, production does), every declared index is used, one indexes file in the repo | `backend/tests/firestore_indexes.py`, `backend/tests/emulator/conftest.py`, `backend/tests/unit/test_firestore_indexes.py` | `make test-backend` |
 | API image: hadolint (every Dockerfile), Trivy (fixable HIGH/CRITICAL fail), non-root user, then started **read-only** against the emulators and smoke-checked | `container` job in `ci.yml`, `.hadolint.yaml`, `scripts/container-smoke.sh`, `scripts/smoke_test.py` | `make test-container` |
 | Terraform: fmt, `validate` of every environment root (locked providers), tflint (Google ruleset), Trivy config scan of Terraform and Dockerfiles | `terraform` job in `ci.yml`, `infra/.tflint.hcl` | CI only |
+| `scripts/deploy.sh` decisions with gcloud/terraform stubbed: deploys the built digest via a reviewed plan, refuses unsafe states before changing anything, rolls back on a failed smoke check; and `scripts/smoke_test.py` fails for each fault it targets | `scripts/tests/` | `python3 -m unittest discover -s scripts/tests` |
 | Terraform module behavior with a mocked Google provider: the deployed image is the one passed in and pinned by digest, public invoker, least-privilege IAM, no emulator/DEBUG env, startup probe, scaling, real OAuth credentials | `infra/modules/activequeue_app/tests/` | `cd infra/modules/activequeue_app && terraform init -backend=false && terraform test` |
 | Dependency audit (pip-audit, pnpm audit at high+) and gitleaks over full history | `security-scans` job in `ci.yml` | see [Security tests](#security-tests) |
 | CodeQL (Python, TypeScript, Actions; security-extended) | `.github/workflows/codeql.yml` | CI only |
 | OWASP ZAP API scan against staging (nightly) | `.github/workflows/security-nightly.yml` | CI only |
 
 `CI Passed` is the single aggregate check to mark as required in branch protection.
-`scripts/deploy.sh` refuses to deploy a commit without a successful CI run on a push.
+`scripts/deploy.sh` refuses to deploy a commit without a successful CI run on a push, applies
+only a reviewed plan, and smoke-checks the result with rollback (see
+[the deployment guide](deployment/cloud_run_deployment.md#3-deploying)).
 
 The emulator tier uses `firebase.test.json` (Firestore 9190, Auth 9199), so it never wipes
 the dev emulators. It needs Java 21. `make test-emulator` runs them in the foreground.
