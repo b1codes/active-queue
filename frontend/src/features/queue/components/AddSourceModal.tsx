@@ -65,7 +65,9 @@ export const AddSourceModal: React.FC<AddSourceModalProps> = ({ visible, onClose
               />
             ) : (
               <>
-                <Text style={styles.title}>Add Content Source</Text>
+                <Text style={styles.title} accessibilityRole="header">
+                  Add Content Source
+                </Text>
                 <Text style={styles.description}>
                   Paste a YouTube playlist URL (e.g. youtube.com/playlist?list=PL...) or raw playlist ID.
                 </Text>
@@ -81,9 +83,14 @@ export const AddSourceModal: React.FC<AddSourceModalProps> = ({ visible, onClose
                   }}
                   autoCapitalize="none"
                   autoCorrect={false}
+                  accessibilityLabel="YouTube playlist URL or ID"
                 />
 
-                {addSourceError ? <Text style={styles.errorText}>{addSourceError}</Text> : null}
+                {addSourceError ? (
+                  <Text style={styles.errorText} accessibilityRole="alert" accessibilityLiveRegion="polite">
+                    {addSourceError}
+                  </Text>
+                ) : null}
 
                 <View style={styles.buttonRow}>
                   <TouchableOpacity
@@ -104,6 +111,10 @@ export const AddSourceModal: React.FC<AddSourceModalProps> = ({ visible, onClose
                     accessible={true}
                     accessibilityRole="button"
                     accessibilityLabel="Add source"
+                    accessibilityState={{
+                      disabled: isAddingSource || !urlOrId.trim(),
+                      busy: isAddingSource,
+                    }}
                   >
                     {isAddingSource ? (
                       <ActivityIndicator color={colors.void} size="small" />
@@ -164,7 +175,7 @@ const styles = StyleSheet.create({
   },
   errorText: {
     ...typography.bodySm,
-    color: colors.heatCore,
+    color: colors.heatCoreInk,
     marginTop: spacing.xs,
   },
   buttonRow: {

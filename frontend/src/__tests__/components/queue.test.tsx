@@ -125,7 +125,13 @@ describe('SyncProgressBar', () => {
     useQueueStore.setState({ syncProgress: { ...base, isSyncing: true, itemsSyncedTotal: 250, estimatedTotal: 1000 } });
     await renderWithProviders(<SyncProgressBar />);
     expect(screen.getByText('250 of ~1000 items synced')).toBeTruthy();
-    expect(screen.getByLabelText(/25 percent/)).toBeTruthy();
+    // VoiceOver reads a progressbar's value, not its label, so the count lives there.
+    expect(screen.getByRole('progressbar', { name: 'Syncing content source' })).toHaveAccessibilityValue({
+      min: 0,
+      max: 100,
+      now: 25,
+      text: '250 of about 1000 items synced',
+    });
     await fireEvent.press(screen.getByRole('button', { name: 'Cancel content sync' }));
     expect(useQueueStore.getState().syncProgress.isCancelled).toBe(true);
   });
@@ -134,13 +140,16 @@ describe('SyncProgressBar', () => {
     useQueueStore.setState({ syncProgress: { ...base, isSyncing: true, itemsSyncedTotal: 5000, estimatedTotal: null } });
     await renderWithProviders(<SyncProgressBar />);
     expect(screen.getByText('5000 of ~1,000+ items synced')).toBeTruthy();
-    expect(screen.getByLabelText(/100 percent/)).toBeTruthy();
+    expect(screen.getByRole('progressbar')).toHaveAccessibilityValue({
+      now: 100,
+      text: '5000 of about 1,000+ items synced',
+    });
   });
 
   it('shows the error after a failed sync', async () => {
     useQueueStore.setState({ syncProgress: { ...base, isSyncing: false, error: 'quota' } });
     await renderWithProviders(<SyncProgressBar />);
-    expect(screen.getByLabelText('Sync error: quota')).toBeTruthy();
+    expect(screen.getByRole('alert', { name: 'Sync error: quota' })).toBeTruthy();
     expect(screen.queryByRole('button')).toBeNull();
   });
 });

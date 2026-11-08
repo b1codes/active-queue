@@ -63,7 +63,7 @@ describe('MatchScreen (content-first, SPEC §5.2)', () => {
       },
     });
     await renderWithProviders(<MatchScreen />);
-    expect(await screen.findByLabelText(/between 5 minutes/)).toBeTruthy();
+    expect(await screen.findByText(/between 5 minutes/)).toBeTruthy();
     await press('Try a different duration');
     expect(router.back).toHaveBeenCalled();
   });
@@ -172,7 +172,7 @@ describe('BlocksScreen (time-first, SPEC §5.3)', () => {
       'POST /api/v1/sessions': { status: 201, data: session({ id: 's_bare', content_id: null }) },
     });
     await renderWithProviders(<BlocksScreen />);
-    expect(await screen.findByLabelText(/No unconsumed feed items fit/)).toBeTruthy();
+    expect(await screen.findByText(/No unconsumed feed items fit/)).toBeTruthy();
     await press('Start a timer-only session');
     expect(api.callsTo('POST', '/api/v1/sessions')[0].body).toEqual({
       activity_id: 'running',
@@ -200,7 +200,7 @@ describe('BlocksScreen (time-first, SPEC §5.3)', () => {
       },
     });
     await renderWithProviders(<BlocksScreen />);
-    await screen.findByLabelText(/No unconsumed feed items fit/);
+    await screen.findByText(/No unconsumed feed items fit/);
     await press('Start a timer-only session');
     await press('Resume active session');
     expect(router.push).toHaveBeenCalledWith({ pathname: '/(app)/session/[id]', params: { id: 's_live' } });

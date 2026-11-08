@@ -79,7 +79,7 @@ describe('NoDurationMatchState', () => {
     [undefined, /No workout items match/],
   ])('explains %s', async (reason, text) => {
     await render(<NoDurationMatchState durationLabel="45:00" rejectionReason={reason} />);
-    expect(screen.getByLabelText(text)).toBeTruthy();
+    expect(screen.getByText(text)).toBeTruthy();
   });
 
   it('shows the target and a reset action', async () => {

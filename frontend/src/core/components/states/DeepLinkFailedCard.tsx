@@ -15,14 +15,10 @@ export const DeepLinkFailedCard: React.FC<DeepLinkFailedCardProps> = ({
   onManualOpenPress,
 }) => {
   return (
-    <View
-      style={styles.card}
-      accessible={true}
-      accessibilityLabel={`Unable to launch ${appName}. Your workout session state is unchanged.`}
-    >
+    <View style={styles.card}>
       <View style={styles.headerRow}>
-        <Text style={styles.icon}>🔗</Text>
-        <Text style={styles.title}>Unable to Open {appName}</Text>
+        <Text style={styles.icon} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">🔗</Text>
+        <Text style={styles.title} accessibilityRole="header">Unable to Open {appName}</Text>
       </View>
 
       <Text style={styles.body}>

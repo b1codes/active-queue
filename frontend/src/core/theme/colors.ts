@@ -26,6 +26,9 @@ export const colors = {
 
   // Semantic Fills & Edges
   heatCoreMuted: 'rgba(255, 59, 48, 0.4)',
+  // Heat Core lifted for text. #FF3B30 text drops to 4.33:1 on Strata, under WCAG AA's
+  // 4.5:1; this clears 4.7:1 on every ground. Keep heatCore for fills and borders.
+  heatCoreInk: '#FF5147',
   thermalGlowDefault: 'rgba(255, 149, 0, 0.35)',
   modalOverlayBg: 'rgba(12, 9, 9, 0.70)',
   bannerAlertBg: 'rgba(255, 149, 0, 0.08)',

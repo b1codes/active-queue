@@ -9,15 +9,11 @@ interface OfflineBannerProps {
 
 export const OfflineBanner: React.FC<OfflineBannerProps> = ({ onRetryPress }) => {
   return (
-    <View
-      style={styles.banner}
-      accessible={true}
-      accessibilityLabel="Network connection offline. Browsing cached feed mode."
-    >
+    <View style={styles.banner}>
       <View style={styles.contentRow}>
-        <Text style={styles.icon}>📡</Text>
+        <Text style={styles.icon} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">📡</Text>
         <View style={styles.textContainer}>
-          <Text style={styles.title}>Network Connection Offline</Text>
+          <Text style={styles.title} accessibilityRole="header">Network Connection Offline</Text>
           <Text style={styles.body}>
             You are browsing cached queue items. New syncs and session updates will resume automatically
             once reconnected.

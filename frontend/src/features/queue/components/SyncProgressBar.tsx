@@ -16,21 +16,49 @@ export const SyncProgressBar: React.FC = () => {
   const progressRatio = Math.min(itemsSyncedTotal / est, 1.0);
   const progressPercent = Math.round(progressRatio * 100);
 
+  const estimateLabel = estimatedTotal ? `${estimatedTotal}` : '1,000+';
+
   return (
     <View style={styles.outerWrapper}>
-      <View
-        style={styles.container}
-        accessible={true}
-        accessibilityLabel={
-          error
-            ? `Sync error: ${error}`
-            : `Syncing content: ${itemsSyncedTotal} of estimated ${estimatedTotal || 1000} items synced (${progressPercent} percent)`
-        }
-      >
+      {/* The status and the Cancel button are siblings, not parent and child: an accessible
+          wrapper would make VoiceOver read the summary and never reach Cancel. */}
+      <View style={styles.container}>
         <View style={styles.headerRow}>
-          <Text style={styles.titleText}>
-            {isSyncing ? 'Syncing Content Source...' : 'Sync Status'}
-          </Text>
+          <View
+            style={styles.status}
+            accessible={true}
+            {...(error
+              ? {
+                  accessibilityRole: 'alert' as const,
+                  accessibilityLabel: `Sync error: ${error}`,
+                }
+              : {
+                  accessibilityRole: 'progressbar' as const,
+                  accessibilityLabel: 'Syncing content source',
+                  accessibilityValue: {
+                    min: 0,
+                    max: 100,
+                    now: progressPercent,
+                    text: `${itemsSyncedTotal} of about ${estimateLabel} items synced`,
+                  },
+                })}
+          >
+            <Text style={styles.titleText}>
+              {isSyncing ? 'Syncing Content Source...' : 'Sync Status'}
+            </Text>
+            {error ? (
+              <Text style={styles.errorText}>{error}</Text>
+            ) : (
+              <>
+                <Text style={styles.progressText}>
+                  {itemsSyncedTotal} of ~{estimateLabel} items synced
+                </Text>
+                <View style={styles.trackBackground}>
+                  <View style={[styles.trackFill, { width: `${progressPercent}%` }]} />
+                </View>
+              </>
+            )}
+          </View>
           {isSyncing && (
             <TouchableOpacity
               onPress={cancelSync}
@@ -43,20 +71,6 @@ export const SyncProgressBar: React.FC = () => {
             </TouchableOpacity>
           )}
         </View>
-
-        {error ? (
-          <Text style={styles.errorText}>{error}</Text>
-        ) : (
-          <>
-            <Text style={styles.progressText}>
-              {itemsSyncedTotal} of ~{estimatedTotal ? estimatedTotal : '1,000+'} items synced
-            </Text>
-
-            <View style={styles.trackBackground}>
-              <View style={[styles.trackFill, { width: `${progressPercent}%` }]} />
-            </View>
-          </>
-        )}
       </View>
     </View>
   );
@@ -78,10 +92,13 @@ const styles = StyleSheet.create({
     padding: spacing.md,
   },
   headerRow: {
-    alignItems: 'center',
+    alignItems: 'flex-start',
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: spacing.xs,
+    gap: spacing.sm,
+  },
+  status: {
+    flex: 1,
+    gap: spacing.xs,
   },
   titleText: {
     ...typography.subtitle,
@@ -96,12 +113,11 @@ const styles = StyleSheet.create({
   },
   cancelText: {
     ...typography.label,
-    color: colors.heatCore,
+    color: colors.heatCoreInk,
   },
   progressText: {
     ...typography.bodySm,
     color: colors.inkSecondary,
-    marginBottom: spacing.xs,
   },
   trackBackground: {
     backgroundColor: colors.void,
@@ -117,6 +133,6 @@ const styles = StyleSheet.create({
   },
   errorText: {
     ...typography.bodySm,
-    color: colors.heatCore,
+    color: colors.heatCoreInk,
   },
 });
