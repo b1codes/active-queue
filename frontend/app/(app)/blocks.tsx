@@ -144,7 +144,7 @@ export default function BlocksScreen() {
 
         {blocks ? (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Select Workout Duration</Text>
+            <Text style={styles.sectionTitle} accessibilityRole="header">Select Workout Duration</Text>
             <View style={styles.presetGrid} accessibilityRole="radiogroup">
               {blocks.map((block) => {
                 const isSelected = selectedDuration === block.duration_seconds;
@@ -179,7 +179,7 @@ export default function BlocksScreen() {
 
         {activities ? (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Activity Type</Text>
+            <Text style={styles.sectionTitle} accessibilityRole="header">Activity Type</Text>
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
@@ -214,7 +214,7 @@ export default function BlocksScreen() {
 
         {blocks && activities ? (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Matched Media</Text>
+            <Text style={styles.sectionTitle} accessibilityRole="header">Matched Media</Text>
 
             {createError ? (
               <View>

@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
+  AccessibilityInfo,
   ActivityIndicator,
   KeyboardAvoidingView,
   Modal,
@@ -45,6 +46,12 @@ export const AddSourceModal: React.FC<AddSourceModalProps> = ({ visible, onClose
     onClose();
   };
 
+  // iOS doesn't speak a new alert by itself, and VoiceOver focus stays on Add Source after
+  // a failed submit, so the reason would otherwise go unheard.
+  useEffect(() => {
+    if (visible && addSourceError) AccessibilityInfo.announceForAccessibility(addSourceError);
+  }, [visible, addSourceError]);
+
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={handleClose}>
       {/* Full-screen scrim — counts as 1 layer against the 2-blur-layer guardrail in
@@ -55,7 +62,9 @@ export const AddSourceModal: React.FC<AddSourceModalProps> = ({ visible, onClose
           style={styles.overlay}
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         >
-          <View style={styles.modalContent}>
+          {/* The Modal is its own window, which confines VoiceOver to the sheet. The escape
+              gesture (two-finger Z) dismisses it, as it would a native sheet. */}
+          <View style={styles.modalContent} onAccessibilityEscape={handleClose}>
             {isWatchLaterError ? (
               <WatchLaterRejectedState
                 onDismissPress={() => {

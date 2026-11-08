@@ -11,6 +11,8 @@ Run `make check` before pushing. It runs the same gates as CI (`.github/workflow
 | ESLint 9 flat config + typescript-eslint strict, zero warnings | `frontend/eslint.config.js` | `make lint-frontend` |
 | tsc --noEmit | `frontend/tsconfig.json` | `make typecheck-frontend` |
 | Jest, random order, coverage over every file in `src/` + `app/` | `frontend/jest.config.js` `coverageThreshold` | `make test-frontend` |
+| Accessibility audit of every story and every screen state, iOS settings (Reduce Transparency/Motion), contrast of every theme token, modal focus | `frontend/src/__tests__/a11y/`, `frontend/src/test-utils/a11y.ts` | `make test-frontend` |
+| Text comes only from `@/core/components/Text` (Dynamic Type ceiling) | `no-restricted-imports` in `frontend/eslint.config.js` | `make lint-frontend` |
 | Release build config: production `eas.json` sets every variable the app reads and none it doesn't, HTTPS API, Terraform's prod project and auth domain; `app.json` declares every scheme `canOpenURL` probes, installed plugins, existing assets | `frontend/src/__tests__/config/buildConfig.test.ts` | `make test-frontend` |
 | expo-doctor (SDK-compatible versions, config) | `frontend` job in `ci.yml` | part of `make check` |
 | No source file with code left untested | `frontend/scripts/check-untested-files.js` | part of `make check` |
@@ -60,6 +62,46 @@ After an intentional API change:
    `dynamic` paths and placeholders (`uid_alice`, `src_1`, `sess_1`) are preserved.
 3. Review the diff, then run `make test-frontend`. If the app can't handle the new response,
    the consumer suite fails here, before a user sees it.
+
+## Accessibility tests
+
+`frontend/src/test-utils/a11y.ts` walks a rendered tree and fails on what VoiceOver, Dynamic
+Type and low-vision users would hit. Call `expectAccessible()` after rendering anything:
+
+| Rule | Fails when |
+|------|------------|
+| `role`, `name` | a pressable has no `accessibilityRole`, or nothing to announce |
+| `state` | a radio/checkbox/switch has no `checked`, a tab no `selected`, or a button shows a spinner without `busy` |
+| `nested` | a control sits inside an `accessible` element. iOS exposes only the outer one, so VoiceOver can't reach the control. |
+| `input-label` | a `TextInput` relies on its placeholder |
+| `target` | a declared size is under 44pt, `hitSlop` included (SPEC §11.4) |
+| `font-cap` | text has no `maxFontSizeMultiplier`, one above `fontScale.max`, or `allowFontScaling={false}` |
+| `clip` | at its ceiling, text no longer fits a fixed-`height` box around it |
+| `decorative` | a lone icon or emoji isn't hidden from VoiceOver |
+| `contrast` | text is under 4.5:1 (3:1 at 24pt, or 18.66pt bold), or an icon under 3:1, against the composited background. Disabled controls are exempt. |
+
+Each rule has a self-test that fails on a known-bad tree (`a11y/auditor.test.tsx`). The
+sweeps:
+
+- `stories.a11y.test.tsx` renders every Storybook story. New stories are picked up
+  automatically.
+- `screens.a11y.test.tsx` renders every route in its loaded, empty, error and in-flight
+  states.
+- `settings.a11y.test.tsx` covers:
+  - Reduce Transparency on both glass tiers
+  - the Tier 3 header over white, Ink, Heat Core and Signal Verified content
+  - every text token on every ground
+  - a source check that no animation escapes Reduce Motion: Reanimated's
+    `ReduceMotion.System` default is what keeps ThermalGlow still
+- `focus.a11y.test.tsx` checks the add-source sheet's reading order, Modal containment,
+  escape gesture and error announcement.
+
+All text renders through `@/core/components/Text`, which defaults `maxFontSizeMultiplier` to
+`fontScale.max` (2.0). Use `fontScale.compact` (1.5) only for chrome in fixed-height rows.
+When `clip` fires, prefer `minHeight` over a lower cap.
+
+The checks read declared props and styles, not native layout. Spatial VoiceOver order, real
+line wrapping and Tier 1 vibrancy are in [manual-qa.md](manual-qa.md#accessibility).
 
 ## Security tests
 

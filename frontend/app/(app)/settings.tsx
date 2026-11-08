@@ -38,7 +38,7 @@ export default function SettingsScreen() {
       <View style={[styles.content, { paddingTop: headerHeight + spacing.lg }]}>
         {/* User Account Card */}
         <View style={styles.card}>
-          <Text style={styles.cardSectionTitle}>Account profile</Text>
+          <Text style={styles.cardSectionTitle} accessibilityRole="header">Account profile</Text>
 
           {/* One element per row, so VoiceOver reads "User ID (UID), u-123" together. */}
           <View style={styles.infoRow} accessible={true}>
@@ -67,7 +67,7 @@ export default function SettingsScreen() {
         {/* Local Dev & Emulator Shortcuts — never rendered in production builds */}
         {isDevToolsEnabled() ? (
         <View style={styles.card}>
-          <Text style={styles.cardSectionTitle}>Local development & testing</Text>
+          <Text style={styles.cardSectionTitle} accessibilityRole="header">Local development & testing</Text>
 
           <TouchableOpacity
             style={styles.emulatorButton}
