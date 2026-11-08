@@ -16,7 +16,7 @@ RESET   := \033[0m
         docker-up docker-down docker-build emulators emulators-stop \
         seed-db seed \
         check contracts test test-backend test-backend-fast test-emulator test-frontend \
-        test-firestore-rules \
+        test-firestore-rules test-container \
         lint lint-backend lint-frontend \
         typecheck typecheck-backend typecheck-frontend \
         format format-backend \
@@ -56,6 +56,7 @@ help:
 	@echo "  $(GREEN)test-emulator$(RESET)     Start test emulators (9190/9199) in the foreground"
 	@echo "  $(GREEN)test-frontend$(RESET)     Run Jest test suite in frontend"
 	@echo "  $(GREEN)test-firestore-rules$(RESET) Test the deployed Firestore rules on the emulator"
+	@echo "  $(GREEN)test-container$(RESET)    Lint, build, scan and smoke-test the API image"
 	@echo "  $(GREEN)contracts$(RESET)         Regenerate API contract files after an API change"
 	@echo ""
 	@echo "  $(GREEN)lint$(RESET)              Run linting & typechecking across full stack"
@@ -229,6 +230,17 @@ test-firestore-rules:
 	cd firestore-rules && npx -y pnpm@11.22.0 install --frozen-lockfile
 	$(FIREBASE_TOOLS) emulators:exec --config firebase.test.json --project demo-activequeue-local \
 		--only firestore "cd firestore-rules && node --test --test-reporter=spec rules.test.mjs"
+
+## test-container: hadolint, build and Trivy-scan the API image, then smoke-test it
+## (read-only) against the test emulators, as the `container` CI job does.
+HADOLINT := docker run --rm -i -v "$(CURDIR)/.hadolint.yaml:/.config/hadolint.yaml:ro" hadolint/hadolint:v2.14.0 hadolint -
+TRIVY    := docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v "$(HOME)/.cache/trivy:/root/.cache/trivy" aquasec/trivy:0.69.3
+test-container:
+	$(HADOLINT) < backend/Dockerfile
+	$(HADOLINT) < docker/firebase/Dockerfile
+	docker build -t activequeue-api:local backend
+	$(TRIVY) image --scanners vuln --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 activequeue-api:local
+	$(FIREBASE_TOOLS) emulators:exec $(TEST_EMULATORS) "scripts/container-smoke.sh activequeue-api:local"
 
 ## test-emulator: Run the test emulators in the foreground (for iterating on tests/emulator)
 test-emulator:

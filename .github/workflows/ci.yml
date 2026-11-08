@@ -26,6 +26,8 @@ env:
   OASDIFF_VERSION: "v1.34.1"
   PIP_AUDIT_VERSION: "2.10.0"
   GITLEAKS_VERSION: "v8.30.1"
+  HADOLINT_VERSION: "v2.14.0"
+  TRIVY_VERSION: "0.69.3"
 
 jobs:
   workflows:
@@ -290,6 +292,74 @@ jobs:
             breaking /specs/base.json /specs/revision.json --format githubactions \
             ${fail_on:+--fail-on "${fail_on}"}
 
+  container:
+    name: API container (hadolint, Trivy, smoke)
+    # Builds the image Cloud Run runs, then starts it read-only against the emulators and
+    # runs the same smoke check scripts/deploy.sh runs after a deploy.
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: hadolint (every Dockerfile)
+        run: |
+          for f in backend/Dockerfile docker/firebase/Dockerfile; do
+            echo "::group::${f}"
+            docker run --rm -i -v "${GITHUB_WORKSPACE}/.hadolint.yaml:/.config/hadolint.yaml:ro" \
+              "hadolint/hadolint:${HADOLINT_VERSION}" hadolint - < "${f}"
+            echo "::endgroup::"
+          done
+
+      - name: Build the API image
+        run: docker build -t activequeue-api:ci backend
+
+      - name: Image runs as an unprivileged user
+        run: |
+          user="$(docker inspect --format '{{.Config.User}}' activequeue-api:ci)"
+          if [ -z "${user}" ] || [ "${user}" = "0" ] || [ "${user}" = "root" ]; then
+            echo "::error::backend/Dockerfile must end with a non-root USER (got '${user}')."
+            exit 1
+          fi
+
+      - name: Cache the Trivy vulnerability DB
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/trivy
+          key: trivy-db-${{ env.TRIVY_VERSION }}-${{ github.run_id }}
+          restore-keys: trivy-db-${{ env.TRIVY_VERSION }}-
+
+      - name: Trivy image scan (fixable HIGH and CRITICAL fail)
+        run: |
+          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
+            -v "${HOME}/.cache/trivy:/root/.cache/trivy" \
+            "aquasec/trivy:${TRIVY_VERSION}" image --scanners vuln \
+            --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 activequeue-api:ci
+
+      - name: Set up Node.js (Firebase emulators)
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Set up Java (Firestore emulator)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Cache Firebase emulator binaries
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/firebase/emulators
+          key: firebase-emulators-${{ env.FIREBASE_TOOLS_VERSION }}
+
+      - name: Smoke check the running container
+        # --read-only proves the container installs nothing at startup. The smoke script
+        # signs in through the Auth emulator; deploy.sh uses a signed custom token instead.
+        run: |
+          npx -y "firebase-tools@${FIREBASE_TOOLS_VERSION}" emulators:exec \
+            --config firebase.test.json --project demo-activequeue-local --only auth,firestore \
+            "scripts/container-smoke.sh activequeue-api:ci"
+
   terraform:
     name: Infrastructure (Terraform)
     runs-on: ubuntu-latest
@@ -321,7 +391,7 @@ jobs:
   ci-passed:
     name: CI Passed
     if: always()
-    needs: [workflows, backend, frontend, firestore-rules, security-scans, api-breaking, terraform]
+    needs: [workflows, backend, frontend, firestore-rules, security-scans, api-breaking, container, terraform]
     runs-on: ubuntu-latest
     steps:
       - name: Check required jobs

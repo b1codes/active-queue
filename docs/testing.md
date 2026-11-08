@@ -21,6 +21,7 @@ Run `make check` before pushing. It runs the same gates as CI (`.github/workflow
 | Third-party contracts against the real services (nightly, about 8 YouTube quota units) | `.github/workflows/contracts-nightly.yml`, `backend/tests/contract/thirdparty/` | `LIVE_CONTRACTS=1 uv run pytest tests/contract/thirdparty` |
 | Firestore security rules deny all client access (SPEC §4.9), one rules file in the repo | `firestore-rules/rules.test.mjs` | `make test-firestore-rules` |
 | Every query the emulator tier runs is served by an index in `firestore.indexes.json` (the emulator never enforces this, production does), every declared index is used, one indexes file in the repo | `backend/tests/firestore_indexes.py`, `backend/tests/emulator/conftest.py`, `backend/tests/unit/test_firestore_indexes.py` | `make test-backend` |
+| API image: hadolint (every Dockerfile), Trivy (fixable HIGH/CRITICAL fail), non-root user, then started **read-only** against the emulators and smoke-checked | `container` job in `ci.yml`, `.hadolint.yaml`, `scripts/container-smoke.sh`, `scripts/smoke_test.py` | `make test-container` |
 | Terraform fmt / validate | `infra/` | CI only |
 | Dependency audit (pip-audit, pnpm audit at high+) and gitleaks over full history | `security-scans` job in `ci.yml` | see [Security tests](#security-tests) |
 | CodeQL (Python, TypeScript, Actions; security-extended) | `.github/workflows/codeql.yml` | CI only |
