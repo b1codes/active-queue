@@ -101,6 +101,13 @@ resource "google_cloud_run_v2_service" "api_service" {
   location = var.gcp_region
   project  = var.gcp_project_id
 
+  # Declared so Terraform owns it: after deploy.sh rolls traffic back to the previous
+  # revision with gcloud, the next plan shows the drift and moves 100% to the latest.
+  traffic {
+    type    = "TRAFFIC_TARGET_ALLOCATION_TYPE_LATEST"
+    percent = 100
+  }
+
   template {
     service_account = google_service_account.api_sa.email
 

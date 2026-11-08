@@ -30,6 +30,19 @@ run "deploys_the_image_it_is_given" {
   }
 }
 
+run "sends_all_traffic_to_the_latest_revision" {
+  command = apply
+
+  assert {
+    condition = (
+      length(google_cloud_run_v2_service.api_service.traffic) == 1 &&
+      google_cloud_run_v2_service.api_service.traffic[0].type == "TRAFFIC_TARGET_ALLOCATION_TYPE_LATEST" &&
+      google_cloud_run_v2_service.api_service.traffic[0].percent == 100
+    )
+    error_message = "Traffic must be declared (100% latest) so the deploy after a rollback moves traffic forward."
+  }
+}
+
 run "rejects_a_mutable_image_tag" {
   command = plan
 
