@@ -19,4 +19,8 @@ RUN apt-get update \
 RUN npm install -g "firebase-tools@${FIREBASE_TOOLS_VERSION}" \
     && npm cache clean --force
 
+# Run as the base image's unprivileged user. The export directory is created here so the
+# docker-compose named volume mounted on it inherits this ownership.
+RUN mkdir -p /workspace/.firebase-data && chown -R ubuntu:ubuntu /workspace
+USER ubuntu
 WORKDIR /workspace
