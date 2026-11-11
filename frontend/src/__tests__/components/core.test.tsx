@@ -13,6 +13,7 @@ import {
 } from '@/core/components';
 import { __resetGlassTierCacheForTests } from '@/core/hooks/useGlassTier';
 import { renderWithProviders } from '@/test-utils';
+import { glassLayerPeak, resetGlassLayerPeak } from '@/core/perf/glassBudget';
 
 const liquidGlass = require('@callstack/liquid-glass') as { isLiquidGlassSupported: boolean };
 
@@ -69,10 +70,14 @@ describe('LiquidGlassSurface', () => {
       </>
     );
     expect(warn).toHaveBeenCalledWith(expect.stringContaining('3 concurrent glass layers'));
+    // jest.setup.ts fails any test whose peak passes the budget; this one does on purpose.
+    expect(glassLayerPeak()).toBe(3);
     await unmount();
+    resetGlassLayerPeak();
     warn.mockClear();
     await render(<LiquidGlassSurface />);
     expect(warn).not.toHaveBeenCalled();
+    expect(glassLayerPeak()).toBe(1);
   });
 });
 

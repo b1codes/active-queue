@@ -13,6 +13,7 @@ import {
 import { colors } from '../theme';
 import { useGlassTier } from '../hooks/useGlassTier';
 import { useReduceTransparency } from '../hooks/useAccessibilitySettings';
+import { acquireGlassLayer } from '../perf/glassBudget';
 
 // 160% Saturation Matrix for Liquid Glass vibrancy, per llc-react/react-native-glass.md §3
 const SATURATE_160_MATRIX = [
@@ -21,12 +22,6 @@ const SATURATE_160_MATRIX = [
   -0.087, -0.197, 1.284, 0, 0,
   0, 0, 0, 1, 0,
 ];
-
-// GPU Overdraw Guardrail, per gpu-acceleration.md: max 2 concurrent blur/backdrop-filter
-// layers app-wide, counted per rendered instance regardless of tier. Dev-only mount counter
-// so a 3rd concurrent glass layer fails loudly instead of silently degrading frame rate.
-const GPU_BLUR_LAYER_BUDGET = 2;
-let activeGlassLayerCount = 0;
 
 interface LiquidGlassSurfaceProps {
   children?: React.ReactNode;
@@ -68,20 +63,8 @@ export const LiquidGlassSurface: React.FC<LiquidGlassSurfaceProps> = memo(
     const reduceTransparency = useReduceTransparency();
     const [size, setSize] = useState({ width: 0, height: 0 });
 
-    useEffect(() => {
-      if (!__DEV__) return;
-      activeGlassLayerCount += 1;
-      if (activeGlassLayerCount > GPU_BLUR_LAYER_BUDGET) {
-        console.warn(
-          `[LiquidGlassSurface] ${activeGlassLayerCount} concurrent glass layers mounted — ` +
-            `exceeds the ${GPU_BLUR_LAYER_BUDGET}-layer GPU guardrail (gpu-acceleration.md). ` +
-            'Use a pre-rendered translucent color for secondary surfaces instead of another live blur.'
-        );
-      }
-      return () => {
-        activeGlassLayerCount -= 1;
-      };
-    }, []);
+    // Counts against the 2-layer GPU blur budget (src/core/perf/glassBudget.ts).
+    useEffect(() => (__DEV__ ? acquireGlassLayer() : undefined), []);
 
     const onLayout = (e: LayoutChangeEvent) => {
       const { width, height } = e.nativeEvent.layout;
