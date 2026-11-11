@@ -33,7 +33,9 @@ appId: com.b1codes.activequeue
           visible: "Session Started"
           timeout: 30000
 # Step 4 sits below the fold, and tapOn doesn't scroll.
+# Step 4 is the end of the content, so it can't be centred: just bring it fully on screen.
 - scrollUntilVisible:
     element: "Abandon session"
     direction: DOWN
-    centerElement: true
+    visibilityPercentage: 100
+    timeout: 30000

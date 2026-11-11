@@ -299,9 +299,20 @@ async function main() {
         }
         if (isHarnessError(frame)) throw new Error(`the harness couldn't render ${id} (see ${actualFile})`);
         const baselineFile = path.join(BASELINES, `tier${tier}`, `${id}.png`);
-        const result = UPDATE
-          ? { status: 'updated' }
-          : await compare(frame, baselineFile, path.join(OUT, 'diff', `tier${tier}`, `${id}.png`));
+        const diffFile = path.join(OUT, 'diff', `tier${tier}`, `${id}.png`);
+        let result = UPDATE ? { status: 'updated' } : await compare(frame, baselineFile, diffFile);
+        if (result.status === 'diff' && onReference) {
+          // System UI the app doesn't draw can cover a capture: on CI a "Ready for Apple
+          // Intelligence" notification slid over one story. It's gone a launch later, while
+          // a real change differs every time. Keep the first attempt, capture once more.
+          const first = result.detail;
+          fs.renameSync(actualFile, actualFile.replace(/\.png$/, '.first-attempt.png'));
+          fs.renameSync(diffFile, diffFile.replace(/\.png$/, '.first-attempt.png'));
+          await showStory(udid, id, tier);
+          const again = await settledCapture(udid, actualFile);
+          result = await compare(again, baselineFile, diffFile);
+          if (result.status === 'match') result = { status: 'match', detail: `on retry; first capture: ${first}` };
+        }
         if (UPDATE) {
           fs.mkdirSync(path.dirname(baselineFile), { recursive: true });
           fs.copyFileSync(actualFile, baselineFile);

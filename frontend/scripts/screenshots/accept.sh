@@ -26,8 +26,8 @@ for tier in tier1 tier3; do
   # Replace the whole tier, so baselines of removed stories go too.
   rm -rf "screenshots/baselines/$tier"
   mkdir -p "screenshots/baselines/$tier"
-  # Story captures only, not the frames kept from a capture that never settled.
-  find "$dest/actual/$tier" -maxdepth 1 -name '*.png' ! -name '*.unsettled-*' \
+  # Story captures only, not frames kept for diagnosis (unsettled, first attempts).
+  find "$dest/actual/$tier" -maxdepth 1 -name '*.png' ! -name '*.unsettled-*' ! -name '*.first-attempt.png' \
     -exec cp {} "screenshots/baselines/$tier/" \;
 done
 git status --short screenshots/baselines

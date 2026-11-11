@@ -272,6 +272,11 @@ compared with `frontend/screenshots/baselines/`. CI runs it on every PR
   baseline.
 - A just-booted simulator is still busy for a while, so one throwaway launch and a pause
   come first.
+- A capture that differs from its baseline is taken once more from a fresh launch, and
+  passes only if that one matches. System UI can cover a capture: on CI, a "Ready for
+  Apple Intelligence" notification once slid over a story. A real change differs both
+  times. The first attempt and its diff are kept as `*.first-attempt.png`, and the
+  report notes the retry.
 - A story that keeps changing for 30 s is relaunched once. If it fails again, it's
   reported as `unsettled`, with its last two frames and their diff kept in `actual/`.
 
