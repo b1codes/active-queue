@@ -36,6 +36,7 @@ Run `make check` before pushing. It runs the same gates as CI (`.github/workflow
 | App monkey: seeded random walks over every screen against a stateful fake API, healthy and flaky (fixed seeds per PR, 25 fresh seeds nightly), plus gesture races (double taps, back mid-request, backgrounding mid-sync) | `frontend/src/__tests__/fuzz/`, `frontend/src/test-utils/monkey.tsx`, `frontend/src/test-utils/fakeBackend.ts` | `make test-frontend`, `MONKEY_SEED=<n> pnpm test -- monkey` |
 | Render budgets: a 1,000-item feed mounts at most 20 rows, sync ticks and banners re-render no row, nothing animates on the JS thread; every test holds the 2-layer GPU blur budget | `frontend/src/__tests__/perf/`, `frontend/src/core/perf/glassBudget.ts`, `frontend/jest.setup.ts` | `make test-frontend` |
 | Production iOS bundle at most 6.5 MiB (startup) and free of Storybook and test code | `frontend/scripts/check-bundle.js`, `frontend` job in `ci.yml` | part of `make check` |
+| Visual regression: every Storybook story screenshotted on the Tier 1 and Tier 3 glass on a pinned iOS simulator, diffed against baselines; light mode changes nothing | `frontend/.rnstorybook/screenshots/`, `frontend/scripts/screenshots/`, `frontend/screenshots/baselines/`, `screenshots` job in `ci.yml` | `make test-screenshots` (macOS) |
 | Firestore reads and writes per request, as a heavy user (4 sources, 1,200-item feed, 30 sessions), each endpoint held to a budget from what bounds it | `backend/tests/emulator/test_read_budgets_emulator.py`, `backend/tests/firestore_meter.py` | `make test-backend` |
 | Sync cost at the 5,000-item cap: YouTube quota units (cold, warm, throttled, unchanged, capped), Firestore writes, wall time | `backend/tests/emulator/test_sync_cost_emulator.py` | `make test-backend` |
 | API image under Cloud Run's 1 vCPU / 512 MiB: cold start, first signed-in request, peak memory, plus the 45 s k6 load smoke against it | `container` job in `ci.yml`, `scripts/container-perf.sh`, `loadtest/api.js` | `make test-container` |
@@ -91,8 +92,9 @@ Type and low-vision users would hit. Call `expectAccessible()` after rendering a
 Each rule has a self-test that fails on a known-bad tree (`a11y/auditor.test.tsx`). The
 sweeps:
 
-- `stories.a11y.test.tsx` renders every Storybook story. New stories are picked up
-  automatically.
+- `stories.a11y.test.tsx` renders every Storybook story inside its own and its meta's
+  decorators (as the screenshot harness does, so contrast is checked against the real
+  backdrop). New stories are picked up automatically.
 - `screens.a11y.test.tsx` renders every route in its loaded, empty, error and in-flight
   states.
 - `settings.a11y.test.tsx` covers:
@@ -248,6 +250,93 @@ same way every time:
 
 Real frame rate, launch time on a device, and how the blur feels while scrolling are in
 [manual-qa.md](manual-qa.md#performance).
+
+## Visual regression tests
+
+Every Storybook story is screenshotted on a pinned iOS simulator, on both glass tiers, and
+compared with `frontend/screenshots/baselines/`. CI runs it on every PR
+(the `screenshots` job).
+
+**How a capture is made.**
+- `scripts/ios-sim-build.sh screenshots` builds a Release simulator app whose JS entry is
+  the harness (`.rnstorybook/screenshots/`), not expo-router. It renders one story full
+  screen, inside its own, its meta's and `preview.tsx`'s decorators.
+- `scripts/screenshots/capture.js` boots a new simulator for each run. It launches the app
+  once per story and tier, choosing the story with launch arguments (`-vrStory <id>
+  -vrTier <1|3>`). A deep link would stop at iOS's "Open in ActiveQueue?" prompt.
+- Once the story has mounted, the harness pings a localhost server the script runs. Only
+  then does capturing start. A slow cold launch leaves the home screen or splash still for
+  seconds, and that would otherwise pass for a settled story.
+- It saves a screenshot once two frames in a row are identical, then compares it with the
+  baseline.
+
+**Comparing.** A pixel has changed when any channel moved by more than 3 of 255
+(`channelTolerance` in `reference.json`), and a capture fails on any changed pixel. The
+tolerance absorbs the 1 to 2 levels of dithering the Tier 1 material shows from one
+launch to the next. A layout shift, a new string or a changed color token moves far more.
+
+`reference.json` also lists masked rectangles. Today that's only the Dynamic Island,
+which iOS sometimes draws into a simulator screenshot around a launch.
+
+The diff image marks changed pixels in red over a faded copy of the capture.
+
+**What's held still.**
+- The clock is frozen at 2026-11-03 09:41 UTC.
+- Reduce Motion is on, which stills ChromaticPulse, ThermalGlow and the skeletons at
+  their first frame.
+- `ActivityIndicator` is swapped for a stopped one that stays visible: UIKit's spinner
+  ignores Reduce Motion.
+- Remote images are replaced with a bundled thumbnail.
+- Each capture is a fresh launch with the status bar hidden, in en_US at the default text
+  size.
+
+Two full runs on fresh simulators matched on all 101 captures before the baselines were
+committed.
+
+**Glass tiers.** `overrideGlassTier()` renders every surface through Tier 1 (the native
+iOS 26 material) or Tier 3 (the Skia fallback), so a regression in either tier shows up.
+
+**Dark only.** `app.json` sets `userInterfaceStyle: "dark"`, so light mode must change
+nothing. The run re-captures three stories in light mode and fails if any pixel differs.
+
+**The reference platform** is pinned in `frontend/screenshots/reference.json`:
+
+| Setting | Value |
+|---------|-------|
+| Runner | GitHub's `macos-26` |
+| Xcode | 26.6 |
+| Simulator | iPhone 17 Pro, iOS 26.5 |
+
+An app linked against another Xcode SDK can render differently even on the same
+simulator. So `capture.js` reads the Xcode that built the app (`DTXcode`), and compares
+against baselines only when it matches. Elsewhere:
+
+- `--off-reference` checks that every story renders and settles, and reports diffs
+  without failing on them.
+- `--baselines <dir>` compares two local runs with each other, to check that rendering is
+  deterministic on your machine.
+
+**Changing how something looks.**
+
+1. Push. The `screenshots` job fails and uploads the `screenshots` artifact: `actual/`,
+   `diff/` (changed pixels in red) and `report.json`.
+2. Review the diffs. Every changed story should be one you meant to change.
+3. Run `make screenshots RUN=<run-id>`. It takes that run's captures as the baselines,
+   including adding new stories and dropping removed ones. Commit the result.
+
+A new story needs a baseline before CI passes. Jest's `visual/catalog.test.tsx` fails on
+any story without a baseline on both tiers, and on any baseline without a story.
+
+```sh
+make test-screenshots                                   # build + capture + diff (reference Xcode)
+make test-screenshots SCREENSHOT_ARGS=--off-reference   # on another Xcode: harness check only
+make screenshots RUN=<ci-run-id>                        # accept a CI run's captures
+cd frontend && node scripts/screenshots/capture.js --off-reference --only feedcard   # a subset
+```
+
+Not covered here: how the Tier 1 material moves and refracts as content scrolls under it
+(a still can't show that), and real devices. See
+[manual-qa.md](manual-qa.md#visual-settings).
 
 ## Security tests
 

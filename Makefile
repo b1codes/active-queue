@@ -17,6 +17,7 @@ RESET   := \033[0m
         seed-db seed \
         check contracts test test-backend test-backend-fast test-emulator test-frontend \
         test-firestore-rules test-container fuzz-api \
+        test-screenshots screenshots \
         lint lint-backend lint-frontend \
         typecheck typecheck-backend typecheck-frontend \
         format format-backend \
@@ -58,6 +59,8 @@ help:
 	@echo "  $(GREEN)test-firestore-rules$(RESET) Test the deployed Firestore rules on the emulator"
 	@echo "  $(GREEN)test-container$(RESET)    Lint, build, scan and smoke-test the API image"
 	@echo "  $(GREEN)fuzz-api$(RESET)          Long Schemathesis run on the test emulators (SEED=<n> replays)"
+	@echo "  $(GREEN)test-screenshots$(RESET)  Screenshot every story on both glass tiers and diff (macOS + Xcode)"
+	@echo "  $(GREEN)screenshots$(RESET)       Update screenshot baselines (RUN=<ci-run-id> takes a CI run's)"
 	@echo "  $(GREEN)contracts$(RESET)         Regenerate API contract files after an API change"
 	@echo ""
 	@echo "  $(GREEN)lint$(RESET)              Run linting & typechecking across full stack"
@@ -260,6 +263,25 @@ fuzz-api:
 	$(FIREBASE_TOOLS) emulators:exec $(TEST_EMULATORS) \
 		"cd backend && REQUIRE_EMULATOR=1 FUZZ_MAX_EXAMPLES=$(FUZZ_MAX_EXAMPLES) uv run pytest -p no:randomly \
 		tests/emulator/test_schemathesis_emulator.py $(if $(SEED),--hypothesis-seed=$(SEED))"
+
+## test-screenshots: Screenshot every Storybook story on the Tier 1 and Tier 3 glass and
+## diff against frontend/screenshots/baselines (docs/testing.md#visual-regression-tests).
+## Needs macOS with Xcode. Off the reference platform (screenshots/reference.json), pass
+## SCREENSHOT_ARGS=--off-reference to check the harness without failing on diffs.
+SCREENSHOT_ARGS ?=
+test-screenshots:
+	cd frontend && scripts/ios-sim-build.sh screenshots
+	cd frontend && node scripts/screenshots/capture.js $(SCREENSHOT_ARGS)
+
+## screenshots: Update the screenshot baselines. RUN=<ci-run-id> takes the captures from a
+## CI run (the reference platform); without it, captures locally (reference Xcode only).
+screenshots:
+ifdef RUN
+	frontend/scripts/screenshots/accept.sh $(RUN)
+else
+	cd frontend && scripts/ios-sim-build.sh screenshots
+	cd frontend && node scripts/screenshots/capture.js --update $(SCREENSHOT_ARGS)
+endif
 
 ## test-emulator: Run the test emulators in the foreground (for iterating on tests/emulator)
 test-emulator:

@@ -55,4 +55,9 @@ module.exports = defineConfig([
     files: ['*.config.js', 'babel.config.js', 'metro.config.js'],
     rules: { '@typescript-eslint/no-require-imports': 'off' },
   },
+  {
+    // Node CLI scripts (CommonJS).
+    files: ['scripts/**/*.js'],
+    languageOptions: { globals: { __dirname: 'readonly' } },
+  },
 ]);

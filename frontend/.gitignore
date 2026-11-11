@@ -25,3 +25,6 @@ expo-env.d.ts
 storybook-static
 coverage/
 dist-ios/
+
+# Simulator builds and screenshot runs (scripts/ios-sim-build.sh, scripts/screenshots)
+build/

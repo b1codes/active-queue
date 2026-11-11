@@ -11,41 +11,24 @@ import React from 'react';
 import { act } from '@testing-library/react-native';
 import { renderWithProviders, resetStores } from '@/test-utils';
 import { expectAccessible } from '@/test-utils/a11y';
+import { collectStories, type StoryModule } from '../../../.rnstorybook/screenshots/catalog';
 
 // storybook/test ships ESM only; stories just need its `fn()` spy factory.
 jest.mock('storybook/test', () => ({ fn: (impl?: (...a: unknown[]) => unknown) => jest.fn(impl) }));
 
-interface StoryModule {
-  default: {
-    title: string;
-    component?: React.ComponentType<Record<string, unknown>>;
-    args?: Record<string, unknown>;
-    render?: (args: Record<string, unknown>) => React.ReactElement;
-  };
-  [name: string]: unknown;
-}
-
-interface Story {
-  args?: Record<string, unknown>;
-  render?: (args: Record<string, unknown>) => React.ReactElement;
-}
-
-function storyFiles(dir: string): string[] {
+function storyModules(dir: string): StoryModule[] {
   return fs.readdirSync(dir, { withFileTypes: true }).flatMap((e) => {
     const full = path.join(dir, e.name);
-    if (e.isDirectory()) return storyFiles(full);
-    return e.name.endsWith('.stories.tsx') ? [full] : [];
+    if (e.isDirectory()) return storyModules(full);
+    return e.name.endsWith('.stories.tsx') ? [require(full) as StoryModule] : [];
   });
 }
 
+// The screenshot harness's catalog renders each story the way Storybook does, inside its
+// own and its meta's decorators (LiquidGlassSurface's swatch backdrop is one), so the
+// contrast check sees the same background a viewer would.
 const SRC = path.resolve(__dirname, '../..');
-const cases = storyFiles(SRC).flatMap((file) => {
-  const mod = require(file) as StoryModule;
-  const meta = mod.default;
-  return Object.entries(mod)
-    .filter(([name, value]) => name !== 'default' && typeof value === 'object' && value !== null)
-    .map(([name, value]) => ({ id: `${meta.title} / ${name}`, meta, story: value as Story }));
-});
+const cases = collectStories(storyModules(SRC), 'file:///thumb.png');
 
 beforeEach(() => resetStores());
 
@@ -53,14 +36,9 @@ it('finds the stories', () => {
   expect(cases.length).toBeGreaterThanOrEqual(16);
 });
 
-describe.each(cases)('$id', ({ meta, story }) => {
+describe.each(cases)('$title $exportName', ({ Component }) => {
   it('has no accessibility violations', async () => {
-    const args = { ...meta.args, ...story.args };
-    const render = story.render ?? meta.render;
-    const Component = meta.component;
-    const ui = render ? render(args) : Component ? <Component {...args} /> : null;
-    if (!ui) throw new Error('story has neither render nor component');
-    await renderWithProviders(ui);
+    await renderWithProviders(<Component />);
     await act(async () => {});
     expectAccessible();
   });

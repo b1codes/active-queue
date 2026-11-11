@@ -453,7 +453,8 @@ jobs:
       - name: Lint scripts (shellcheck, Ruff)
         run: |
           docker run --rm -v "${GITHUB_WORKSPACE}:/mnt" -w /mnt \
-            "koalaman/shellcheck:${SHELLCHECK_VERSION}" scripts/*.sh loadtest/*.sh
+            "koalaman/shellcheck:${SHELLCHECK_VERSION}" scripts/*.sh loadtest/*.sh \
+            frontend/scripts/*.sh frontend/scripts/screenshots/*.sh
           pipx run "ruff==${RUFF_VERSION}" check scripts loadtest
           pipx run "ruff==${RUFF_VERSION}" format --check scripts loadtest
 
@@ -464,12 +465,81 @@ jobs:
             --skip-dirs /repo/frontend/node_modules --skip-dirs /repo/firestore-rules/node_modules \
             /repo
 
+  screenshots:
+    name: Visual regression (Storybook screenshots, iOS simulator)
+    # The reference platform for frontend/screenshots/baselines (reference.json): this
+    # runner image, its Xcode and simulator. Every story on the Tier 1 (native liquid glass)
+    # and Tier 3 (Skia) glass, diffed pixel for pixel. On a failure, the "screenshots"
+    # artifact holds actual/, diff/ and report.json; after review, `make screenshots
+    # RUN=<run-id>` takes them as the new baselines. See docs/testing.md.
+    runs-on: macos-26
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Select the reference Xcode
+        run: |
+          xcode=$(python3 -c 'import json; print(json.load(open("frontend/screenshots/reference.json"))["xcode"])')
+          sudo xcode-select -s "/Applications/Xcode_${xcode}.app"
+          xcodebuild -version
+
+      - name: Set up pnpm (version from package.json packageManager)
+        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320  # v4.4.0
+        with:
+          package_json_file: frontend/package.json
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: pnpm install --frozen-lockfile
+
+      - name: Cache CocoaPods downloads
+        uses: actions/cache@v4
+        with:
+          path: ~/Library/Caches/CocoaPods
+          key: pods-${{ runner.os }}-${{ hashFiles('frontend/pnpm-lock.yaml', 'frontend/app.json') }}
+          restore-keys: pods-${{ runner.os }}-
+
+      - name: Build the screenshot harness (Release, simulator)
+        working-directory: frontend
+        run: scripts/ios-sim-build.sh screenshots
+
+      - name: Capture and diff every story
+        working-directory: frontend
+        run: node scripts/screenshots/capture.js
+
+      - name: Upload captures and diffs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: screenshots
+          path: frontend/build/screenshots/
+          if-no-files-found: ignore
+          retention-days: 14
+
+      - name: Upload the Xcode build log
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: screenshots-xcodebuild-log
+          path: frontend/build/xcodebuild-screenshots.log
+          if-no-files-found: ignore
+          retention-days: 7
+
   # Single required status check for branch protection (ClickUp 86bbb7ru0). Add every new
   # job to `needs`; this fails if any of them failed or was cancelled, and is never skipped.
   ci-passed:
     name: CI Passed
     if: always()
-    needs: [workflows, backend, frontend, firestore-rules, security-scans, api-breaking, container, terraform]
+    needs: [workflows, backend, frontend, firestore-rules, security-scans, api-breaking, container, terraform, screenshots]
     runs-on: ubuntu-latest
     steps:
       - name: Check required jobs
