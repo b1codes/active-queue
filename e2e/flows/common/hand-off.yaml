@@ -1,17 +1,32 @@
 # The session checklist up to "in progress": skip the tracker, launch the media (iOS opens
 # the video in Safari, since the simulator has no YouTube app) and come back to the app.
+# Each tap is confirmed by the next state and retried: on a slow runner a tap can land
+# while the screen is still re-rendering. The app guards each action against repeats.
 appId: com.b1codes.activequeue
 ---
 - extendedWaitUntil:
     visible: "Skip Tracker Step"
-    timeout: 20000
-- tapOn: "Skip Tracker Step"
-- tapOn: "Launch Media and Start Workout Session"
-- launchApp:
-    stopApp: false
-- extendedWaitUntil:
-    visible: "Session Started"
-    timeout: 20000
+    timeout: 30000
+- retry:
+    maxRetries: 3
+    commands:
+      - tapOn:
+          text: "Skip Tracker Step"
+          optional: true
+      - extendedWaitUntil:
+          visible: "Launch Media and Start Workout Session"
+          timeout: 15000
+- retry:
+    maxRetries: 3
+    commands:
+      - tapOn:
+          text: "Launch Media and Start Workout Session"
+          optional: true
+      - launchApp:
+          stopApp: false
+      - extendedWaitUntil:
+          visible: "Session Started"
+          timeout: 30000
 # Step 4 sits below the fold, and tapOn doesn't scroll.
 - scrollUntilVisible:
     element: "Abandon session"

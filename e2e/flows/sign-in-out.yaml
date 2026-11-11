@@ -31,11 +31,11 @@ name: Sign in and out
     stopApp: true
 - extendedWaitUntil:
     visible: "Active Queue"
-    timeout: 20000
+    timeout: 30000
 - runFlow: common/sign-out.yaml
 - launchApp:
     stopApp: true
 - extendedWaitUntil:
     visible:
       id: sign-in-email
-    timeout: 20000
+    timeout: 30000

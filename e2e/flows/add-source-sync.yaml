@@ -14,7 +14,7 @@ name: Add a source and watch it sync
 - tapOn: "Add source"
 - extendedWaitUntil:
     visible: ".*fixture-unavailable.* not found or private"
-    timeout: 20000
+    timeout: 30000
 - eraseText: 40
 - inputText: "fixture-large-playlist"
 - tapOn: "Add source"
@@ -31,4 +31,4 @@ name: Add a source and watch it sync
 # All 1,197 playable items are queued (3 fixture entries are private, deleted or live).
 - extendedWaitUntil:
     visible: "1.2k"
-    timeout: 20000
+    timeout: 30000

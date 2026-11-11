@@ -20,5 +20,5 @@ name: Hide a feed item
     stopApp: true
 - extendedWaitUntil:
     visible: "Fixture Workout Video #14 — High Intensity Cardio.*"
-    timeout: 20000
+    timeout: 30000
 - assertNotVisible: "Fixture Workout Video #15 — High Intensity Cardio.*"

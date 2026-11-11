@@ -16,7 +16,9 @@ appId: com.b1codes.activequeue
 - retry:
     maxRetries: 3
     commands:
-      - tapOn: "Add source"
+      - tapOn:
+          text: "Add source"
+          optional: true
       - extendedWaitUntil:
           notVisible: "Add Content Source"
           timeout: 15000

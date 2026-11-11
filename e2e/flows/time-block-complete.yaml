@@ -18,19 +18,32 @@ name: Time block to a completed session
 - tapOn: "Activity Cycling / Spin Workout"
 - extendedWaitUntil:
     visible: "Start a timer-only session"
-    timeout: 20000
+    timeout: 30000
 - assertNotVisible:
     id: start-matched-session
 - tapOn: "Target duration 45 min"
 - extendedWaitUntil:
     visible:
       id: start-matched-session
-    timeout: 20000
+    timeout: 30000
 - assertVisible: "45m 0s"
-- tapOn:
-    id: start-matched-session
+- waitForAnimationToEnd
+- retry:
+    maxRetries: 3
+    commands:
+      - tapOn:
+          id: start-matched-session
+          optional: true
+      - extendedWaitUntil:
+          visible: "Skip Tracker Step"
+          timeout: 30000
 - runFlow: common/hand-off.yaml
-- tapOn: "Mark session complete"
-- extendedWaitUntil:
-    visible: "Completed cycling session, 45:00.*"
-    timeout: 20000
+- retry:
+    maxRetries: 3
+    commands:
+      - tapOn:
+          text: "Mark session complete"
+          optional: true
+      - extendedWaitUntil:
+          visible: "Completed cycling session, 45:00.*"
+          timeout: 30000

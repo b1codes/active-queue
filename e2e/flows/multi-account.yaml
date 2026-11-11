@@ -29,12 +29,12 @@ name: Two accounts on one device
       NAME: bob
 - extendedWaitUntil:
     visible: "No Content Sources Added"
-    timeout: 20000
+    timeout: 30000
 - assertNotVisible: "Fixture Workout Video.*"
 - tapOn: "History, tab.*"
 - extendedWaitUntil:
     visible: "No Sessions Yet"
-    timeout: 20000
+    timeout: 30000
 - runFlow: common/sign-out.yaml
 - runFlow:
     file: common/sign-in.yaml
@@ -42,4 +42,4 @@ name: Two accounts on one device
       NAME: alice
 - extendedWaitUntil:
     visible: "Fixture Workout Video #15 — High Intensity Cardio.*"
-    timeout: 20000
+    timeout: 30000

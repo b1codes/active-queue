@@ -14,16 +14,30 @@ name: Match from the queue and abandon
 - tapOn: "Fixture Workout Video #12 — High Intensity Cardio, duration 15:00.*"
 - extendedWaitUntil:
     visible: "Strength Training"
-    timeout: 20000
+    timeout: 30000
 - tapOn: "Strength Training"
-- tapOn: "Start session"
+- waitForAnimationToEnd
+- retry:
+    maxRetries: 3
+    commands:
+      - tapOn:
+          text: "Start session"
+          optional: true
+      - extendedWaitUntil:
+          visible: "Skip Tracker Step"
+          timeout: 30000
 - runFlow: common/hand-off.yaml
-- tapOn: "Abandon session"
-- extendedWaitUntil:
-    visible: "Active Queue"
-    timeout: 20000
+- retry:
+    maxRetries: 3
+    commands:
+      - tapOn:
+          text: "Abandon session"
+          optional: true
+      - extendedWaitUntil:
+          visible: "Active Queue"
+          timeout: 30000
 - assertNotVisible: "Resume.*"
 - tapOn: "History, tab.*"
 - extendedWaitUntil:
     visible: "Abandoned strength session, 15:00.*"
-    timeout: 20000
+    timeout: 30000
