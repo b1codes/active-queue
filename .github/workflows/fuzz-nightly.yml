@@ -1,6 +1,6 @@
-name: Fuzz (nightly)
+name: Fuzz & monkey (nightly)
 
-# Long, freshly seeded fuzz runs. PRs run the same suites short and derandomized inside
+# Long, freshly seeded fuzz runs. PRs run the same suites short and with fixed seeds inside
 # CI's normal jobs; this widens the search every night with a new seed, logged so any
 # failure reproduces locally (see docs/testing.md#fuzz-and-monkey-tests).
 on:
@@ -83,3 +83,45 @@ jobs:
           npx -y "firebase-tools@${FIREBASE_TOOLS_VERSION}" emulators:exec \
             --config firebase.test.json --project demo-activequeue-local --only auth,firestore \
             "cd backend && uv run pytest -p no:randomly tests/emulator/test_schemathesis_emulator.py --hypothesis-seed=${SEED}"
+
+  app:
+    name: App monkey (seeded random walks over every screen)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up pnpm (version from package.json packageManager)
+        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320  # v4.4.0
+        with:
+          package_json_file: frontend/package.json
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: pnpm install --frozen-lockfile
+
+      - name: Pick and log the seed
+        id: seed
+        env:
+          INPUT_SEED: ${{ inputs.seed }}
+        run: |
+          seed="${INPUT_SEED:-$(od -An -N4 -tu4 /dev/urandom | tr -d ' ')}"
+          echo "seed=${seed}" >> "$GITHUB_OUTPUT"
+          echo "::notice title=App monkey seed::${seed}"
+          echo "App monkey seed \`${seed}\`. Replay: \`MONKEY_SEED=${seed} MONKEY_RUNS=25 MONKEY_STEPS=300 pnpm test -- monkey\`" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Monkey runs (25 seeds x 5 start screens x healthy/flaky API, 300 steps each)
+        working-directory: frontend
+        env:
+          MONKEY_SEED: ${{ steps.seed.outputs.seed }}
+          MONKEY_RUNS: "25"
+          MONKEY_STEPS: "300"
+        run: pnpm test -- src/__tests__/fuzz/monkey.test.tsx

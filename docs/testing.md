@@ -32,6 +32,8 @@ Run `make check` before pushing. It runs the same gates as CI (`.github/workflow
 | Dependency audit (pip-audit, pnpm audit at high+) and gitleaks over full history | `security-scans` job in `ci.yml` | see [Security tests](#security-tests) |
 | CodeQL (Python, TypeScript, Actions; security-extended) | `.github/workflows/codeql.yml` | CI only |
 | OWASP ZAP API scan against staging (nightly) | `.github/workflows/security-nightly.yml` | CI only |
+| API fuzzing: Schemathesis over every operation in `contracts/openapi.json` on the emulators (25 derandomized examples per operation per PR, 1000 with a fresh logged seed nightly) | `backend/tests/emulator/test_schemathesis_emulator.py`, `.github/workflows/fuzz-nightly.yml` | `make test-backend`, `make fuzz-api SEED=<n>` |
+| App monkey: seeded random walks over every screen against a stateful fake API, healthy and flaky (fixed seeds per PR, 25 fresh seeds nightly), plus gesture races (double taps, back mid-request, backgrounding mid-sync) | `frontend/src/__tests__/fuzz/`, `frontend/src/test-utils/monkey.tsx`, `frontend/src/test-utils/fakeBackend.ts` | `make test-frontend`, `MONKEY_SEED=<n> pnpm test -- monkey` |
 
 `CI Passed` is the single aggregate check to mark as required in branch protection.
 `scripts/deploy.sh` refuses to deploy a commit without a successful CI run on a push, applies
@@ -102,6 +104,55 @@ When `clip` fires, prefer `minHeight` over a lower cap.
 
 The checks read declared props and styles, not native layout. Spatial VoiceOver order, real
 line wrapping and Tier 1 vibrancy are in [manual-qa.md](manual-qa.md#accessibility).
+
+## Fuzz and monkey tests
+
+**API: Schemathesis** (`backend/tests/emulator/test_schemathesis_emulator.py`) generates valid and
+invalid requests from the committed contract and sends them, as a signed-in user, to the real
+app under uvicorn on the emulators. A response fails when it:
+
+- is a 5xx,
+- uses a status code, content type, header or body the contract doesn't document,
+- rejects input the contract allows, or accepts input it forbids,
+- still answers when Schemathesis resends the request without the token or with a bad one,
+- answers an undeclared method without a 405 and an accurate `Allow` header.
+
+Exemptions sit at the top of the file, each with its reason. When a failure is the contract
+being vague, fix the contract (for example, the ID `pattern`) rather than adding an exemption.
+
+**App: monkey** (`frontend/src/__tests__/fuzz/monkey.test.tsx`) mounts each screen and takes
+seeded random actions: taps, double taps, two-finger taps, long presses, VoiceOver actions,
+scrolls, pull to refresh, typing, toggles, alert answers, swipe back, and background and
+return. `router.push`/`replace`/`back` really change screens. The API is
+`src/test-utils/fakeBackend.ts`, an in-memory server that keeps the session state machine,
+chunked syncs and the real error codes. In flaky mode, 15% of requests fail. A run fails on:
+
+- a crash,
+- a `console.error`,
+- an unhandled rejection (Jest fails the test),
+- rendered `undefined`/`NaN`/`[object Object]`,
+- a request to a route the API doesn't have,
+- a screen left with nothing to tap and nowhere to go back to.
+
+`monkey.selftest.test.tsx` proves each of these is caught, and that the same seed replays the
+same walk.
+
+**Gesture races** (`gestureRaces.test.tsx`) press twice in one frame, before the first press
+can re-render a button disabled. So guard an action where it starts (the store function or a
+ref), not with `disabled` alone. After an `await`, navigate only if the screen is still
+mounted (`useIsMounted`).
+
+Replaying a nightly failure: the run's summary prints the seed and the command.
+
+```sh
+make fuzz-api SEED=<seed> FUZZ_MAX_EXAMPLES=1000                       # API
+cd frontend && MONKEY_SEED=<seed> MONKEY_RUNS=25 MONKEY_STEPS=300 pnpm test -- monkey   # app
+MONKEY_LOG=1 ...   # print each walk
+```
+
+The monkey drives React through Jest, so native gesture recognition, real multi-touch and
+iOS's own crash reporting are outside it. The E2E simulator harness covers those (ClickUp
+86bcxruy6).
 
 ## Security tests
 
