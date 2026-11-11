@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import re
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING, Any
 
 import structlog
@@ -198,8 +198,13 @@ class ContentService:
                 )
                 source.status = "active"
                 source.next_page_token = None
+                # The abandoned walk may have recorded the new item count; forget it so
+                # the preflight can't call the half-walked playlist unchanged.
+                source.item_count = None
 
         is_resuming = bool(source.next_page_token)
+        items_processed = source.sync_items_processed if is_resuming else 0
+        walk_updates: dict[str, Any] = {}
         provider_impl = get_provider(source.provider)
 
         if not is_resuming:
@@ -275,9 +280,31 @@ class ContentService:
                     message="No changes detected in preflight check",
                 )
 
+            # Record the count this walk is answering to. Without it the preflight compares
+            # against the count from when the source was added, so after any change to the
+            # playlist it never again says "unchanged" and every start is a full walk.
+            walk_updates["item_count"] = meta.item_count
+
         # feed_items.consumed is a projection of the user's durable consumed record
         # (SPEC §4.7): re-syncs and re-added playlists must not resurface watched items.
         consumed_ids = await self._user_repo.get_consumed_content_ids(user_id)
+
+        # content_cache is shared by every user, so details another sync already fetched
+        # cost no quota (SPEC §8.2 step 4). Entries older than the TTL are refetched.
+        cached: dict[str, ContentCacheItem] = {}
+        fresh_after = now - timedelta(days=settings.content_cache_ttl_days)
+
+        async def known(external_ids: list[str]) -> set[str]:
+            found = await self._content_repo.get_content_cache_batch(
+                [format_content_id(source.provider, e) for e in external_ids]
+            )
+            hits = {
+                c.external_id: c
+                for c in found.values()
+                if c.is_available and c.updated_at >= fresh_after
+            }
+            cached.update(hits)
+            return set(hits)
 
         current_token = source.next_page_token
         chunk_cache_items: list[ContentCacheItem] = []
@@ -287,12 +314,14 @@ class ContentService:
         total_items_in_chunk = 0
         skipped_unplayable = 0
 
-        while pages_fetched < settings.pages_per_chunk:
+        cap = settings.max_items_per_source
+        while pages_fetched < settings.pages_per_chunk and items_processed < cap:
             try:
                 page = await provider_impl.fetch_playlist_items(
                     source.external_source_id,
                     page_token=current_token,
-                    max_results=50,
+                    max_results=min(50, cap - items_processed),
+                    known=known,
                 )
             except ProviderError as err:
                 if err.code == "PROVIDER_QUOTA_EXCEEDED":
@@ -327,6 +356,22 @@ class ContentService:
                 raise
 
             pages_fetched += 1
+            items_processed += len(page.items) + len(page.known_ids)
+
+            chunk_feed_items.extend(
+                FeedItem(
+                    id=f"{user_id}_{hit.content_id}",
+                    user_id=user_id,
+                    content_id=hit.content_id,
+                    source_id=source.id,
+                    published_at=hit.published_at,
+                    duration_seconds=hit.duration_seconds,
+                    consumed=hit.content_id in consumed_ids,
+                    created_at=now,
+                    updated_at=now,
+                )
+                for hit in (cached[external_id] for external_id in page.known_ids)
+            )
 
             for raw in page.items:
                 if raw.duration_seconds <= 0:
@@ -370,15 +415,21 @@ class ContentService:
             if not current_token:
                 break
 
+        if current_token and items_processed >= cap:
+            logger.warning("sync_item_cap_reached", source_id=source_id, cap=cap)
+            current_token = None
+
         await self._content_repo.upsert_content_cache_batch(chunk_cache_items)
         await self._content_repo.upsert_feed_items_batch(chunk_feed_items)
 
         is_complete = current_token is None
         new_status = "active" if is_complete else "syncing"
 
-        update_dict = {
+        update_dict: dict[str, Any] = {
+            **walk_updates,
             "status": new_status,
             "next_page_token": current_token,
+            "sync_items_processed": 0 if is_complete else items_processed,
             "updated_at": now,
         }
         if is_complete:

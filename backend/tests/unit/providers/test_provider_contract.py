@@ -20,7 +20,7 @@ import pytest
 import respx
 
 from app.core.errors import NotFoundError, ProviderError, ValidationError
-from app.providers.base import PlaylistMetadata, PlaylistPage, RawContentItem
+from app.providers.base import KnownLookup, PlaylistMetadata, PlaylistPage, RawContentItem
 from app.providers.fixture import UNAVAILABLE_EXTERNAL_IDS, FixtureProvider
 from app.providers.youtube import API_BASE, YouTubeProvider
 
@@ -46,6 +46,7 @@ class Harness:
     unavailable_ids: frozenset[str]
     quota: Callable[[], str]  # arrange quota exhaustion, return the playlist ID to call
     missing: Callable[[], str]  # arrange a missing playlist, return its ID
+    detail_calls: Callable[[], int] = lambda: 0  # quota spent on video details so far
 
 
 def _fixture_harness() -> Iterator[Harness]:
@@ -71,13 +72,15 @@ def _youtube_harness() -> Iterator[Harness]:
                 200, json=_fx(f"playlist_items_{page[request.url.params.get('pageToken')]}")
             )
 
+        recorded = [
+            v for page in ("page1", "page2", "page3") for v in _fx(f"videos_{page}")["items"]
+        ]
+
         def videos(request: httpx.Request) -> httpx.Response:
-            by_ids = {
-                "vidA001,vidPriv1": "page1",
-                "vidDel01,vidLive1": "page2",
-                "vidB002": "page3",
-            }
-            return httpx.Response(200, json=_fx(f"videos_{by_ids[request.url.params['id']]}"))
+            # Like the real API: the requested IDs that exist, in request order.
+            wanted = request.url.params["id"].split(",")
+            by_id = {v["id"]: v for v in recorded}
+            return httpx.Response(200, json={"items": [by_id[i] for i in wanted if i in by_id]})
 
         def playlists(request: httpx.Request) -> httpx.Response:
             if request.url.params["id"] == "PLmissing":
@@ -86,7 +89,7 @@ def _youtube_harness() -> Iterator[Harness]:
 
         playlists_route = router.get(f"{API_BASE}/playlists").mock(side_effect=playlists)
         items_route = router.get(f"{API_BASE}/playlistItems").mock(side_effect=items)
-        router.get(f"{API_BASE}/videos").mock(side_effect=videos)
+        videos_route = router.get(f"{API_BASE}/videos").mock(side_effect=videos)
 
         def quota() -> str:
             exhausted = httpx.Response(403, json=_fx("error_quota"))
@@ -102,6 +105,7 @@ def _youtube_harness() -> Iterator[Harness]:
             unavailable_ids=frozenset({"vidPriv1", "vidDel01"}),
             quota=quota,
             missing=lambda: "PLmissing",
+            detail_calls=lambda: videos_route.call_count,
         )
 
 
@@ -111,13 +115,15 @@ def harness(request: pytest.FixtureRequest) -> Iterator[Harness]:
     yield from factory()
 
 
-async def _walk(h: Harness) -> tuple[list[RawContentItem], list[PlaylistPage]]:
+async def _walk(
+    h: Harness, known: KnownLookup | None = None
+) -> tuple[list[RawContentItem], list[PlaylistPage]]:
     items: list[RawContentItem] = []
     pages: list[PlaylistPage] = []
     token: str | None = None
     for _ in range(MAX_PAGES):
         page = await h.provider.fetch_playlist_items(
-            h.playlist_id, page_token=token, max_results=2
+            h.playlist_id, page_token=token, max_results=2, known=known
         )
         assert isinstance(page, PlaylistPage)
         pages.append(page)
@@ -191,6 +197,34 @@ async def test_items_are_well_formed(harness: Harness) -> None:
 async def test_unavailable_videos_are_dropped(harness: Harness) -> None:
     items, _ = await _walk(harness)
     assert not {i.external_id for i in items} & harness.unavailable_ids
+
+
+async def test_known_ids_are_reported_not_fetched(harness: Harness) -> None:
+    """SPEC §8.2 step 4: details the caller's cache already holds cost no quota."""
+    plain, _ = await _walk(harness)
+    first, rest = plain[0].external_id, {i.external_id for i in plain[1:]}
+    seen: list[str] = []
+
+    async def known_first(ids: list[str]) -> set[str]:
+        seen.extend(ids)
+        return {first} & set(ids)
+
+    items, pages = await _walk(harness, known_first)
+    assert {i.external_id for i in items} == rest
+    assert [k for p in pages for k in p.known_ids] == [first]
+    # The lookup sees every listed ID, unplayable ones included, so a cached video that
+    # has since gone private is still answered from the cache until its TTL runs out.
+    assert set(seen) >= {i.external_id for i in plain}
+    assert set(seen) & harness.unavailable_ids
+
+    async def known_all(ids: list[str]) -> list[str]:
+        return ids
+
+    before = harness.detail_calls()
+    items, pages = await _walk(harness, known_all)
+    assert items == []
+    assert {k for p in pages for k in p.known_ids} >= {i.external_id for i in plain}
+    assert harness.detail_calls() == before, "every video was known: no details fetched"
 
 
 # --- error mapping -----------------------------------------------------------------------

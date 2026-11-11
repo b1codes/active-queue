@@ -22,6 +22,7 @@ async def test_sync_source_chunk_single_page() -> None:
     mock_content_repo = MagicMock()
     mock_content_repo.upsert_content_cache_batch = AsyncMock()
     mock_content_repo.upsert_feed_items_batch = AsyncMock()
+    mock_content_repo.get_content_cache_batch = AsyncMock(return_value={})  # cold cache
 
     source = Source(
         id="u1_fixture_fixture-small-playlist",
@@ -50,6 +51,7 @@ async def test_sync_source_chunk_1200_items_multichunk_completion() -> None:
     mock_content_repo = MagicMock()
     mock_content_repo.upsert_content_cache_batch = AsyncMock()
     mock_content_repo.upsert_feed_items_batch = AsyncMock()
+    mock_content_repo.get_content_cache_batch = AsyncMock(return_value={})  # cold cache
 
     source = Source(
         id="u1_fixture_fixture-large-playlist",
@@ -155,7 +157,9 @@ async def test_sync_stalled_expiration() -> None:
     mock_source_repo.get_source = AsyncMock(return_value=source)
     mock_source_repo.update_source = AsyncMock()
 
-    service = ContentService(mock_source_repo, AsyncMock(), _user_repo())
+    content_repo = AsyncMock()
+    content_repo.get_content_cache_batch.return_value = {}
+    service = ContentService(mock_source_repo, content_repo, _user_repo())
     res = await service.sync_source_chunk("u1", source.id)
 
     # Re-synced small playlist cleanly

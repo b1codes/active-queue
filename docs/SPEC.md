@@ -333,7 +333,7 @@ Provider metadata, keyed by namespaced content ID and **shared across all users*
 | `fetched_at` | timestamp | |
 | `ttl_expires_at` | timestamp | `fetched_at + 30d` |
 
-Duration never changes, so an expired TTL only refreshes title/availability. A stale-but-present cache entry is always preferable to a failed request: on a provider error during refresh, serve the stale entry and log a warning.
+Duration never changes, so an expired TTL only refreshes title/availability. The implementation derives expiry from the entry's `updated_at` (`content_cache_ttl_days`, 30) rather than storing `ttl_expires_at`; a sync asks the cache before `videos.list` and fetches details only for missing or expired entries. A stale-but-present cache entry is always preferable to a failed request: on a provider error during refresh, serve the stale entry and log a warning.
 
 ### 4.7 `feed_items/{userId}_{contentId}`
 

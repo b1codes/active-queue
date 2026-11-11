@@ -20,6 +20,9 @@ class Source(BaseModel):
     status: str = "active"  # "active" | "syncing" | "error" | "disabled"
     last_sync_at: datetime | None = None
     next_page_token: str | None = None
+    # Playlist entries walked so far in the in-flight sync; the walk stops at
+    # max_items_per_source (SPEC §4.5, §8.2 step 10).
+    sync_items_processed: int = 0
     error_message: str | None = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
@@ -38,6 +41,7 @@ class Source(BaseModel):
             "status": self.status,
             "last_sync_at": self.last_sync_at,
             "next_page_token": self.next_page_token,
+            "sync_items_processed": self.sync_items_processed,
             "error_message": self.error_message,
             "created_at": self.created_at,
             "updated_at": self.updated_at,
@@ -58,6 +62,7 @@ class Source(BaseModel):
             status=data.get("status", "active"),
             last_sync_at=data.get("last_sync_at"),
             next_page_token=data.get("next_page_token"),
+            sync_items_processed=data.get("sync_items_processed") or 0,
             error_message=data.get("error_message"),
             created_at=data.get("created_at") or datetime.now(UTC),
             updated_at=data.get("updated_at") or datetime.now(UTC),

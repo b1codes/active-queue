@@ -24,6 +24,7 @@ class Settings(BaseSettings):
     content_provider: Literal["fixture", "youtube"] = "fixture"
     youtube_api_key: str | None = None
     max_items_per_source: int = 5000
+    content_cache_ttl_days: int = 30
     pages_per_chunk: int = 5
     sync_throttle_seconds: int = 900
     sync_stall_timeout_seconds: int = 3600

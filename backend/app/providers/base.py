@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+from collections.abc import Awaitable, Callable, Collection
 from datetime import datetime
 from typing import Protocol
 
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, Field, field_validator
 
 from app.core.errors import ValidationError
 from app.core.sanitizer import sanitize_text, sanitize_url
@@ -115,6 +116,13 @@ class PlaylistPage(BaseModel):
     items: list[RawContentItem]
     next_page_token: str | None = None
     total_results: int | None = None
+    # External IDs on this page that the caller's `known` lookup already had details for.
+    # They were not fetched, so they are not in `items` (SPEC §8.2 step 4).
+    known_ids: list[str] = Field(default_factory=list)
+
+
+# Given a page's external IDs, returns those the caller already has fresh details for.
+KnownLookup = Callable[[list[str]], Awaitable[Collection[str]]]
 
 
 class ContentProvider(Protocol):
@@ -137,6 +145,12 @@ class ContentProvider(Protocol):
         source_id: str,
         page_token: str | None = None,
         max_results: int = 50,
+        *,
+        known: KnownLookup | None = None,
     ) -> PlaylistPage:
-        """Fetch a page of raw content items."""
+        """Fetch a page of raw content items.
+
+        With `known`, IDs it returns are skipped rather than fetched and come back in
+        `known_ids`, so a warm sync spends no quota on details the cache already holds.
+        """
         ...

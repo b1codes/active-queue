@@ -12,7 +12,7 @@ import pytest
 from app.core.errors import NotFoundError, ProviderError, ValidationError
 from app.features.content.models import Source
 from app.features.content.service import ContentService
-from app.providers.base import PlaylistMetadata, PlaylistPage
+from app.providers.base import KnownLookup, PlaylistMetadata, PlaylistPage
 
 
 class StubProvider:
@@ -36,7 +36,12 @@ class StubProvider:
         return self._meta or PlaylistMetadata(source_id=source_id, title="t", item_count=99)
 
     async def fetch_playlist_items(
-        self, source_id: str, page_token: str | None = None, max_results: int = 50
+        self,
+        source_id: str,
+        page_token: str | None = None,
+        max_results: int = 50,
+        *,
+        known: KnownLookup | None = None,
     ) -> PlaylistPage:
         if self._fetch:
             raise self._fetch

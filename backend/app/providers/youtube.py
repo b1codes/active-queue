@@ -11,6 +11,7 @@ from app.core.config import settings
 from app.core.errors import NotFoundError, ProviderError, ValidationError
 from app.providers.base import (
     ContentProvider,
+    KnownLookup,
     PlaylistMetadata,
     PlaylistPage,
     RawContentItem,
@@ -170,12 +171,17 @@ class YouTubeProvider(ContentProvider):
         source_id: str,
         page_token: str | None = None,
         max_results: int = 50,
+        *,
+        known: KnownLookup | None = None,
     ) -> PlaylistPage:
         """Fetch one page via playlistItems.list + videos.list (1 unit each).
 
         Private and deleted videos still appear in playlistItems.list but are silently
         absent from videos.list (SPEC §12.3). They are unplayable, so they are omitted
         from the page rather than emitted with a null duration and a made-up timestamp.
+
+        IDs `known` returns are left out of videos.list, which is skipped (saving its
+        unit) when every video on the page is known (SPEC §8.2 step 4).
         """
         key = self._require_key()
         params: dict[str, Any] = {
@@ -202,9 +208,18 @@ class YouTubeProvider(ContentProvider):
                 video_ids.append(vid_id)
                 playlist_snippets[vid_id] = snippet
 
+        known_ids: list[str] = []
+        if known is not None and video_ids:
+            already = set(await known(list(video_ids)))
+            known_ids = [v for v in video_ids if v in already]
+            video_ids = [v for v in video_ids if v not in already]
+
         if not video_ids:
             return PlaylistPage(
-                items=[], next_page_token=next_page_token, total_results=total_results
+                items=[],
+                next_page_token=next_page_token,
+                total_results=total_results,
+                known_ids=known_ids,
             )
 
         videos_data = await self._api_get(
@@ -242,6 +257,7 @@ class YouTubeProvider(ContentProvider):
             items=result_items,
             next_page_token=next_page_token,
             total_results=total_results,
+            known_ids=known_ids,
         )
 
 
