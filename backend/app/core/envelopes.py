@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from typing import Any, Literal, TypeVar
+from typing import Annotated, Any, Literal, TypeVar
 
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, BeforeValidator, ConfigDict, Field
 
 from app.core.errors import ERROR_CODES
 
@@ -19,6 +19,32 @@ class ResponseSchema(BaseModel):
     """
 
     model_config = ConfigDict(json_schema_serialization_defaults_required=True)
+
+
+class RequestSchema(BaseModel):
+    """Base for every request body model.
+
+    Strict, so a value of the wrong JSON type is a 400 rather than coerced: lax mode
+    turned `"sync_enabled": 0` or `"false"` into a boolean the client never sent. Integer
+    fields take `JsonInt`.
+    """
+
+    model_config = ConfigDict(strict=True)
+
+
+def _integral_float_to_int(value: Any) -> Any:
+    if isinstance(value, float) and value.is_integer():
+        return int(value)
+    return value
+
+
+# A JSON Schema `integer` includes 1800.0 (a number with no fractional part), which strict
+# mode alone rejects. Strings, booleans and 1800.5 are still rejected.
+JsonInt = Annotated[int, BeforeValidator(_integral_float_to_int)]
+
+# Bounds go on the int, before the validator, or the contract gets raw `ge`/`le` keys
+# instead of `minimum`/`maximum`.
+DurationSeconds = Annotated[int, Field(ge=300, le=86400), BeforeValidator(_integral_float_to_int)]
 
 
 class ErrorDetail(ResponseSchema):

@@ -19,9 +19,9 @@ from pydantic import ValidationError
 from app.core.sanitizer import (
     CONTROL_CHAR_RE,
     DANGEROUS_SCHEME_RE,
+    DOCUMENT_ID_PATTERN,
     HTML_TAG_RE,
     is_valid_document_id,
-    sanitize_document_id,
     sanitize_identifier,
     sanitize_string_list,
     sanitize_text,
@@ -178,15 +178,20 @@ def test_accepted_document_ids_are_legal_firestore_ids(identifier: str) -> None:
 
 
 @FUZZ
-@given(identifier=hostile_text)
-def test_sanitize_document_id_returns_a_legal_id_or_rejects(identifier: str) -> None:
-    try:
-        out = sanitize_document_id(identifier)
-    except ValueError:
-        return
-    if out is not None:
-        assert is_valid_document_id(out)
-        assert len(out) <= 200
+@given(identifier=hostile_text | st.from_regex(DOCUMENT_ID_PATTERN))
+@example(identifier="abc\n")
+@example(identifier="__x__")
+@example(identifier="..")
+@example(identifier="...")
+@example(identifier="__")
+@example(identifier="___")
+def test_published_id_pattern_matches_the_validator(identifier: str) -> None:
+    """contracts/openapi.json publishes DOCUMENT_ID_PATTERN (ECMA-262 semantics, where `$`
+    never matches before a trailing newline); the API enforces is_valid_document_id. If the
+    two disagreed, a client or fuzzer working from the contract would send IDs the API
+    rejects, or the contract would promise to reject IDs the API accepts."""
+    ecma_match = re.fullmatch(DOCUMENT_ID_PATTERN.removesuffix("$") + r"\Z", identifier)
+    assert bool(ecma_match) is is_valid_document_id(identifier)
 
 
 @FUZZ

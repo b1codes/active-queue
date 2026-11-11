@@ -112,6 +112,7 @@
             "description": "Namespaced content ID, e.g. yt:video123 or fx:item1",
             "maxLength": 200,
             "minLength": 1,
+            "pattern": "^(?!\\.\\.?$)(?!__.*__$)[A-Za-z0-9_\\-.:]+$",
             "title": "Content Id",
             "type": "string"
           }
@@ -182,6 +183,7 @@
             "description": "ID of catalog activity, e.g. running or strength",
             "maxLength": 100,
             "minLength": 1,
+            "pattern": "^(?!\\.\\.?$)(?!__.*__$)[A-Za-z0-9_\\-.:]+$",
             "title": "Activity Id",
             "type": "string"
           },
@@ -189,6 +191,8 @@
             "anyOf": [
               {
                 "maxLength": 200,
+                "minLength": 1,
+                "pattern": "^(?!\\.\\.?$)(?!__.*__$)[A-Za-z0-9_\\-.:]+$",
                 "type": "string"
               },
               {
@@ -2136,6 +2140,7 @@
             "schema": {
               "maxLength": 200,
               "minLength": 1,
+              "pattern": "^(?!\\.\\.?$)(?!__.*__$)[A-Za-z0-9_\\-.:]+$",
               "title": "Content Id",
               "type": "string"
             }
@@ -2987,6 +2992,7 @@
             "schema": {
               "maxLength": 200,
               "minLength": 1,
+              "pattern": "^(?!\\.\\.?$)(?!__.*__$)[A-Za-z0-9_\\-.:]+$",
               "title": "Session Id",
               "type": "string"
             }
@@ -3127,6 +3133,7 @@
             "schema": {
               "maxLength": 200,
               "minLength": 1,
+              "pattern": "^(?!\\.\\.?$)(?!__.*__$)[A-Za-z0-9_\\-.:]+$",
               "title": "Session Id",
               "type": "string"
             }
@@ -3267,6 +3274,7 @@
             "schema": {
               "maxLength": 200,
               "minLength": 1,
+              "pattern": "^(?!\\.\\.?$)(?!__.*__$)[A-Za-z0-9_\\-.:]+$",
               "title": "Session Id",
               "type": "string"
             }
@@ -3424,6 +3432,7 @@
             "schema": {
               "maxLength": 200,
               "minLength": 1,
+              "pattern": "^(?!\\.\\.?$)(?!__.*__$)[A-Za-z0-9_\\-.:]+$",
               "title": "Session Id",
               "type": "string"
             }
@@ -3826,6 +3835,7 @@
             "schema": {
               "maxLength": 200,
               "minLength": 1,
+              "pattern": "^(?!\\.\\.?$)(?!__.*__$)[A-Za-z0-9_\\-.:]+$",
               "title": "Source Id",
               "type": "string"
             }
@@ -3966,6 +3976,7 @@
             "schema": {
               "maxLength": 200,
               "minLength": 1,
+              "pattern": "^(?!\\.\\.?$)(?!__.*__$)[A-Za-z0-9_\\-.:]+$",
               "title": "Source Id",
               "type": "string"
             }

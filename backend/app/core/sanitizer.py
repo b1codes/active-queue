@@ -111,26 +111,20 @@ DOCUMENT_ID_RE = re.compile(r"^[A-Za-z0-9_\-.:]+$")
 RESERVED_DOCUMENT_ID_RE = re.compile(r"^__.*__$")
 
 
+# The same rule as one ECMA-262 pattern, published in the API contract (contracts/openapi.json)
+# so clients and schema-driven fuzzers know which IDs the API accepts.
+# tests/unit/test_sanitizer_properties.py holds the two definitions to each other.
+DOCUMENT_ID_PATTERN = r"^(?!\.\.?$)(?!__.*__$)[A-Za-z0-9_\-.:]+$"
+
+
 def is_valid_document_id(identifier: str) -> bool:
     """Return True if identifier is safe to use as (part of) a Firestore document ID."""
+    # fullmatch, not match: `$` also matches before a trailing newline, so "abc\n" passed.
     return (
-        bool(DOCUMENT_ID_RE.match(identifier))
+        bool(DOCUMENT_ID_RE.fullmatch(identifier))
         and identifier not in (".", "..")
         and not RESERVED_DOCUMENT_ID_RE.match(identifier)
     )
-
-
-def sanitize_document_id(identifier: str | None, max_length: int = 200) -> str | None:
-    """sanitize_identifier, then enforce Firestore document ID rules.
-
-    Raises ValueError (surfaced as 400 VALIDATION_FAILED by Pydantic) on invalid input.
-    """
-    cleaned = sanitize_identifier(identifier, max_length=max_length)
-    if cleaned is None:
-        return None
-    if not is_valid_document_id(cleaned):
-        raise ValueError("must contain only letters, digits, '_', '-', '.', ':'")
-    return cleaned
 
 
 def sanitize_string_list(

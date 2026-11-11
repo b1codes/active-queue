@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import Field, field_validator
 
-from app.core.envelopes import ResponseSchema
+from app.core.envelopes import DurationSeconds, RequestSchema, ResponseSchema
 from app.core.sanitizer import sanitize_string_list, sanitize_text
 from app.features.users.models import User, UserAuthorization, UserPreferences
 
@@ -60,12 +60,12 @@ class UserMeData(ResponseSchema):
     authorization: UserAuthorizationSchema
 
 
-class UpdatePreferencesRequest(BaseModel):
+class UpdatePreferencesRequest(RequestSchema):
     """Request schema for PATCH /api/v1/users/me/preferences per SPEC §4.2."""
 
     preferred_activity_types: list[str] | None = None
     preferred_tracker_app: str | None = Field(None, max_length=50)
-    default_time_block_seconds: int | None = Field(None, ge=300, le=86400)
+    default_time_block_seconds: DurationSeconds | None = None
     hide_completed: bool | None = None
     dark_mode: bool | None = None
     sync_enabled: bool | None = None

@@ -14,7 +14,6 @@ from starlette.requests import Request  # noqa: TC002 - FastAPI resolves it at r
 from app.core.config import Settings
 from app.core.sanitizer import (
     is_valid_document_id,
-    sanitize_document_id,
     sanitize_identifier,
     sanitize_string_list,
     sanitize_text,
@@ -230,19 +229,12 @@ def test_sanitize_identifier(raw: str | None, expected: str | None) -> None:
         ("__", True),  # shorter than the reserved __.*__ form
         ("_x_", True),
         ("has space", False),
+        ("abc\n", False),  # `$` matched before a trailing newline; found by Schemathesis
         ("", False),
     ],
 )
 def test_is_valid_document_id(value: str, ok: bool) -> None:
     assert is_valid_document_id(value) is ok
-
-
-def test_sanitize_document_id() -> None:
-    assert sanitize_document_id(None) is None
-    assert sanitize_document_id("  ") is None
-    assert sanitize_document_id(" yt:abc ") == "yt:abc"
-    with pytest.raises(ValueError, match="letters, digits"):
-        sanitize_document_id("bad/id")
 
 
 def test_sanitize_string_list() -> None:
