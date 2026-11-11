@@ -160,6 +160,11 @@ async def test_sync_has_its_own_tighter_budget(
     api: AsyncClient, mock_firestore_client: MagicMock
 ) -> None:
     """10/min on POST /sources/{id}/sync is enforced before the handler touches Firestore."""
+    # The admitted requests 404 on a missing source. A mock snapshot "exists", fails Source
+    # validation, and rendering each 500's traceback took ~3s, so the requests straddled a
+    # fixed-window boundary often enough to flake.
+    snapshot = mock_firestore_client.collection.return_value.document.return_value.get
+    snapshot.return_value.exists = False
     with patch("firebase_admin.auth.verify_id_token", _verifier({"alice-token": "alice"})):
         first = await api.post("/api/v1/sources/src_1/sync", headers=_bearer("alice-token"))
         for _ in range(9):
