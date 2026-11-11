@@ -56,8 +56,11 @@ const floodLimited = new Counter('flood_limited');
 //   staging: real Firestore. GET /content/feed is SPEC §1.4's 400 ms warm budget; the
 //            rest are what a Cloud Run instance on indexed Firestore should comfortably
 //            beat.
-//   local:   the emulator stack. The emulator scans a collection for every query, so these
-//            are regression budgets with about 2x headroom over a CI runner, not targets.
+//   local:   the emulator stack on a GitHub ubuntu runner, about 4x what 20 users measure
+//            there (feed p95 ~37 ms). Regression tripwires, not targets: the emulator scans
+//            a collection per query. LATENCY_FACTOR scales them for slower machines
+//            (run.sh sets 10 on macOS, where Docker Desktop and the emulator are ~10x slower).
+const LATENCY_FACTOR = Number(__ENV.LATENCY_FACTOR || 1);
 const LATENCY_P95 = {
   staging: {
     feed: 400,
@@ -73,17 +76,17 @@ const LATENCY_P95 = {
     sources: 250,
   },
   local: {
-    feed: 800,
-    activities: 100,
-    match_time: 700,
-    match: 100,
-    session_create: 250,
-    session_start: 100,
-    session_complete: 100,
-    session_abandon: 100,
-    history: 250,
-    me: 50,
-    sources: 100,
+    feed: 150,
+    activities: 25,
+    match_time: 60,
+    match: 25,
+    session_create: 100,
+    session_start: 40,
+    session_complete: 60,
+    session_abandon: 50,
+    history: 40,
+    me: 25,
+    sources: 25,
   },
 };
 
@@ -102,7 +105,7 @@ if (P.flood) thresholds.flood_limited = ['count>0'];
 // The per-PR smoke run is too short for stable percentiles, so it only trips at 10x the
 // local budgets: a pathological regression, never noise.
 const budgets = PROFILE === 'smoke' ? LATENCY_P95.local : LATENCY_P95[PROFILE];
-const factor = PROFILE === 'smoke' ? 10 : 1;
+const factor = (PROFILE === 'smoke' ? 10 : 1) * (PROFILE === 'staging' ? 1 : LATENCY_FACTOR);
 for (const [name, p95] of Object.entries(budgets)) {
   thresholds[`http_req_duration{scenario:journey,name:${name}}`] = [`p(95)<${p95 * factor}`];
 }

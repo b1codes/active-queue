@@ -208,9 +208,11 @@ to be limited.
 
 Two things to know when reading the numbers:
 
-- The emulator has no indexes. Every query scans its collection (75-90 ms for a feed query
-  on a CI-sized data set), so the `local` budgets are tripwires, not targets. The read
-  budgets above cover cost at scale.
+- The emulator has no indexes and scans a collection per query, so the `local` budgets
+  are regression tripwires, not targets. They sit at about 4x what 20 users measure on a
+  GitHub ubuntu runner (feed p95 ~37 ms). On macOS, Docker Desktop and the emulator run
+  about 10x slower, so `run.sh` multiplies them by `LOAD_LATENCY_FACTOR` (10 on macOS, 1
+  elsewhere). The read budgets above cover cost at scale.
 - The limiter's windows are fixed to the minute. A short run can split a client's requests
   across two windows, so the smoke rates are set to exceed each limit in half the run.
 

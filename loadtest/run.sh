@@ -75,6 +75,13 @@ case "$PROFILE" in
   *) echo "usage: $0 local|smoke|staging" >&2; exit 2 ;;
 esac
 
+# Emulator-stack budgets are calibrated on a GitHub ubuntu runner. On macOS, Docker Desktop
+# and the emulator JVM measure ~10x slower, so scale them unless told otherwise.
+latency_factor="${LOAD_LATENCY_FACTOR:-1}"
+if [[ "$(uname)" == "Darwin" && -z "${LOAD_LATENCY_FACTOR:-}" ]]; then
+  latency_factor=10
+fi
+
 # Linux (CI) shares the host network; Docker Desktop reaches the host by name.
 network=(--network host)
 if [[ "$(uname)" == "Darwin" && "$target" == http://127.0.0.1:* ]]; then
@@ -84,6 +91,6 @@ fi
 
 docker run --rm ${network[@]+"${network[@]}"} --user "$(id -u):$(id -g)" -v "$ROOT/loadtest:/scripts:ro" -v "$OUT:/out" \
   -e BASE_URL="$target" -e PROFILE="$PROFILE" -e SPOOF_IPS="$spoof" -e PLAYLIST="$playlist" \
-  -e TOKENS=/out/tokens.json "$K6_IMAGE" run --quiet --summary-export /out/summary.json \
+  -e TOKENS=/out/tokens.json -e LATENCY_FACTOR="$latency_factor" "$K6_IMAGE" run --quiet --summary-export /out/summary.json \
   /scripts/api.js 2>&1 | tee "$OUT/k6.log"
 exit "${PIPESTATUS[0]}"
