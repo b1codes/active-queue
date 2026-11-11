@@ -88,6 +88,10 @@ for key in KeyboardAutocorrection KeyboardPrediction KeyboardAutocapitalization 
   prefs com.apple.Preferences "$key" -bool false
 done
 prefs com.apple.Preferences DidShowContinuousPathIntroduction -bool true
+# Reduce Motion stills the app's endless Reanimated loops (loading skeletons, pulses).
+# XCTest waits for the app to go idle before each view query, and on CI's runner a
+# running loop made a single query take over a minute.
+prefs com.apple.Accessibility ReduceMotionEnabled -bool true
 prefs com.apple.keyboard.preferences DidShowContinuousPathIntroduction -bool true
 xcrun simctl shutdown "$udid"
 xcrun simctl boot "$udid"
@@ -142,8 +146,11 @@ for flow in "${flows[@]}"; do
       if [[ $attempt -eq 1 ]]; then echo "e2e: passed  $name"; else echo "e2e: passed  $name (on retry)"; fi
       break
     fi
-    if [[ $attempt -eq 1 ]] && grep -qE "$DRIVER_FAILURE" "$log"; then
-      echo "e2e: retrying $name: the Maestro driver lost the device (see $log)"
+    # A failure the app caused names it: a failed assertion or an element that never
+    # appeared. One that names nothing, or names the driver, is retried once.
+    if [[ $attempt -eq 1 ]] && { grep -qE "$DRIVER_FAILURE" "$log" \
+      || ! grep -qE 'Assertion is false|Element not found|not found:' "$log"; }; then
+      echo "e2e: retrying $name: the Maestro driver failed without an app-level reason (see $log)"
       continue
     fi
     echo "e2e: FAILED  $name (see $log)"

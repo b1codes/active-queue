@@ -359,7 +359,10 @@ Not covered here: how the Tier 1 material moves and refracts as content scrolls 
   seconds and its progress can be watched.
 - **The simulator:** a new iPhone 17 Pro on iOS 26.5 each run, with an English-only
   keyboard and no autocorrect, predictions or swipe typing. XCTest types key by key, and
-  those features rewrite or swallow keys.
+  those features rewrite or swallow keys. Reduce Motion is on: XCTest waits for the app
+  to go idle before each view query, and the loading skeleton's endless loop made a
+  single query take over a minute on CI. Motion itself is covered by the a11y suite and
+  manual QA.
 
 Each journey creates its own Auth-emulator account (`common/create-account.js`) and signs
 in through the real sign-in screen. No journey depends on another's data, so they can run
@@ -395,7 +398,8 @@ journey, with retries, because a cold start on CI can outrun Maestro's timeout. 
 journey then runs in its own Maestro invocation, so a crashed driver costs at most that
 journey. A journey that failed only because the driver lost the device
 (`DeviceUnreachableException`, `kAXErrorServerNotFound` or `IOSDriverTimeoutException`, all seen on CI's slower runner) is
-retried once, and the log says so. A failed assertion is never retried.
+retried once, and the log says so. So is a failure that names no reason at all. A
+failed assertion or a missing element is never retried.
 
 The run also fails if the app crashed, judged by iOS crash reports written during the
 run, or if the API answered any request with a 5xx.
