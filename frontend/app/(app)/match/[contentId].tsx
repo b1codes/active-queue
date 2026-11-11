@@ -14,6 +14,7 @@ import { colors, rounded, spacing, typography } from '@/core/theme';
 import { ApiError } from '@/core/api/apiClient';
 import { matchContent, type ContentMatchResult } from '@/features/matching/matchingApi';
 import { useSessionStore } from '@/features/sessions/sessionStore';
+import { useIsMounted } from '@/core/hooks';
 
 /**
  * Content-first matching (SPEC §5.2): given a queued item, show which catalog activities
@@ -24,6 +25,7 @@ export default function MatchScreen() {
   const insets = useSafeAreaInsets();
   const { contentId } = useLocalSearchParams<{ contentId: string }>();
   const { createNewSession, isLoading, error, errorCode, conflictSessionId } = useSessionStore();
+  const mounted = useIsMounted();
 
   const [match, setMatch] = useState<ContentMatchResult | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -59,7 +61,8 @@ export default function MatchScreen() {
       match_mode: 'content_first',
       content_id: contentId,
     });
-    if (session) {
+    // The user may have gone back while the create was in flight.
+    if (session && mounted.current) {
       router.push({ pathname: '/(app)/session/[id]', params: { id: session.id } });
     }
   };

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   AppState,
@@ -15,6 +15,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { colors, rounded, spacing, typography } from '@/core/theme';
 import { launchTrackerApp, mediaTargetForContent } from '@/features/sessions/deepLinks';
 import { useSessionStore } from '@/features/sessions/sessionStore';
+import { useIsMounted } from '@/core/hooks';
 
 export default function SessionHandoffScreen() {
   const router = useRouter();
@@ -38,6 +39,8 @@ export default function SessionHandoffScreen() {
   } = useSessionStore();
 
   const [trackerLaunched, setTrackerLaunched] = useState(false);
+  const launchingTracker = useRef(false);
+  const mounted = useIsMounted();
   const [trackerError, setTrackerError] = useState<string | null>(null);
   const [isResolving, setIsResolving] = useState(
     () => !currentSession || currentSession.id !== routeSessionId
@@ -66,7 +69,7 @@ export default function SessionHandoffScreen() {
     const subscription = AppState.addEventListener('change', (nextAppState: AppStateStatus) => {
       if (nextAppState === 'active') {
         if (trackerLaunched && currentStep === 1) {
-          advanceStep();
+          advanceStep(1);
         }
       }
     });
@@ -77,15 +80,21 @@ export default function SessionHandoffScreen() {
   }, [trackerLaunched, currentStep, advanceStep]);
 
   const handleLaunchTracker = async () => {
+    // A double tap would open the tracker twice.
+    if (launchingTracker.current) return;
+    launchingTracker.current = true;
     setTrackerError(null);
     const trackerId = currentSession?.activity_id === 'running' ? 'apple_fitness' : 'custom';
-    const res = await launchTrackerApp(trackerId);
-
-    if (res.success) {
-      setTrackerLaunched(true);
-      advanceStep();
-    } else {
-      setTrackerError(res.error || 'Failed to launch tracker app');
+    try {
+      const res = await launchTrackerApp(trackerId);
+      if (res.success) {
+        setTrackerLaunched(true);
+        advanceStep(1);
+      } else {
+        setTrackerError(res.error || 'Failed to launch tracker app');
+      }
+    } finally {
+      launchingTracker.current = false;
     }
   };
 
@@ -95,15 +104,15 @@ export default function SessionHandoffScreen() {
   };
 
   const handleComplete = async () => {
-    if (await completeCurrentSession()) router.replace('/(app)/history');
+    if ((await completeCurrentSession()) && mounted.current) router.replace('/(app)/history');
   };
 
   const handleAbandon = async () => {
-    if (await abandonCurrentSession()) router.replace('/(app)');
+    if ((await abandonCurrentSession()) && mounted.current) router.replace('/(app)');
   };
 
   const handleDiscard = async () => {
-    if (await discardCurrentSession()) router.replace('/(app)');
+    if ((await discardCurrentSession()) && mounted.current) router.replace('/(app)');
   };
 
   const isPending = currentSession?.status === 'pending';

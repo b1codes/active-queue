@@ -48,7 +48,13 @@ export const sessionSlice = createSlice({
       state.currentStep = 2;
       state.trackerError = null;
     },
-    advanceStep: (state) => {
+    /**
+     * Advance one step. With `from`, only if the checklist is still on that step: two taps
+     * on "Open Tracker" both finish step 1, and the second must not also finish step 2
+     * (the media launch and server start), which would leave the session never started.
+     */
+    advanceStep: (state, action: PayloadAction<ChecklistStep | undefined>) => {
+      if (action.payload !== undefined && state.currentStep !== action.payload) return;
       if (state.currentStep < 3) {
         state.currentStep = (state.currentStep + 1) as ChecklistStep;
       }

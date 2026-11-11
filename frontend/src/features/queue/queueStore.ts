@@ -106,10 +106,21 @@ export async function addSource(urlOrId: string): Promise<Source | null> {
   }
 }
 
+// Each sync loop's ticket. Starting a sync takes a new one, and a loop whose ticket is no
+// longer current stops at its next check without touching syncProgress, so a cancelled or
+// replaced loop can't keep calling /sync or overwrite the new loop's progress.
+let currentSyncRun = 0;
+
 export async function startResumableSync(
   sourceId: string,
   itemEstimate?: number | null
 ): Promise<void> {
+  const running = store.getState().queue.syncProgress;
+  // A second tap on Sync / Finish Sync for the source already syncing is a no-op.
+  if (running.isSyncing && !running.isCancelled && running.sourceId === sourceId) return;
+  const run = ++currentSyncRun;
+  const superseded = () => run !== currentSyncRun;
+
   store.dispatch(
     setQueueState({
       syncProgress: {
@@ -130,6 +141,7 @@ export async function startResumableSync(
   let totalSynced = 0;
 
   while (hasMore) {
+    if (superseded()) return;
     if (store.getState().queue.syncProgress.isCancelled) {
       store.dispatch(setSyncProgress({ isSyncing: false, error: 'Sync cancelled' }));
       break;
@@ -152,6 +164,7 @@ export async function startResumableSync(
       const chunkData = await apiClient<SyncChunkResponse>(`/api/v1/sources/${sourceId}/sync`, {
         method: 'POST',
       });
+      if (superseded()) return;
 
       totalSynced += chunkData.items_synced;
       hasMore = chunkData.has_more;
@@ -168,6 +181,7 @@ export async function startResumableSync(
         break;
       }
     } catch (err: unknown) {
+      if (superseded()) return;
       const { code, message } = toQueueError(err, 'Sync chunk failed');
       store.dispatch(setSyncProgress({ isSyncing: false, error: message, errorCode: code }));
       break;

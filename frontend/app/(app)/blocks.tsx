@@ -21,6 +21,7 @@ import {
   type TimeMatchResult,
 } from '@/features/matching/matchingApi';
 import { useSessionStore } from '@/features/sessions/sessionStore';
+import { useIsMounted } from '@/core/hooks';
 
 const DEFAULT_BLOCK_SECONDS = 1800;
 
@@ -39,6 +40,7 @@ export default function BlocksScreen() {
   const [headerHeight, setHeaderHeight] = useGlassHeaderHeight();
   const { createNewSession, isLoading: isCreating, error: createError, errorCode, conflictSessionId } =
     useSessionStore();
+  const mounted = useIsMounted();
 
   const [blocks, setBlocks] = useState<TimeBlock[] | null>(null);
   const [activities, setActivities] = useState<Activity[] | null>(null);
@@ -105,7 +107,8 @@ export default function BlocksScreen() {
       content_id: contentId,
       target_duration_seconds: contentId ? null : selectedDuration,
     });
-    if (session) {
+    // The user may have gone back while the create was in flight.
+    if (session && mounted.current) {
       router.push({ pathname: '/(app)/session/[id]', params: { id: session.id } });
     }
   };

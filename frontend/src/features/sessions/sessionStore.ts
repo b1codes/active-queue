@@ -31,7 +31,7 @@ export interface SessionStoreActions {
   discardCurrentSession: () => Promise<boolean>;
   startCurrentSession: (trackerId: string, externalId?: string) => Promise<boolean>;
   skipTrackerStep: () => void;
-  advanceStep: () => void;
+  advanceStep: (from?: ChecklistStep) => void;
   setSessionFromServer: (session: Session) => void;
   checkActiveSession: () => Promise<Session | null>;
   clearSession: () => void;
@@ -70,6 +70,9 @@ function failure(err: unknown, fallback: string) {
 }
 
 export async function createNewSession(input: CreateSessionInput): Promise<Session | null> {
+  // A second tap before the button re-renders disabled would create a second session (and
+  // get ACTIVE_SESSION_EXISTS back), so a create already in flight wins.
+  if (store.getState().session.isLoading) return null;
   store.dispatch(
     setSessionState({ isLoading: true, error: null, errorCode: null, conflictSessionId: null })
   );
@@ -136,16 +139,18 @@ export function skipTrackerStep(): void {
   store.dispatch(skipTrackerStepAction());
 }
 
-export function advanceStep(): void {
-  store.dispatch(advanceStepAction());
+export function advanceStep(from?: ChecklistStep): void {
+  store.dispatch(advanceStepAction(from));
 }
 
 export async function startCurrentSession(
   mediaProvider: string,
   externalId?: string
 ): Promise<boolean> {
-  const { currentSession } = store.getState().session;
-  if (!currentSession) return false;
+  const { currentSession, isLoading } = store.getState().session;
+  // Ignore a second tap while the first is in flight: it would start the session twice and
+  // open the media app twice.
+  if (!currentSession || isLoading) return false;
 
   store.dispatch(setSessionState({ isLoading: true, mediaError: null }));
 
