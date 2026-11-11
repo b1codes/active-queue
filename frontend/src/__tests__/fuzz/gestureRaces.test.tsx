@@ -255,13 +255,21 @@ describe('backgrounding during sync', () => {
         { data: { items_synced: 20, has_more: false } },
       ])
     );
-    const first = useQueueStore.getState().startResumableSync('src_1', 120);
-    act(() => useQueueStore.getState().cancelSync());
-    const second = useQueueStore.getState().startResumableSync('src_1', 120);
+    // Start both loops inside act, and wait for the feed and source refreshes each one
+    // fires when it ends. Left floating, they ran into the next test and broke its act
+    // scope (an order-dependent failure: jest --randomize --seed=724292233).
+    let first!: Promise<void>;
+    let second!: Promise<void>;
+    await act(async () => {
+      first = useQueueStore.getState().startResumableSync('src_1', 120);
+      useQueueStore.getState().cancelSync();
+      second = useQueueStore.getState().startResumableSync('src_1', 120);
+    });
     await api.release();
     await act(async () => {
       await Promise.all([first, second]);
     });
+    await waitFor(() => expect(api.callsTo('GET', '/api/v1/sources').length).toBeGreaterThan(0));
 
     // The cancelled loop stops after its in-flight chunk; only the new loop continues.
     expect(api.callsTo('POST', '/api/v1/sources/src_1/sync')).toHaveLength(3);
