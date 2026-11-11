@@ -372,6 +372,23 @@ jobs:
             --config firebase.test.json --project demo-activequeue-local --only auth,firestore \
             "scripts/container-smoke.sh activequeue-api:ci"
 
+      - name: Cold start, memory and k6 load smoke (Cloud Run's 1 vCPU / 512 MiB)
+        # Times docker run -> /healthz 200 and the first signed-in request, then runs the
+        # k6 smoke profile (loadtest/api.js) while sampling memory. Budgets are in the
+        # script. Fails on a 5xx, a throttled legitimate user, an unthrottled abuser or
+        # flood, an OOM kill, or a blown budget.
+        run: |
+          npx -y "firebase-tools@${FIREBASE_TOOLS_VERSION}" emulators:exec \
+            --config firebase.test.json --project demo-activequeue-local --only auth,firestore \
+            "scripts/container-perf.sh activequeue-api:ci"
+
+      - name: Load smoke summary
+        if: always()
+        run: |
+          if [ -f loadtest/out/summary.json ]; then
+            python3 loadtest/summary.py loadtest/out/summary.json "k6 load smoke (API image)" >> "${GITHUB_STEP_SUMMARY}"
+          fi
+
   terraform:
     name: Infrastructure (Terraform, deploy script)
     # Every root and the module, not just infra/: `terraform validate` isn't recursive.
@@ -428,9 +445,9 @@ jobs:
       - name: Lint scripts (shellcheck, Ruff)
         run: |
           docker run --rm -v "${GITHUB_WORKSPACE}:/mnt" -w /mnt \
-            "koalaman/shellcheck:${SHELLCHECK_VERSION}" scripts/*.sh
-          pipx run "ruff==${RUFF_VERSION}" check scripts
-          pipx run "ruff==${RUFF_VERSION}" format --check scripts
+            "koalaman/shellcheck:${SHELLCHECK_VERSION}" scripts/*.sh loadtest/*.sh
+          pipx run "ruff==${RUFF_VERSION}" check scripts loadtest
+          pipx run "ruff==${RUFF_VERSION}" format --check scripts loadtest
 
       - name: Trivy config scan (Terraform + Dockerfiles)
         run: |

@@ -233,7 +233,8 @@ test-firestore-rules:
 		--only firestore "cd firestore-rules && node --test --test-reporter=spec rules.test.mjs"
 
 ## test-container: hadolint, build and Trivy-scan the API image, then smoke-test it
-## (read-only) against the test emulators, as the `container` CI job does.
+## (read-only) against the test emulators, and time its cold start, memory and k6 load
+## under Cloud Run's limits, as the `container` CI job does.
 HADOLINT := docker run --rm -i -v "$(CURDIR)/.hadolint.yaml:/.config/hadolint.yaml:ro" hadolint/hadolint:v2.14.0 hadolint -
 TRIVY    := docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v "$(HOME)/.cache/trivy:/root/.cache/trivy" aquasec/trivy:0.69.3
 test-container:
@@ -243,6 +244,13 @@ test-container:
 	mkdir -p "$(HOME)/.cache/trivy"
 	$(TRIVY) image --scanners vuln --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 activequeue-api:local
 	$(FIREBASE_TOOLS) emulators:exec $(TEST_EMULATORS) "scripts/container-smoke.sh activequeue-api:local"
+	$(FIREBASE_TOOLS) emulators:exec $(TEST_EMULATORS) "scripts/container-perf.sh activequeue-api:local"
+
+## load-test: The nightly k6 API load test against the API on the test emulators
+## (loadtest/api.js). PROFILE=smoke runs the 45-second per-PR version. Results: loadtest/out/.
+PROFILE ?= local
+load-test:
+	$(FIREBASE_TOOLS) emulators:exec $(TEST_EMULATORS) "loadtest/run.sh $(PROFILE)"
 
 ## fuzz-api: The nightly Schemathesis run, locally. `make fuzz-api SEED=123` replays a
 ## nightly seed; FUZZ_MAX_EXAMPLES sets examples per operation (the PR run uses 25).

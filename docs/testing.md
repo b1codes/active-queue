@@ -34,6 +34,10 @@ Run `make check` before pushing. It runs the same gates as CI (`.github/workflow
 | OWASP ZAP API scan against staging (nightly) | `.github/workflows/security-nightly.yml` | CI only |
 | API fuzzing: Schemathesis over every operation in `contracts/openapi.json` on the emulators (25 derandomized examples per operation per PR, 1000 with a fresh logged seed nightly) | `backend/tests/emulator/test_schemathesis_emulator.py`, `.github/workflows/fuzz-nightly.yml` | `make test-backend`, `make fuzz-api SEED=<n>` |
 | App monkey: seeded random walks over every screen against a stateful fake API, healthy and flaky (fixed seeds per PR, 25 fresh seeds nightly), plus gesture races (double taps, back mid-request, backgrounding mid-sync) | `frontend/src/__tests__/fuzz/`, `frontend/src/test-utils/monkey.tsx`, `frontend/src/test-utils/fakeBackend.ts` | `make test-frontend`, `MONKEY_SEED=<n> pnpm test -- monkey` |
+| Firestore reads and writes per request, as a heavy user (4 sources, 1,200-item feed, 30 sessions), each endpoint held to a budget from what bounds it | `backend/tests/emulator/test_read_budgets_emulator.py`, `backend/tests/firestore_meter.py` | `make test-backend` |
+| Sync cost at the 5,000-item cap: YouTube quota units (cold, warm, throttled, unchanged, capped), Firestore writes, wall time | `backend/tests/emulator/test_sync_cost_emulator.py` | `make test-backend` |
+| API image under Cloud Run's 1 vCPU / 512 MiB: cold start, first signed-in request, peak memory, plus the 45 s k6 load smoke against it | `container` job in `ci.yml`, `scripts/container-perf.sh`, `loadtest/api.js` | `make test-container` |
+| k6 API load: 20 users for 3 min with p95 budgets per endpoint, no 5xx, no throttled legitimate user, abuser and IP flood limited (nightly, emulator stack and staging) | `.github/workflows/perf-nightly.yml`, `loadtest/` | `make load-test` |
 
 `CI Passed` is the single aggregate check to mark as required in branch protection.
 `scripts/deploy.sh` refuses to deploy a commit without a successful CI run on a push, applies
@@ -153,6 +157,77 @@ MONKEY_LOG=1 ...   # print each walk
 The monkey drives React through Jest, so native gesture recognition, real multi-touch and
 iOS's own crash reporting are outside it. The E2E simulator harness covers those (ClickUp
 86bcxruy6).
+
+## Performance and load tests
+
+**Firestore cost per request.** Firestore bills per document, so reads are both a
+request's cost and most of its latency. `tests/firestore_meter.py` wraps the SDK's gRPC
+client and counts what Firestore bills: one read per document a query returns (one if it
+returns none), one per document a get asks for, one per 1,000 entries a `count()` matches,
+one write per write in a commit. `test_read_budgets_emulator.py` runs every endpoint as a
+heavy user and holds each to a budget derived from what bounds it: a page size, the
+5-source cap, `TIME_MATCH_RESULT_LIMIT`. A new query whose reads grow with the user's data
+fails here. `pytest -s` prints the whole table.
+
+**Sync cost.** `test_sync_cost_emulator.py` runs the real `YouTubeProvider` against a fake
+Data API that bills each call, and holds SPEC §8.3's scenarios to their budgets at the
+5,000-item cap:
+
+| Scenario | Units |
+|----------|------:|
+| cold (nothing cached) | 201 |
+| warm (another user already synced it) | 101 |
+| start within 15 minutes of the last | 0 |
+| unchanged since the last walk | 1 |
+
+It also checks that a walk stops at `max_items_per_source`, that cache entries older than
+30 days are fetched again, and the writes and wall time of a cold sync.
+
+**Load (k6).** `loadtest/api.js` has three scenarios:
+
+- `journey`: each virtual user is one app user (feed, match-time, match, create, start,
+  complete or abandon, history), with think time and a staggered start.
+- `abuser`: one user at 4 requests a second.
+- `flood`: one address at 15 requests a second with no token.
+
+A run fails on any 5xx, any 429 to a journey user, an abuser or flood that is never
+limited, a 429 without `Retry-After`, or a p95 over budget. `loadtest/run.sh` mints the
+tokens, wipes the test emulators and runs k6 from a pinned image.
+
+| Profile | Where | Duration | Latency budgets |
+|---------|-------|----------|-----------------|
+| `smoke` | every PR, against the built image (`container` job) | 45 s | 10x `local`: catches pathological regressions only |
+| `local` | nightly, uvicorn on the emulators | 3 min | regression tripwires |
+| `staging` | nightly, when its variables are set (see the workflow header) | 3 min | SPEC §1.4: feed p95 ≤ 400 ms |
+
+Locally, each user gets its own client address through `X-Forwarded-For` with
+`TRUSTED_PROXY_HOPS=1`, as Cloud Run's front end provides. On staging every user shares
+the runner's address, so the run stays under the 300/min per-IP guard and has no flood
+scenario. The limiter is per instance (SPEC §10.2), so staging doesn't require the abuser
+to be limited.
+
+Two things to know when reading the numbers:
+
+- The emulator has no indexes. Every query scans its collection (75-90 ms for a feed query
+  on a CI-sized data set), so the `local` budgets are tripwires, not targets. The read
+  budgets above cover cost at scale.
+- The limiter's windows are fixed to the minute. A short run can split a client's requests
+  across two windows, so the smoke rates are set to exceed each limit in half the run.
+
+```sh
+make load-test                    # nightly profile, results in loadtest/out/
+make load-test PROFILE=smoke      # the per-PR version
+make test-container               # cold start, memory and the smoke run against the image
+```
+
+Cold start and memory: `scripts/container-perf.sh` starts the image read-only with
+`--cpus 1 --memory 512m`. It times `docker run` to the first `/healthz` 200 (budget 4 s)
+and the first signed-in request (1.5 s), samples memory during the smoke run (budget
+256 MiB, half the limit), and fails on an OOM kill. On staging, the nightly job times the
+first request of the night, normally a cold start (budget 6 s).
+
+The app side (startup time, scroll frame rate, blur and Reanimated frame drops) needs a
+simulator or a device. See [manual-qa.md](manual-qa.md).
 
 ## Security tests
 
