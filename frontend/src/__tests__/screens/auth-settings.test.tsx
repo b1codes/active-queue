@@ -38,6 +38,11 @@ describe('SignInScreen', () => {
     await renderWithProviders(<SignInScreen />);
     expect(screen.getByRole('alert')).toBeTruthy();
     expect(screen.getByText('Invalid email address or password. Please verify your details.')).toBeTruthy();
+    // VoiceOver reads the banner's label, not its text: it gets the same plain message,
+    // never Firebase's raw error (found by the E2E sign-in journey).
+    expect(screen.getByRole('alert').props.accessibilityLabel).toBe(
+      'Authentication error: Invalid email address or password. Please verify your details.',
+    );
   });
 
   it('passes other errors through and survives a failed sign-in', async () => {

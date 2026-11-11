@@ -34,6 +34,12 @@ export default function SignInScreen() {
   };
 
   const isButtonDisabled = isLoading || !email || !password;
+  // One message for the eye and for VoiceOver: the banner is a single accessible element,
+  // so its label is all a screen reader hears, and it must not be Firebase's raw error.
+  const errorMessage =
+    error && /user-not-found|wrong-password|invalid-credential/.test(error)
+      ? "Invalid email address or password. Please verify your details."
+      : error;
 
   return (
     <KeyboardAvoidingView
@@ -58,14 +64,10 @@ export default function SignInScreen() {
             accessible={true}
             accessibilityRole="alert"
             accessibilityLiveRegion="polite"
-            accessibilityLabel={`Authentication error: ${error}`}
+            accessibilityLabel={`Authentication error: ${errorMessage}`}
           >
             <Ionicons name="alert-circle-outline" size={20} color={colors.ink} />
-            <Text style={styles.errorText}>
-              {error.includes("user-not-found") || error.includes("wrong-password") || error.includes("invalid-credential")
-                ? "Invalid email address or password. Please verify your details."
-                : error}
-            </Text>
+            <Text style={styles.errorText}>{errorMessage}</Text>
           </View>
         ) : null}
 
