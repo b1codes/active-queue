@@ -10,11 +10,27 @@ name: Hide a feed item
     file: common/add-source.yaml
     env:
       SOURCE: fixture-small-playlist
-- tapOn: "Options for Fixture Workout Video #15 — High Intensity Cardio"
-- tapOn: "Hide from Queue"
-- extendedWaitUntil:
-    notVisible: "Fixture Workout Video #15 — High Intensity Cardio.*"
-    timeout: 15000
+# UIKit drops touches on an alert until it has finished presenting, so each tap waits
+# for the screen to settle and is confirmed by what it should change.
+- retry:
+    maxRetries: 3
+    commands:
+      - tapOn:
+          text: "Options for Fixture Workout Video #15 — High Intensity Cardio"
+          optional: true
+      - extendedWaitUntil:
+          visible: "Hide from Queue"
+          timeout: 10000
+- retry:
+    maxRetries: 3
+    commands:
+      - waitForAnimationToEnd
+      - tapOn:
+          text: "Hide from Queue"
+          optional: true
+      - extendedWaitUntil:
+          notVisible: "Fixture Workout Video #15 — High Intensity Cardio.*"
+          timeout: 15000
 - assertVisible: "Fixture Workout Video #14 — High Intensity Cardio.*"
 - launchApp:
     stopApp: true

@@ -270,6 +270,10 @@ compared with `frontend/screenshots/baselines/`. CI runs it on every PR
   seconds, and that would otherwise pass for a settled story.
 - It saves a screenshot once two frames in a row are identical, then compares it with the
   baseline.
+- A just-booted simulator is still busy for a while, so one throwaway launch and a pause
+  come first.
+- A story that keeps changing for 30 s is relaunched once. If it fails again, it's
+  reported as `unsettled`, with its last two frames and their diff kept in `actual/`.
 
 **Comparing.** A pixel has changed when any channel moved by more than 3 of 255
 (`channelTolerance` in `reference.json`), and a capture fails on any changed pixel. The

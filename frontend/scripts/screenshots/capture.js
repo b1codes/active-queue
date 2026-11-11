@@ -52,7 +52,7 @@ const UPDATE = process.argv.includes('--update');
 const ONLY = arg('--only');
 const APP = path.resolve(arg('--app') ?? path.join(ROOT, 'build/ios/screenshots/ActiveQueue.app'));
 const OFF_REFERENCE = process.argv.includes('--off-reference');
-const SETTLE_TIMEOUT_MS = 20000;
+const SETTLE_TIMEOUT_MS = 30000;
 const LAUNCH_TIMEOUT_MS = 45000; // a fresh simulator's first launch takes ~8 s
 // A pixel has changed when any channel moved by more than this (of 255). The Tier 1 native
 // material dithers by 1-2 levels from one launch to the next (measured on iOS 26.5), which
@@ -182,8 +182,18 @@ async function settledCapture(udid, file) {
       return frame;
     }
     if (Date.now() - started > SETTLE_TIMEOUT_MS) {
-      fs.rmSync(tmp, { force: true });
-      throw new Error(`${path.basename(file)} never settled: something on screen keeps changing`);
+      // Keep the last two frames and what changed between them, for diagnosis.
+      const base = file.replace(/\.png$/, '');
+      fs.renameSync(tmp, `${base}.unsettled-last.png`);
+      fs.writeFileSync(`${base}.unsettled-previous.png`, PNG.sync.write(previous));
+      const diff = new PNG({ width: frame.width, height: frame.height });
+      changedPixels(frame.data, previous.data, frame.width, (i, isChanged) =>
+        diff.data.set(isChanged ? [255, 0, 0, 255] : [255, 255, 255, 255], i),
+      );
+      fs.writeFileSync(`${base}.unsettled-diff.png`, PNG.sync.write(diff));
+      const err = new Error(`${path.basename(file)} never settled: something on screen keeps changing`);
+      err.unsettled = true;
+      throw err;
     }
     previous = frame;
     await sleep(250);
@@ -261,12 +271,32 @@ async function main() {
   const results = [];
   try {
     configure(udid);
+    // A just-booted simulator keeps finishing first-boot work for a while (on CI the
+    // first story once never settled). One throwaway launch and a pause let it quiet down.
+    await showStory(udid, ids[0], TIERS[0]);
+    await sleep(10000);
     for (const tier of TIERS) {
       for (const id of ids) {
         const actualFile = path.join(OUT, 'actual', `tier${tier}`, `${id}.png`);
         fs.mkdirSync(path.dirname(actualFile), { recursive: true });
-        await showStory(udid, id, tier);
-        const frame = await settledCapture(udid, actualFile);
+        let frame;
+        try {
+          await showStory(udid, id, tier);
+          frame = await settledCapture(udid, actualFile);
+        } catch (e) {
+          if (!e.unsettled) throw e;
+          // Once more from a fresh launch; a second failure is the story's own motion.
+          console.warn(`  tier ${tier}  retry    ${id} (never settled; relaunching)`);
+          try {
+            await showStory(udid, id, tier);
+            frame = await settledCapture(udid, actualFile);
+          } catch (e2) {
+            if (!e2.unsettled) throw e2;
+            results.push({ id, tier, status: 'unsettled', detail: 'kept changing for 30 s twice; frames in actual/' });
+            console.log(`  tier ${tier}  unsettled ${id}`);
+            continue;
+          }
+        }
         if (isHarnessError(frame)) throw new Error(`the harness couldn't render ${id} (see ${actualFile})`);
         const baselineFile = path.join(BASELINES, `tier${tier}`, `${id}.png`);
         const result = UPDATE

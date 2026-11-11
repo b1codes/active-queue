@@ -22,6 +22,11 @@ appId: com.b1codes.activequeue
       - tapOn:
           text: "Launch Media and Start Workout Session"
           optional: true
+          # Safari opens youtube.com, which never stops moving; don't wait for it.
+          waitToSettleTimeoutMs: 3000
+      # The hand-off happened (the session start is what's checked); close Safari so a
+      # heavy page can't stall the driver, and come back.
+      - stopApp: com.apple.mobilesafari
       - launchApp:
           stopApp: false
       - extendedWaitUntil:
