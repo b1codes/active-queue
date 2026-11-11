@@ -101,3 +101,13 @@ async def test_http_exception_handler_envelope(client: AsyncClient) -> None:
     data = response.json()
     assert data["status"] == "error"
     assert data["error"]["code"] == "AUTH_TOKEN_MISSING"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("method", ["TRACE", "PUT", "PATCH"])
+async def test_method_not_allowed_lists_allowed_methods(client: AsyncClient, method: str) -> None:
+    """A 405 keeps Starlette's `Allow` header (RFC 9110 §15.5.6). Found by Schemathesis."""
+    response = await client.request(method, "/api/v1/sessions")
+    assert response.status_code == 405
+    assert set(response.headers["allow"].replace(" ", "").split(",")) == {"GET", "POST"}
+    assert response.json()["status"] == "error"

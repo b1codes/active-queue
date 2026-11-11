@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING
 import structlog
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import JSONResponse, Response
+from starlette.routing import Match
 
 from app.core.envelopes import ErrorBody, ErrorDetail, ErrorEnvelope
 from app.core.errors import AppError
@@ -84,7 +85,28 @@ async def validation_error_handler(_request: Request, exc: RequestValidationErro
     return JSONResponse(status_code=400, content=envelope.model_dump())
 
 
-async def http_exception_handler(_request: Request, exc: HTTPException) -> JSONResponse:
+_METHODS = ("GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS")
+
+
+def _allowed_methods(request: Request) -> str:
+    """Every method some route fully matches at this path.
+
+    Starlette's own 405 lists only the first route whose path matched, so a path served by
+    several routes (GET and POST /sessions) advertised just one of its methods. Probing
+    each method through the public `matches()` works whatever routers are nested.
+    """
+    allowed = [
+        method
+        for method in _METHODS
+        if any(
+            route.matches({**request.scope, "method": method})[0] is Match.FULL
+            for route in request.app.router.routes
+        )
+    ]
+    return ", ".join(allowed)
+
+
+async def http_exception_handler(request: Request, exc: HTTPException) -> JSONResponse:
     """Starlette/FastAPI HTTPException handler returning standard house error envelope."""
     code = "HTTP_ERROR"
     if exc.status_code == 401:
@@ -102,4 +124,11 @@ async def http_exception_handler(_request: Request, exc: HTTPException) -> JSONR
             message=str(exc.detail) if exc.detail else "An HTTP error occurred",
         )
     )
-    return JSONResponse(status_code=exc.status_code, content=envelope.model_dump())
+    # Keep the exception's headers (a 401 may carry `WWW-Authenticate`). A 405 must list the
+    # methods the resource supports in `Allow` (RFC 9110 §15.5.6).
+    headers = dict(exc.headers or {})
+    if exc.status_code == 405:
+        headers["Allow"] = _allowed_methods(request)
+    return JSONResponse(
+        status_code=exc.status_code, content=envelope.model_dump(), headers=headers
+    )
