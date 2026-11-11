@@ -276,8 +276,10 @@ compared with `frontend/screenshots/baselines/`. CI runs it on every PR
 tolerance absorbs the 1 to 2 levels of dithering the Tier 1 material shows from one
 launch to the next. A layout shift, a new string or a changed color token moves far more.
 
-`reference.json` also lists masked rectangles. Today that's only the Dynamic Island,
-which iOS sometimes draws into a simulator screenshot around a launch.
+`reference.json` also lists masked rectangles, each with its reason:
+- the Dynamic Island, which iOS sometimes draws into a simulator screenshot around a
+  launch;
+- a 3×3 block at the top-left corner, which Xcode 27's screenshot tool blacks out.
 
 The diff image marks changed pixels in red over a faded copy of the capture.
 
@@ -309,7 +311,8 @@ nothing. The run re-captures three stories in light mode and fails if any pixel 
 | Simulator | iPhone 17 Pro, iOS 26.5 |
 
 An app linked against another Xcode SDK can render differently even on the same
-simulator. So `capture.js` reads the Xcode that built the app (`DTXcode`), and compares
+simulator. Built with Xcode 27.2, 96 of the 98 baselines matched exactly; the other two
+differed by a few pixels on Tier 1 glass edges. So `capture.js` reads the Xcode that built the app (`DTXcode`), and compares
 against baselines only when it matches. Elsewhere:
 
 - `--off-reference` checks that every story renders and settles, and reports diffs

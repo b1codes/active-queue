@@ -12,6 +12,14 @@
       "y": 24,
       "width": 406,
       "height": 144
+    },
+    {
+      "name": "Screenshot corner",
+      "why": "Xcode 27's simctl io screenshot blacks out a 3x3 block at the top-left corner; Xcode 26.6 (CI) doesn't. Masked so local off-reference runs show only real differences.",
+      "x": 0,
+      "y": 0,
+      "width": 4,
+      "height": 4
     }
   ]
 }
