@@ -86,6 +86,7 @@ export default function SignInScreen() {
               autoCorrect={false}
               accessible={true}
               accessibilityLabel="Email address"
+              testID="sign-in-email"
               accessibilityHint="Enter your account email address"
             />
           </View>
@@ -101,6 +102,7 @@ export default function SignInScreen() {
               secureTextEntry
               accessible={true}
               accessibilityLabel="Password"
+              testID="sign-in-password"
               accessibilityHint="Enter your account password"
             />
           </View>

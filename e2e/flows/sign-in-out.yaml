@@ -1,0 +1,41 @@
+# Journey: a wrong password is refused; sign in, see a new account's empty queue, sign out,
+# and stay signed out across a relaunch.
+appId: com.b1codes.activequeue
+name: Sign in and out
+---
+- runScript:
+    file: common/create-account.js
+    env:
+      NAME: alice
+- launchApp:
+    clearState: true
+- tapOn:
+    id: sign-in-email
+- inputText: ${output.alice}
+- tapOn:
+    id: sign-in-password
+- inputText: "not-the-password"
+- tapOn: "Sign in"
+- extendedWaitUntil:
+    visible: ".*Invalid email address or password.*"
+    timeout: 15000
+- launchApp:
+    clearState: true
+- runFlow:
+    file: common/sign-in.yaml
+    env:
+      NAME: alice
+- assertVisible: "No Content Sources Added"
+# Signed in survives a relaunch.
+- launchApp:
+    stopApp: true
+- extendedWaitUntil:
+    visible: "Active Queue"
+    timeout: 20000
+- runFlow: common/sign-out.yaml
+- launchApp:
+    stopApp: true
+- extendedWaitUntil:
+    visible:
+      id: sign-in-email
+    timeout: 20000

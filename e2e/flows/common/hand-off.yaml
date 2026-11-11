@@ -1,0 +1,19 @@
+# The session checklist up to "in progress": skip the tracker, launch the media (iOS opens
+# the video in Safari, since the simulator has no YouTube app) and come back to the app.
+appId: com.b1codes.activequeue
+---
+- extendedWaitUntil:
+    visible: "Skip Tracker Step"
+    timeout: 20000
+- tapOn: "Skip Tracker Step"
+- tapOn: "Launch Media and Start Workout Session"
+- launchApp:
+    stopApp: false
+- extendedWaitUntil:
+    visible: "Session Started"
+    timeout: 20000
+# Step 4 sits below the fold, and tapOn doesn't scroll.
+- scrollUntilVisible:
+    element: "Abandon session"
+    direction: DOWN
+    centerElement: true

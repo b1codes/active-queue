@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import re
 from datetime import UTC, datetime, timedelta
 
@@ -85,7 +86,13 @@ class FixtureProvider(ContentProvider):
 
     Allows running the full ActiveQueue application with zero GCP dependency, zero API keys,
     and zero network overhead.
+
+    `page_latency_ms` delays each playlist page, standing in for the Data API's round trip
+    (settings.fixture_page_latency_ms; 0 everywhere but the E2E stack).
     """
+
+    def __init__(self, page_latency_ms: int = 0) -> None:
+        self._page_latency_s = page_latency_ms / 1000
 
     async def validate_source_url(self, url: str) -> tuple[str, str]:
         """Validate URL and extract (provider_name, source_id).
@@ -175,6 +182,8 @@ class FixtureProvider(ContentProvider):
         known: KnownLookup | None = None,
     ) -> PlaylistPage:
         """Fetch paginated page of playlist items. IDs `known` returns go in known_ids."""
+        if self._page_latency_s:
+            await asyncio.sleep(self._page_latency_s)
         if source_id == "fixture-quota-exceeded":
             raise ProviderError(
                 code="PROVIDER_QUOTA_EXCEEDED",

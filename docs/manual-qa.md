@@ -76,12 +76,24 @@ size, then at AX2, where `fontScale.max` (2.0) stops text growth.
 
 ## Platform hand-offs
 
-Covered by [e2e_device_validation.md](testing/e2e_device_validation.md) until the E2E suite
-(ClickUp 86bcxruy6) lands:
-- Sign in with Apple
-- the custom auth domain
-- Apple Fitness and tracker URL-scheme hand-off
-- the deep-link device matrix
+What CI already checks on every PR, so you don't need to here (see
+[testing.md](testing.md#e2e-tests)):
+- sign-in and sign-out with email and password
+- adding a source and its sync
+- hiding
+- both matching paths
+- start, complete and abandon
+- history
+- account isolation
+- the hand-off to a video URL and back
+
+Still on a physical iPhone, with
+[e2e_device_validation.md](testing/e2e_device_validation.md):
+- [ ] Sign in with Apple, through the custom auth domain.
+- [ ] Media hand-off opens the **YouTube app** (not Safari) at the right video, and coming
+      back lands on the session checklist.
+- [ ] Apple Fitness and the other tracker URL schemes open the right app.
+- [ ] The deep-link device matrix ([deep_link_device_matrix_report.md](testing/deep_link_device_matrix_report.md)).
 
 ## Performance
 
@@ -114,4 +126,5 @@ Monitor from the dev menu, or record a Core Animation trace in Instruments.
   start a sync, then press and hold a card. The UI-thread frame rate doesn't drop.
 
 Record the device, iOS version, build and fps for each in the release ticket. The E2E
-simulator harness (ClickUp 86bcxruy6) is where these can become automated traces.
+simulator stack (`make e2e`) is where these could become automated traces. Simulator
+frame rates don't predict a device's, so they stay here for now.

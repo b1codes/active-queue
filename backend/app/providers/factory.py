@@ -13,8 +13,8 @@ def get_provider(provider_name: str | None = None) -> ContentProvider:
     """
     target_provider = (provider_name or settings.content_provider).lower()
     if target_provider == "fixture":
-        return FixtureProvider()
+        return FixtureProvider(page_latency_ms=settings.fixture_page_latency_ms)
     if target_provider == "youtube":
         return YouTubeProvider()
     # Fallback to FixtureProvider for unknown/dev provider names
-    return FixtureProvider()
+    return FixtureProvider(page_latency_ms=settings.fixture_page_latency_ms)

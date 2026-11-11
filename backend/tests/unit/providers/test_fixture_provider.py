@@ -90,3 +90,37 @@ async def test_get_provider_factory() -> None:
     """get_provider returns FixtureProvider instance when requested or default."""
     p = get_provider("fixture")
     assert isinstance(p, FixtureProvider)
+
+
+@pytest.mark.asyncio
+async def test_fixture_provider_page_latency(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Each page waits page_latency_ms (the E2E stack's stand-in for the Data API)."""
+    waits: list[float] = []
+
+    async def fake_sleep(seconds: float) -> None:
+        waits.append(seconds)
+
+    monkeypatch.setattr("app.providers.fixture.asyncio.sleep", fake_sleep)
+    await FixtureProvider(page_latency_ms=150).fetch_playlist_items("fixture-small-playlist")
+    await FixtureProvider().fetch_playlist_items("fixture-small-playlist")
+    assert waits == [0.15]
+
+
+def test_get_provider_passes_fixture_latency(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The factory hands settings.fixture_page_latency_ms to the fixture provider."""
+    monkeypatch.setattr("app.providers.factory.settings.fixture_page_latency_ms", 250)
+    provider = get_provider("fixture")
+    assert isinstance(provider, FixtureProvider)
+    assert provider._page_latency_s == 0.25
+
+
+def test_fixture_page_latency_is_bounded() -> None:
+    """A typo can't stall every sync: the setting is capped at 5 s and never negative."""
+    from pydantic import ValidationError as PydanticValidationError
+
+    from app.core.config import Settings
+
+    assert Settings(fixture_page_latency_ms=5000).fixture_page_latency_ms == 5000
+    for bad in (-1, 5001):
+        with pytest.raises(PydanticValidationError):
+            Settings(fixture_page_latency_ms=bad)

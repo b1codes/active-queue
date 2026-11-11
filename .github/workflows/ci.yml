@@ -32,6 +32,9 @@ env:
   SHELLCHECK_VERSION: "v0.10.0"
   RUFF_VERSION: "0.16.2"
   EXPO_DOCTOR_VERSION: "1.17.11"
+  # E2E UI driver (ClickUp 86bcxruy6): the release zip, checked against this digest.
+  MAESTRO_VERSION: "2.11.0"
+  MAESTRO_SHA256: "5384593cb4e7a106489e75a821d157dd43f4e438df6bc308b72e82c685e1283a"
 
 jobs:
   workflows:
@@ -454,7 +457,7 @@ jobs:
         run: |
           docker run --rm -v "${GITHUB_WORKSPACE}:/mnt" -w /mnt \
             "koalaman/shellcheck:${SHELLCHECK_VERSION}" scripts/*.sh loadtest/*.sh \
-            frontend/scripts/*.sh frontend/scripts/screenshots/*.sh
+            frontend/scripts/*.sh frontend/scripts/screenshots/*.sh e2e/*.sh
           pipx run "ruff==${RUFF_VERSION}" check scripts loadtest
           pipx run "ruff==${RUFF_VERSION}" format --check scripts loadtest
 
@@ -534,12 +537,108 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
 
+  e2e:
+    name: E2E journeys (Maestro, iOS simulator, API + emulators)
+    # The Release app on a fresh simulator against the real API (fixture provider) and
+    # the Firebase emulators. e2e/run.sh starts from empty emulators every run. On a
+    # failure the "e2e" artifact holds each flow's screenshots and view hierarchy, the
+    # JUnit report and the API log. See docs/testing.md#e2e-tests.
+    runs-on: macos-26
+    timeout-minutes: 75
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up pnpm (version from package.json packageManager)
+        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320  # v4.4.0
+        with:
+          package_json_file: frontend/package.json
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e  # v6.8.0
+        with:
+          version: ${{ env.UV_VERSION }}
+
+      - name: Set up Java (Firestore emulator, Maestro)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Cache Firebase emulator binaries
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/firebase/emulators
+          key: firebase-emulators-${{ env.FIREBASE_TOOLS_VERSION }}
+
+      - name: Cache CocoaPods downloads
+        uses: actions/cache@v4
+        with:
+          path: ~/Library/Caches/CocoaPods
+          key: pods-${{ runner.os }}-${{ hashFiles('frontend/pnpm-lock.yaml', 'frontend/app.json') }}
+          restore-keys: pods-${{ runner.os }}-
+
+      - name: Install dependencies
+        run: |
+          (cd frontend && pnpm install --frozen-lockfile)
+          (cd backend && uv sync --frozen)
+
+      - name: Install Maestro (pinned, checksum verified)
+        run: |
+          zip="${RUNNER_TEMP}/maestro.zip"
+          curl -fsSL -o "$zip" \
+            "https://github.com/mobile-dev-inc/maestro/releases/download/cli-${MAESTRO_VERSION}/maestro.zip"
+          echo "${MAESTRO_SHA256}  ${zip}" | shasum -a 256 -c -
+          unzip -q "$zip" -d "${RUNNER_TEMP}"
+          echo "MAESTRO=${RUNNER_TEMP}/maestro/bin/maestro" >> "$GITHUB_ENV"
+
+      - name: Build the app for the E2E stack (Release, simulator)
+        working-directory: frontend
+        run: scripts/ios-sim-build.sh e2e
+
+      - name: Run the journeys
+        run: |
+          npx -y "firebase-tools@${FIREBASE_TOOLS_VERSION}" emulators:exec \
+            --config firebase.test.json --project demo-activequeue-local --only auth,firestore \
+            "e2e/run.sh"
+
+      - name: Upload reports, screenshots and the API log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e
+          path: frontend/build/e2e/
+          if-no-files-found: ignore
+          retention-days: 14
+
+      - name: Upload the Xcode build log
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-xcodebuild-log
+          path: frontend/build/xcodebuild-e2e.log
+          if-no-files-found: ignore
+          retention-days: 7
+
   # Single required status check for branch protection (ClickUp 86bbb7ru0). Add every new
   # job to `needs`; this fails if any of them failed or was cancelled, and is never skipped.
   ci-passed:
     name: CI Passed
     if: always()
-    needs: [workflows, backend, frontend, firestore-rules, security-scans, api-breaking, container, terraform, screenshots]
+    needs: [workflows, backend, frontend, firestore-rules, security-scans, api-breaking, container, terraform, screenshots, e2e]
     runs-on: ubuntu-latest
     steps:
       - name: Check required jobs

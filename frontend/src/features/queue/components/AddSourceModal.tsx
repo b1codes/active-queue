@@ -93,6 +93,7 @@ export const AddSourceModal: React.FC<AddSourceModalProps> = ({ visible, onClose
                   autoCapitalize="none"
                   autoCorrect={false}
                   accessibilityLabel="YouTube playlist URL or ID"
+                  testID="add-source-url"
                 />
 
                 {addSourceError ? (

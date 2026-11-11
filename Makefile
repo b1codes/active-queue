@@ -17,7 +17,7 @@ RESET   := \033[0m
         seed-db seed \
         check contracts test test-backend test-backend-fast test-emulator test-frontend \
         test-firestore-rules test-container fuzz-api \
-        test-screenshots screenshots \
+        test-screenshots screenshots e2e \
         lint lint-backend lint-frontend \
         typecheck typecheck-backend typecheck-frontend \
         format format-backend \
@@ -59,6 +59,7 @@ help:
 	@echo "  $(GREEN)test-firestore-rules$(RESET) Test the deployed Firestore rules on the emulator"
 	@echo "  $(GREEN)test-container$(RESET)    Lint, build, scan and smoke-test the API image"
 	@echo "  $(GREEN)fuzz-api$(RESET)          Long Schemathesis run on the test emulators (SEED=<n> replays)"
+	@echo "  $(GREEN)e2e$(RESET)               E2E journeys: Release app on a simulator + API + emulators (macOS)"
 	@echo "  $(GREEN)test-screenshots$(RESET)  Screenshot every story on both glass tiers and diff (macOS + Xcode)"
 	@echo "  $(GREEN)screenshots$(RESET)       Update screenshot baselines (RUN=<ci-run-id> takes a CI run's)"
 	@echo "  $(GREEN)contracts$(RESET)         Regenerate API contract files after an API change"
@@ -263,6 +264,14 @@ fuzz-api:
 	$(FIREBASE_TOOLS) emulators:exec $(TEST_EMULATORS) \
 		"cd backend && REQUIRE_EMULATOR=1 FUZZ_MAX_EXAMPLES=$(FUZZ_MAX_EXAMPLES) uv run pytest -p no:randomly \
 		tests/emulator/test_schemathesis_emulator.py $(if $(SEED),--hypothesis-seed=$(SEED))"
+
+## e2e: The E2E journeys (e2e/flows) with Maestro on an iOS simulator, against the API on
+## the test emulators with the fixture provider (docs/testing.md#e2e-tests). Needs macOS,
+## Xcode and Maestro (MAESTRO=<path> if it isn't on PATH). FLOWS=e2e/flows/x.yaml runs one.
+FLOWS ?=
+e2e:
+	cd frontend && scripts/ios-sim-build.sh e2e
+	$(FIREBASE_TOOLS) emulators:exec $(TEST_EMULATORS) "e2e/run.sh $(FLOWS)"
 
 ## test-screenshots: Screenshot every Storybook story on the Tier 1 and Tier 3 glass and
 ## diff against frontend/screenshots/baselines (docs/testing.md#visual-regression-tests).

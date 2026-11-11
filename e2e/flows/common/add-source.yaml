@@ -1,0 +1,26 @@
+# Adds SOURCE through the Add Source sheet and waits for its first items in the queue.
+appId: com.b1codes.activequeue
+---
+- tapOn: "Add Source"
+- retry:
+    maxRetries: 3
+    commands:
+      - tapOn:
+          id: add-source-url
+      - eraseText: 60
+      - inputText: ${SOURCE}
+      - waitForAnimationToEnd
+      - assertVisible:
+          id: add-source-url
+          text: ${SOURCE}
+- retry:
+    maxRetries: 3
+    commands:
+      - tapOn: "Add source"
+      - extendedWaitUntil:
+          notVisible: "Add Content Source"
+          timeout: 15000
+- extendedWaitUntil:
+    visible:
+      id: "feed-card-.*"
+    timeout: 60000

@@ -6,6 +6,11 @@
 
 ## 1. Overview & Physical Device Testing Rationale
 
+> The session workflow in §3B also runs automatically on every PR against a simulator and
+> the emulators (`make e2e`, [testing.md](../testing.md#e2e-tests)). On a device, focus on
+> what the simulator can't show: Sign in with Apple, the YouTube app hand-off, real
+> hardware. See [manual-qa.md](../manual-qa.md).
+
 Per **SPEC §12.4** and **Risk #9**, emulator-based authentication is insufficient for production sign-off. Firebase Auth Emulators cannot validate:
 - Real Apple Services ID entitlement bindings.
 - Apple Developer Team & Key ID JWT signature generation.
@@ -35,7 +40,7 @@ Per **SPEC §12.4** and **Risk #9**, emulator-based authentication is insufficie
 
 ### B. End-to-End Session Workflow Verification
 1. **Ingest Source**: Paste YouTube playlist URL (`https://youtube.com/playlist?list=PL...`). Verify sync progress bar updates smoothly and source items populate feed.
-2. **Select Activity & Time**: Select activity (e.g. `Cycling`, 30 min duration). Verify time-matching algorithm surfaces content within ±10% tolerance window (27–33 min).
+2. **Select Activity & Time**: Select activity (e.g. `Cycling`, 30 min duration). Verify time-matching surfaces content in the SPEC §5.3 window: 30 to 35 min, or 28 to 30 min if nothing is longer.
 3. **Run Active Session**: Start session. Verify active session banner renders and timer ticks down.
 4. **Complete Session**: Tap **"Complete Session"**. Verify transactional session completion marks feed items consumed and clears active session state.
 5. **Feed Auto-Hide**: Return to feed screen. Verify completed items are automatically hidden from feed per SPEC §7.4.

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 LOCAL_FIRESTORE_EMULATOR_HOST = "localhost:9090"
@@ -22,6 +23,10 @@ class Settings(BaseSettings):
     firestore_emulator_host: str | None = None
     firebase_auth_emulator_host: str | None = None
     content_provider: Literal["fixture", "youtube"] = "fixture"
+    # Fixture provider only: delay per playlist page, so a local stack syncs at a real
+    # YouTube page's pace (~100-300 ms) and the app's sync progress can be watched. The
+    # E2E stack sets it (e2e/run.sh); tests and dev leave it at 0.
+    fixture_page_latency_ms: int = Field(default=0, ge=0, le=5000)
     youtube_api_key: str | None = None
     max_items_per_source: int = 5000
     content_cache_ttl_days: int = 30

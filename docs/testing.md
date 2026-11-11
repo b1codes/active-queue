@@ -37,6 +37,7 @@ Run `make check` before pushing. It runs the same gates as CI (`.github/workflow
 | Render budgets: a 1,000-item feed mounts at most 20 rows, sync ticks and banners re-render no row, nothing animates on the JS thread; every test holds the 2-layer GPU blur budget | `frontend/src/__tests__/perf/`, `frontend/src/core/perf/glassBudget.ts`, `frontend/jest.setup.ts` | `make test-frontend` |
 | Production iOS bundle at most 6.5 MiB (startup) and free of Storybook and test code | `frontend/scripts/check-bundle.js`, `frontend` job in `ci.yml` | part of `make check` |
 | Visual regression: every Storybook story screenshotted on the Tier 1 and Tier 3 glass on a pinned iOS simulator, diffed against baselines; light mode changes nothing | `frontend/.rnstorybook/screenshots/`, `frontend/scripts/screenshots/`, `frontend/screenshots/baselines/`, `screenshots` job in `ci.yml` | `make test-screenshots` (macOS) |
+| E2E journeys: the Release app on a fresh iOS simulator, driven by Maestro, against the real API (fixture provider) on empty Firebase emulators. Sign in and out, add a source and watch it sync, hide a feed item, time block to completed session, match from the queue and abandon, two accounts on one device. No journey may cause a 5xx. | `e2e/`, `e2e` job in `ci.yml` | `make e2e` (macOS) |
 | Firestore reads and writes per request, as a heavy user (4 sources, 1,200-item feed, 30 sessions), each endpoint held to a budget from what bounds it | `backend/tests/emulator/test_read_budgets_emulator.py`, `backend/tests/firestore_meter.py` | `make test-backend` |
 | Sync cost at the 5,000-item cap: YouTube quota units (cold, warm, throttled, unchanged, capped), Firestore writes, wall time | `backend/tests/emulator/test_sync_cost_emulator.py` | `make test-backend` |
 | API image under Cloud Run's 1 vCPU / 512 MiB: cold start, first signed-in request, peak memory, plus the 45 s k6 load smoke against it | `container` job in `ci.yml`, `scripts/container-perf.sh`, `loadtest/api.js` | `make test-container` |
@@ -159,8 +160,8 @@ MONKEY_LOG=1 ...   # print each walk
 ```
 
 The monkey drives React through Jest, so native gesture recognition, real multi-touch and
-iOS's own crash reporting are outside it. The E2E simulator harness covers those (ClickUp
-86bcxruy6).
+iOS's own crash reporting are outside it. The E2E journeys exercise native gestures on
+the simulator (see [E2E tests](#e2e-tests)). A seeded random walk there is a follow-up.
 
 ## Performance and load tests
 
@@ -337,6 +338,54 @@ cd frontend && node scripts/screenshots/capture.js --off-reference --only feedca
 Not covered here: how the Tier 1 material moves and refracts as content scrolls under it
 (a still can't show that), and real devices. See
 [manual-qa.md](manual-qa.md#visual-settings).
+
+## E2E tests
+
+`e2e/run.sh` runs the journeys in `e2e/flows/` against the whole stack:
+
+- **The app:** a Release simulator build (`frontend/scripts/ios-sim-build.sh e2e`) with
+  the emulator settings inlined: API on `127.0.0.1:8090`, Auth emulator on 9199.
+- **The API:** the real FastAPI app under uvicorn, on the test emulators (Firestore 9190,
+  Auth 9199). Both are emptied at the start of every run.
+- **Content:** the fixture provider stands in for YouTube. `FIXTURE_PAGE_LATENCY_MS=200`
+  gives each playlist page a real Data API round trip, so a 1,200-item sync takes a few
+  seconds and its progress can be watched.
+- **The simulator:** a new iPhone 17 Pro on iOS 26.5 each run, with an English-only
+  keyboard and no autocorrect, predictions or swipe typing. XCTest types key by key, and
+  those features rewrite or swallow keys.
+
+Each journey creates its own Auth-emulator account (`common/create-account.js`) and signs
+in through the real sign-in screen. No journey depends on another's data, so they can run
+in any order or alone. The runner also fails if any request in the API log got a 5xx.
+
+| Journey | What it proves |
+|---------|----------------|
+| `sign-in-out` | A wrong password is refused with the plain-language message (and VoiceOver hears the same). Sign-in survives a relaunch; sign-out does too. |
+| `add-source-sync` | An unknown playlist is refused with a reason. A 1,200-item playlist syncs in chunks with visible progress and fills the queue (count badge 1.2k). |
+| `hide-feed-item` | Hiding from the options menu removes the card, and it stays hidden after a relaunch. |
+| `time-block-complete` | Time first (SPEC §5.3: a block B takes B to B+5 min, else B−2 min to B). 60 min has no match, 45 min matches a 45:00 video. Start, hand off to the media, come back, complete. History shows it. |
+| `match-abandon` | Content first: pick a queued 15:00 video, pick an activity, start, hand off, abandon. No active session is left, and History shows the abandon. |
+| `multi-account` | After Alice signs out, Bob sees none of her sources, queue or history. Alice's data is there when she signs back in. |
+| `change-preferences` | Skipped (`tags: [skip]`): the app has no preferences screen yet (ClickUp 86bcyn043). |
+
+The media hand-off opens the video in Safari, since the simulator has no YouTube app.
+The journey then brings the app back. Real YouTube, Apple Fitness and tracker apps, and
+Sign in with Apple, stay in [manual-qa.md](manual-qa.md#platform-hand-offs).
+
+Selectors are accessibility labels where the app has them, which keeps them honest: a
+label VoiceOver can't use is one a journey can't either. Text inputs have `testID`s,
+because a label also matches the field's visible caption. Taps that can land mid-animation
+(the keyboard coming up) are verified and retried: `common/sign-in.yaml` checks each
+field's value after typing.
+
+```sh
+make e2e MAESTRO=<path to maestro>                         # build, then every journey
+make e2e MAESTRO=... FLOWS=e2e/flows/hide-feed-item.yaml   # one journey
+```
+
+Results land in `frontend/build/e2e/`: `report.xml` (JUnit), each flow's screenshots and
+view hierarchy on failure (`artifacts/`), and `api.log`. CI uploads them as the `e2e`
+artifact. Maestro is pinned in `ci.yml` (`MAESTRO_VERSION`, checked by SHA-256).
 
 ## Security tests
 

@@ -1,0 +1,34 @@
+# Journey: a playlist the provider can't find is refused with a reason; a 1,200-item
+# playlist syncs in chunks with visible progress, and its items fill the queue.
+appId: com.b1codes.activequeue
+name: Add a source and watch it sync
+---
+- runFlow:
+    file: common/new-user.yaml
+    env:
+      NAME: syncer
+- tapOn: "Add Source"
+- tapOn:
+    id: add-source-url
+- inputText: "fixture-unavailable"
+- tapOn: "Add source"
+- extendedWaitUntil:
+    visible: ".*fixture-unavailable.* not found or private"
+    timeout: 20000
+- eraseText: 40
+- inputText: "fixture-large-playlist"
+- tapOn: "Add source"
+# The progress bar shows while the 250-item chunks land.
+- extendedWaitUntil:
+    visible: ".*items synced.*"
+    timeout: 30000
+- extendedWaitUntil:
+    visible: "Fixture Workout Video #1200 — High Intensity Cardio.*"
+    timeout: 120000
+- extendedWaitUntil:
+    notVisible: "Syncing Content Source..."
+    timeout: 120000
+# All 1,197 playable items are queued (3 fixture entries are private, deleted or live).
+- extendedWaitUntil:
+    visible: "1.2k"
+    timeout: 20000
