@@ -111,6 +111,24 @@ export async function addSource(urlOrId: string): Promise<Source | null> {
 // replaced loop can't keep calling /sync or overwrite the new loop's progress.
 let currentSyncRun = 0;
 
+// The API allows 10 sync calls a minute per user (SPEC §10.2) and a 5,000-item playlist
+// takes 20 chunks, so a long sync is expected to be told to wait. It waits out the
+// server's Retry-After (a fixed window, so at most a minute) this many times in a row.
+const MAX_RATE_LIMIT_WAITS = 3;
+const MAX_RETRY_AFTER_SECONDS = 60;
+
+/** Resolves after `seconds`, or as soon as `stop()` is true (checked every 250 ms). */
+function waitUnless(seconds: number, stop: () => boolean): Promise<void> {
+  const until = Date.now() + seconds * 1000;
+  return new Promise((resolve) => {
+    const tick = () => {
+      if (stop() || Date.now() >= until) resolve();
+      else setTimeout(tick, Math.min(250, until - Date.now()));
+    };
+    tick();
+  });
+}
+
 export async function startResumableSync(
   sourceId: string,
   itemEstimate?: number | null
@@ -139,10 +157,12 @@ export async function startResumableSync(
   let currentIteration = 0;
   let hasMore = true;
   let totalSynced = 0;
+  let rateLimitWaits = 0;
+  const cancelled = () => store.getState().queue.syncProgress.isCancelled;
 
   while (hasMore) {
     if (superseded()) return;
-    if (store.getState().queue.syncProgress.isCancelled) {
+    if (cancelled()) {
       store.dispatch(setSyncProgress({ isSyncing: false, error: 'Sync cancelled' }));
       break;
     }
@@ -168,6 +188,7 @@ export async function startResumableSync(
 
       totalSynced += chunkData.items_synced;
       hasMore = chunkData.has_more;
+      rateLimitWaits = 0;
 
       store.dispatch(
         setSyncProgress({
@@ -182,6 +203,14 @@ export async function startResumableSync(
       }
     } catch (err: unknown) {
       if (superseded()) return;
+      const retryAfter = err instanceof ApiError && err.isRateLimited ? err.retryAfterSeconds : undefined;
+      if (retryAfter !== undefined && rateLimitWaits < MAX_RATE_LIMIT_WAITS) {
+        // The refused request synced nothing, so it doesn't count toward the 40-chunk guard.
+        rateLimitWaits += 1;
+        currentIteration -= 1;
+        await waitUnless(Math.min(retryAfter, MAX_RETRY_AFTER_SECONDS), () => superseded() || cancelled());
+        continue;
+      }
       const { code, message } = toQueueError(err, 'Sync chunk failed');
       store.dispatch(setSyncProgress({ isSyncing: false, error: message, errorCode: code }));
       break;

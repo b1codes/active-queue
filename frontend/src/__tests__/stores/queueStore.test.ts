@@ -157,6 +157,60 @@ describe('startResumableSync', () => {
     expect(queue().syncProgress.error).toBe('Sync cancelled');
   });
 
+  // The API allows 10 sync calls a minute per user (SPEC §10.2), and a 5,000-item playlist
+  // takes 20 chunks. Chunk 11 used to end the sync with an error.
+  describe('when the API rate-limits a long sync', () => {
+    const limited = { status: 429, headers: { 'Retry-After': '7' }, error: { code: 'RATE_LIMITED', message: 'slow down' } };
+
+    afterEach(() => jest.useRealTimers());
+
+    it('waits out Retry-After and finishes the sync', async () => {
+      jest.useFakeTimers();
+      const replies = [...Array(10)].map(() => chunk(250, true));
+      const api = mockApi({
+        'POST /api/v1/sources/s/sync': [...replies, limited, ...Array(9).fill(chunk(250, true)), chunk(250, false)],
+        ...refresh,
+      });
+      const done = startResumableSync('s', 5000);
+      await jest.advanceTimersByTimeAsync(6_900);
+      expect(api.callsTo('POST', '/api/v1/sources/s/sync')).toHaveLength(11);
+      expect(queue().syncProgress).toMatchObject({ isSyncing: true, error: null });
+
+      await jest.advanceTimersByTimeAsync(200);
+      await done;
+      expect(api.callsTo('POST', '/api/v1/sources/s/sync')).toHaveLength(21);
+      expect(queue().syncProgress).toMatchObject({ isSyncing: false, itemsSyncedTotal: 5000, iterationCount: 20, error: null });
+    });
+
+    it('stops waiting when the user cancels', async () => {
+      jest.useFakeTimers();
+      const api = mockApi({ 'POST /api/v1/sources/s/sync': [chunk(250, true), limited], ...refresh });
+      const done = startResumableSync('s');
+      await jest.advanceTimersByTimeAsync(1_000);
+      cancelSync();
+      await jest.advanceTimersByTimeAsync(500);
+      await done;
+      expect(api.callsTo('POST', '/api/v1/sources/s/sync')).toHaveLength(2);
+      expect(queue().syncProgress).toMatchObject({ isSyncing: false, error: 'Sync cancelled' });
+    });
+
+    it('gives up after repeated refusals, and without Retry-After', async () => {
+      jest.useFakeTimers();
+      const api = mockApi({ 'POST /api/v1/sources/s/sync': limited, ...refresh });
+      const done = startResumableSync('s');
+      await jest.advanceTimersByTimeAsync(10 * 7_000);
+      await done;
+      expect(api.callsTo('POST', '/api/v1/sources/s/sync')).toHaveLength(4); // 1 + 3 waits
+      expect(queue().syncProgress).toMatchObject({ isSyncing: false, errorCode: 'RATE_LIMITED' });
+
+      jest.useRealTimers();
+      const bare = mockApi({ 'POST /api/v1/sources/s/sync': { ...limited, headers: {} }, ...refresh });
+      await startResumableSync('s');
+      expect(bare.callsTo('POST', '/api/v1/sources/s/sync')).toHaveLength(1);
+      expect(queue().syncProgress.errorCode).toBe('RATE_LIMITED');
+    });
+  });
+
   it('surfaces quota exhaustion with its code', async () => {
     mockApi({
       'POST /api/v1/sources/s/sync': { status: 503, error: { code: 'PROVIDER_QUOTA_EXCEEDED', message: 'quota' } },

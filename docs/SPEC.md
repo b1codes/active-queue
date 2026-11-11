@@ -804,6 +804,7 @@ do {
 
 - `items_total_estimate` comes from the preflight `itemCount` and is an estimate — private and deleted entries still count toward it upstream, so the bar may finish slightly short of 100%. The client renders "250 of ~1,284."
 - **The 40-iteration guard is required**, not defensive decoration: 40 × 250 items covers the 5,000-item cap with margin, and without it a server bug that never sets `complete` becomes an infinite client loop burning quota.
+- **A long sync is expected to be rate-limited.** The 5,000-item cap is 20 chunks and the sync limit is 10 a minute (§10.2), so a `429` with `Retry-After` mid-sync is waited out, not shown as an error: the client sleeps for `Retry-After` (at most 60 s, cancellable) and continues, up to 3 refusals in a row. A refused request synced nothing, so it doesn't count toward the 40-iteration guard.
 - The loop is cancellable. Abandoning it mid-way is safe and resumable — that is the entire point of persisting the cursor (§4.5).
 - `throttled: true` with `complete: true` means a start request arrived inside the 15-minute window; the client shows the last sync's result rather than an error.
 - `skipped: true` means the preflight found no change.
