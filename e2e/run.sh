@@ -8,8 +8,8 @@
 #
 # Needs: the E2E build (frontend/scripts/ios-sim-build.sh e2e), uv, Xcode's simctl, and
 # Maestro ($MAESTRO, else `maestro` on PATH). Every run starts from empty emulators and a
-# new simulator. Results: frontend/build/e2e/ (report.xml, per-flow screenshots and
-# hierarchies, api.log).
+# new simulator. Results: frontend/build/e2e/ (reports/<journey>.xml, artifacts/ with each
+# journey's log, screenshots and hierarchies, crashes/, api.log).
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -92,12 +92,63 @@ xcrun simctl bootstatus "$udid" -b >/dev/null
 xcrun simctl install "$udid" "$APP"
 echo "e2e: $DEVICE, $RUNTIME ($udid); API on :$PORT"
 
+# One Maestro run per journey: if the XCTest driver dies (on a slow CI runner it has lost
+# the app's accessibility server mid-query: DeviceUnreachableException,
+# kAXErrorServerNotFound), only that journey is affected, and the next run starts a fresh
+# driver. A journey that failed only that way is retried once and logged. Failed
+# assertions are never retried.
 flows=("$@")
-[[ ${#flows[@]} -gt 0 ]] || flows=("$ROOT/e2e/flows")
+if [[ ${#flows[@]} -eq 0 ]]; then
+  for f in "$ROOT"/e2e/flows/*.yaml; do
+    [[ "$(basename "$f")" == config.yaml ]] && continue
+    # `tags: [skip]` marks a journey the app can't do yet (each names its ClickUp task).
+    if sed -n '1,/^---/p' "$f" | grep -qE '^ *- skip$'; then
+      echo "e2e: skipped $(basename "$f" .yaml) (tagged skip)"
+      continue
+    fi
+    flows+=("$f")
+  done
+fi
+started_at=$(date +%s)
+mkdir -p "$OUT/reports" "$OUT/artifacts"
 status=0
-"$MAESTRO" --device "$udid" test "${flows[@]}" \
-  --format junit --output "$OUT/report.xml" --test-output-dir "$OUT/artifacts" \
-  -e PASSWORD=e2e-password-1 -e "AUTH_EMULATOR=http://$FIREBASE_AUTH_EMULATOR_HOST" || status=$?
+failed=()
+for flow in "${flows[@]}"; do
+  name=$(basename "$flow" .yaml)
+  for attempt in 1 2; do
+    log="$OUT/artifacts/$name.attempt$attempt.log"
+    if "$MAESTRO" --device "$udid" test "$flow" \
+      --format junit --output "$OUT/reports/$name.xml" \
+      --test-output-dir "$OUT/artifacts/$name" \
+      -e PASSWORD=e2e-password-1 -e "AUTH_EMULATOR=http://$FIREBASE_AUTH_EMULATOR_HOST" \
+      > "$log" 2>&1; then
+      if [[ $attempt -eq 1 ]]; then echo "e2e: passed  $name"; else echo "e2e: passed  $name (on retry)"; fi
+      break
+    fi
+    if [[ $attempt -eq 1 ]] && grep -qE 'DeviceUnreachableException|kAXErrorServerNotFound' "$log"; then
+      echo "e2e: retrying $name: the Maestro driver lost the device (see $log)"
+      continue
+    fi
+    echo "e2e: FAILED  $name (see $log)"
+    grep -E 'Assertion is false|FAILED|Exception' "$log" | head -5 | sed 's/^/        /'
+    failed+=("$name")
+    status=1
+    break
+  done
+done
+
+# The app must never crash. The simulator writes app crash reports to the Mac's own
+# DiagnosticReports folder.
+mkdir -p "$OUT/crashes"
+while IFS= read -r -d '' report; do
+  if [[ $(stat -f %m "$report") -ge $started_at ]]; then
+    cp "$report" "$OUT/crashes/"
+  fi
+done < <(find "$HOME/Library/Logs/DiagnosticReports" -maxdepth 1 -name 'ActiveQueue*' -print0 2>/dev/null)
+if compgen -G "$OUT/crashes/*" >/dev/null; then
+  echo "e2e: the app crashed during the run (reports in $OUT/crashes)" >&2
+  status=1
+fi
 
 # Server-side: no journey may have caused a 5xx.
 if grep -qE 'status_code=5[0-9]{2}' <(sed 's/\x1b\[[0-9;]*m//g' "$OUT/api.log"); then
@@ -105,4 +156,7 @@ if grep -qE 'status_code=5[0-9]{2}' <(sed 's/\x1b\[[0-9;]*m//g' "$OUT/api.log");
   status=1
 fi
 xcrun simctl terminate "$udid" "$BUNDLE_ID" 2>/dev/null || true
+if [[ ${#failed[@]} -gt 0 ]]; then
+  echo "e2e: ${#failed[@]} of ${#flows[@]} journeys failed: ${failed[*]}" >&2
+fi
 exit "$status"

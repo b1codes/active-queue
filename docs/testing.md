@@ -386,9 +386,22 @@ make e2e MAESTRO=<path to maestro>                         # build, then every j
 make e2e MAESTRO=... FLOWS=e2e/flows/hide-feed-item.yaml   # one journey
 ```
 
-Results land in `frontend/build/e2e/`: `report.xml` (JUnit), each flow's screenshots and
-view hierarchy on failure (`artifacts/`), and `api.log`. CI uploads them as the `e2e`
-artifact. Maestro is pinned in `ci.yml` (`MAESTRO_VERSION`, checked by SHA-256).
+Each journey runs in its own Maestro invocation, so a crashed XCTest driver costs at most
+that journey. A journey that failed only because the driver lost the device
+(`DeviceUnreachableException`, `kAXErrorServerNotFound`, seen on CI's slower runner) is
+retried once, and the log says so. A failed assertion is never retried.
+
+The run also fails if the app crashed, judged by iOS crash reports written during the
+run, or if the API answered any request with a 5xx.
+
+Results land in `frontend/build/e2e/`:
+- `reports/<journey>.xml` (JUnit)
+- `artifacts/`: each journey's Maestro log, and its screenshots and view hierarchy on
+  failure
+- `crashes/`
+- `api.log`
+
+CI uploads them as the `e2e` artifact. Maestro is pinned in `ci.yml` (`MAESTRO_VERSION`, checked by SHA-256).
 
 ## Security tests
 
