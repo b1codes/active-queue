@@ -82,3 +82,36 @@ Covered by [e2e_device_validation.md](testing/e2e_device_validation.md) until th
 - the custom auth domain
 - Apple Fitness and tracker URL-scheme hand-off
 - the deep-link device matrix
+
+## Performance
+
+What CI already checks, so you don't need to here:
+- Firestore reads per request and YouTube quota per sync
+- API latency, rate limiting and memory under load
+- container cold start
+- how many feed rows mount, and which re-render
+- the 2-layer blur budget
+- JS-thread animation
+- bundle size
+
+Details are in [testing.md](testing.md#performance-and-load-tests).
+
+The checks below need a real device. Use a **release** build (`eas build --profile
+preview`): debug builds run the JS unoptimized and every number is wrong. Use the oldest
+supported iPhone, since it is the one that drops frames first. Turn on the Performance
+Monitor from the dev menu, or record a Core Animation trace in Instruments.
+
+- **Launch:** cold launch (app killed, then tapped) to a usable feed in under 2 s on a warm
+  API. The API's own cold start is measured nightly; on a staging cold start, add it.
+- **Long feed:** sync a 1,000+ item playlist, then fling the feed top to bottom and back.
+  It holds 60 fps (120 on ProMotion) with no blank rows after the fling settles.
+- **Glass while scrolling:** scroll content under the glass header with Tier 1 (iOS 26+)
+  and with Tier 3. Neither drops frames, and the header text stays legible.
+- **Sync in the background of the UI:** start a 5,000-item sync and scroll the feed while it
+  runs. Scrolling stays smooth and the progress card advances. A pause of up to a minute is
+  the rate limit and expected.
+- **Animations:** ThermalGlow and ChromaticPulse stay smooth while the JS thread is busy:
+  start a sync, then press and hold a card. The UI-thread frame rate doesn't drop.
+
+Record the device, iOS version, build and fps for each in the release ticket. The E2E
+simulator harness (ClickUp 86bcxruy6) is where these can become automated traces.

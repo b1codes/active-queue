@@ -168,6 +168,14 @@ jobs:
           pnpm test:coverage
           node scripts/check-untested-files.js coverage/coverage-final.json
 
+      - name: Production iOS bundle within its startup budget
+        # Hermes maps the whole bundle at launch; its size is the startup cost a change
+        # controls. Fails over the budget, or if Storybook or test code ships.
+        working-directory: frontend
+        run: |
+          npx expo export --platform ios --output-dir dist-ios
+          node scripts/check-bundle.js dist-ios
+
   firestore-rules:
     name: Firestore security rules
     # Loads the rules firebase.json deploys into the emulator and checks that every client

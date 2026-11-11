@@ -201,8 +201,9 @@ check:
 	cd frontend && npx -y openapi-typescript@$(OPENAPI_TS_VERSION) ../contracts/openapi.json \
 		-o src/__tests__/contracts/openapi.gen.ts && git diff --exit-code src/__tests__/contracts/openapi.gen.ts
 	cd frontend && pnpm lint && pnpm typecheck && npx -y expo-doctor@1.17.11
-	@echo "$(BLUE)[5/7] Frontend tests + coverage gate + untested-file check$(RESET)"
+	@echo "$(BLUE)[5/7] Frontend tests + coverage gate + untested-file check + bundle budget$(RESET)"
 	cd frontend && pnpm test:coverage && node scripts/check-untested-files.js coverage/coverage-final.json
+	cd frontend && npx expo export --platform ios --output-dir dist-ios >/dev/null && node scripts/check-bundle.js dist-ios
 	@echo "$(BLUE)[6/7] Firestore security rules$(RESET)"
 	$(MAKE) test-firestore-rules
 	@echo "$(BLUE)[7/7] Workflow lint (actionlint, via Docker)$(RESET)"

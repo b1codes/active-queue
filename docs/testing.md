@@ -34,6 +34,8 @@ Run `make check` before pushing. It runs the same gates as CI (`.github/workflow
 | OWASP ZAP API scan against staging (nightly) | `.github/workflows/security-nightly.yml` | CI only |
 | API fuzzing: Schemathesis over every operation in `contracts/openapi.json` on the emulators (25 derandomized examples per operation per PR, 1000 with a fresh logged seed nightly) | `backend/tests/emulator/test_schemathesis_emulator.py`, `.github/workflows/fuzz-nightly.yml` | `make test-backend`, `make fuzz-api SEED=<n>` |
 | App monkey: seeded random walks over every screen against a stateful fake API, healthy and flaky (fixed seeds per PR, 25 fresh seeds nightly), plus gesture races (double taps, back mid-request, backgrounding mid-sync) | `frontend/src/__tests__/fuzz/`, `frontend/src/test-utils/monkey.tsx`, `frontend/src/test-utils/fakeBackend.ts` | `make test-frontend`, `MONKEY_SEED=<n> pnpm test -- monkey` |
+| Render budgets: a 1,000-item feed mounts at most 20 rows, sync ticks and banners re-render no row, nothing animates on the JS thread; every test holds the 2-layer GPU blur budget | `frontend/src/__tests__/perf/`, `frontend/src/core/perf/glassBudget.ts`, `frontend/jest.setup.ts` | `make test-frontend` |
+| Production iOS bundle at most 6.5 MiB (startup) and free of Storybook and test code | `frontend/scripts/check-bundle.js`, `frontend` job in `ci.yml` | part of `make check` |
 | Firestore reads and writes per request, as a heavy user (4 sources, 1,200-item feed, 30 sessions), each endpoint held to a budget from what bounds it | `backend/tests/emulator/test_read_budgets_emulator.py`, `backend/tests/firestore_meter.py` | `make test-backend` |
 | Sync cost at the 5,000-item cap: YouTube quota units (cold, warm, throttled, unchanged, capped), Firestore writes, wall time | `backend/tests/emulator/test_sync_cost_emulator.py` | `make test-backend` |
 | API image under Cloud Run's 1 vCPU / 512 MiB: cold start, first signed-in request, peak memory, plus the 45 s k6 load smoke against it | `container` job in `ci.yml`, `scripts/container-perf.sh`, `loadtest/api.js` | `make test-container` |
@@ -228,8 +230,24 @@ and the first signed-in request (1.5 s), samples memory during the smoke run (bu
 256 MiB, half the limit), and fails on an OOM kill. On staging, the nightly job times the
 first request of the night, normally a cold start (budget 6 s).
 
-The app side (startup time, scroll frame rate, blur and Reanimated frame drops) needs a
-simulator or a device. See [manual-qa.md](manual-qa.md).
+**App.** Jest can't measure frames, but it can count the work that costs them, the
+same way every time:
+
+- `src/__tests__/perf/renderBudgets.test.tsx` mounts a 1,000-item feed and fails if
+  more than 20 rows mount. It also fails if 20 sync-progress ticks, or a banner change
+  above the list, re-render any row. It counts `FeedCard` through a wrapper that keeps its
+  memo comparison, so a parent passing a fresh callback fails. A source check fails on
+  `requestAnimationFrame`, `setInterval`, core `Animated` or `LayoutAnimation` in app code:
+  animation runs as Reanimated worklets on the UI thread.
+- The GPU blur budget (at most 2 concurrent glass layers, `src/core/perf/glassBudget.ts`)
+  is checked after every test by `jest.setup.ts`, across every story, screen state and
+  monkey walk.
+- Startup: Hermes maps the whole bundle at launch. `scripts/check-bundle.js` fails a
+  production iOS export over 6.5 MiB (5.70 MiB in Nov 2026), or one that contains
+  Storybook (+2.9 MiB) or test code.
+
+Real frame rate, launch time on a device, and how the blur feels while scrolling are in
+[manual-qa.md](manual-qa.md#performance).
 
 ## Security tests
 
