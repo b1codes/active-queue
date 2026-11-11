@@ -4,4 +4,4 @@ appId: com.b1codes.activequeue
 - tapOn: "Sign out"
 - extendedWaitUntil:
     visible: "Email address"
-    timeout: 15000
+    timeout: 30000

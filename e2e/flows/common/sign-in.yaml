@@ -12,6 +12,7 @@ appId: com.b1codes.activequeue
     commands:
       - tapOn:
           id: sign-in-email
+      - waitForAnimationToEnd
       - eraseText: 80
       - inputText: ${output[NAME]}
       - waitForAnimationToEnd
@@ -23,6 +24,7 @@ appId: com.b1codes.activequeue
     commands:
       - tapOn:
           id: sign-in-password
+      - waitForAnimationToEnd
       - eraseText: 40
       - inputText: ${PASSWORD}
       - waitForAnimationToEnd

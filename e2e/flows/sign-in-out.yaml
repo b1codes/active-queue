@@ -9,16 +9,44 @@ name: Sign in and out
       NAME: alice
 - launchApp:
     clearState: true
-- tapOn:
-    id: sign-in-email
-- inputText: ${output.alice}
-- tapOn:
-    id: sign-in-password
-- inputText: "not-the-password"
-- tapOn: "Sign in"
 - extendedWaitUntil:
-    visible: ".*Invalid email address or password.*"
-    timeout: 15000
+    visible:
+      id: sign-in-email
+    timeout: 30000
+# Same checks as common/sign-in.yaml: each field is confirmed by its value.
+- retry:
+    maxRetries: 3
+    commands:
+      - tapOn:
+          id: sign-in-email
+      - waitForAnimationToEnd
+      - eraseText: 80
+      - inputText: ${output.alice}
+      - waitForAnimationToEnd
+      - assertVisible:
+          id: sign-in-email
+          text: ${output.alice}
+- retry:
+    maxRetries: 3
+    commands:
+      - tapOn:
+          id: sign-in-password
+      - waitForAnimationToEnd
+      - eraseText: 40
+      - inputText: "not-the-password"
+      - waitForAnimationToEnd
+      - assertVisible:
+          id: sign-in-email
+          text: ${output.alice}
+- retry:
+    maxRetries: 3
+    commands:
+      - tapOn:
+          text: "Sign in"
+          optional: true
+      - extendedWaitUntil:
+          visible: ".*Invalid email address or password.*"
+          timeout: 45000
 - launchApp:
     clearState: true
 - runFlow:

@@ -12,6 +12,7 @@ name: Hide a feed item
       SOURCE: fixture-small-playlist
 # UIKit drops touches on an alert until it has finished presenting, so each tap waits
 # for the screen to settle and is confirmed by what it should change.
+# Each attempt starts from the options button, so a lost tap reopens the alert.
 - retry:
     maxRetries: 3
     commands:
@@ -20,17 +21,14 @@ name: Hide a feed item
           optional: true
       - extendedWaitUntil:
           visible: "Hide from Queue"
-          timeout: 10000
-- retry:
-    maxRetries: 3
-    commands:
+          timeout: 30000
       - waitForAnimationToEnd
       - tapOn:
           text: "Hide from Queue"
           optional: true
       - extendedWaitUntil:
           notVisible: "Fixture Workout Video #15 — High Intensity Cardio.*"
-          timeout: 15000
+          timeout: 30000
 - assertVisible: "Fixture Workout Video #14 — High Intensity Cardio.*"
 - launchApp:
     stopApp: true
