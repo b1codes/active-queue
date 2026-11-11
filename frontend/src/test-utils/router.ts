@@ -30,11 +30,19 @@ export function resetRouter(): void {
   segments = ['(app)'];
 }
 
+/** Screen names the last render registered, after Stack.Protected guards. */
+export const registeredScreens: string[] = [];
+
 function Navigator({ children }: { children?: React.ReactNode }) {
+  registeredScreens.length = 0;
   return React.createElement(React.Fragment, null, children);
 }
+Navigator.Protected = function Protected({ guard, children }: { guard: boolean; children?: React.ReactNode }) {
+  return guard ? React.createElement(React.Fragment, null, children) : null;
+};
 type IconFn = (p: { color: string; focused: boolean; size: number }) => React.ReactNode;
-Navigator.Screen = function Screen({ options }: { options?: { tabBarIcon?: IconFn } }) {
+Navigator.Screen = function Screen({ name, options }: { name?: string; options?: { tabBarIcon?: IconFn } }) {
+  if (name) registeredScreens.push(name);
   // Render tab icons in both states so tab configuration is exercised.
   if (!options?.tabBarIcon) return null;
   return React.createElement(
