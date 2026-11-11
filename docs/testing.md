@@ -390,9 +390,11 @@ make e2e MAESTRO=<path to maestro>                         # build, then every j
 make e2e MAESTRO=... FLOWS=e2e/flows/hide-feed-item.yaml   # one journey
 ```
 
-Each journey runs in its own Maestro invocation, so a crashed XCTest driver costs at most
-that journey. A journey that failed only because the driver lost the device
-(`DeviceUnreachableException`, `kAXErrorServerNotFound`, seen on CI's slower runner) is
+A warm-up (`e2e/warmup/launch.yaml`) starts Maestro's XCTest driver once before any
+journey, with retries, because a cold start on CI can outrun Maestro's timeout. Each
+journey then runs in its own Maestro invocation, so a crashed driver costs at most that
+journey. A journey that failed only because the driver lost the device
+(`DeviceUnreachableException`, `kAXErrorServerNotFound` or `IOSDriverTimeoutException`, all seen on CI's slower runner) is
 retried once, and the log says so. A failed assertion is never retried.
 
 The run also fails if the app crashed, judged by iOS crash reports written during the

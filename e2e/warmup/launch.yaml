@@ -1,0 +1,10 @@
+# Not a journey: installs and starts Maestro's XCTest driver and launches the app once, so
+# no journey pays for a cold driver (on CI the first start has outrun Maestro's timeout).
+appId: com.b1codes.activequeue
+---
+- launchApp:
+    clearState: true
+- extendedWaitUntil:
+    visible:
+      id: sign-in-email
+    timeout: 120000

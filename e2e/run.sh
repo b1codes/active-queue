@@ -21,6 +21,9 @@ RUNTIME="${E2E_RUNTIME:-iOS 26.5}"
 MAESTRO="${MAESTRO:-maestro}"
 BUNDLE_ID="com.b1codes.activequeue"
 export MAESTRO_CLI_NO_ANALYTICS=1 MAESTRO_CLI_ANALYSIS_NOTIFICATION_DISABLED=true
+# Installing and starting the XCTest driver on a cold CI simulator can outrun Maestro's
+# default wait (IOSDriverTimeoutException).
+export MAESTRO_DRIVER_STARTUP_TIMEOUT="${MAESTRO_DRIVER_STARTUP_TIMEOUT:-240000}"
 
 : "${FIRESTORE_EMULATOR_HOST:?run inside firebase emulators:exec (see make e2e)}"
 : "${FIREBASE_AUTH_EMULATOR_HOST:?run inside firebase emulators:exec}"
@@ -93,10 +96,9 @@ xcrun simctl install "$udid" "$APP"
 echo "e2e: $DEVICE, $RUNTIME ($udid); API on :$PORT"
 
 # One Maestro run per journey: if the XCTest driver dies (on a slow CI runner it has lost
-# the app's accessibility server mid-query: DeviceUnreachableException,
-# kAXErrorServerNotFound), only that journey is affected, and the next run starts a fresh
-# driver. A journey that failed only that way is retried once and logged. Failed
-# assertions are never retried.
+# the app's accessibility server mid-query, or not started in time), only that journey is
+# affected. A journey that failed only that way ($DRIVER_FAILURE) is retried once and
+# logged. Failed assertions are never retried.
 flows=("$@")
 if [[ ${#flows[@]} -eq 0 ]]; then
   for f in "$ROOT"/e2e/flows/*.yaml; do
@@ -111,6 +113,21 @@ if [[ ${#flows[@]} -eq 0 ]]; then
 fi
 started_at=$(date +%s)
 mkdir -p "$OUT/reports" "$OUT/artifacts"
+# Driver lost the device, or never came up: infrastructure, not the app.
+DRIVER_FAILURE='DeviceUnreachableException|kAXErrorServerNotFound|IOSDriverTimeoutException'
+
+# Start the driver once before any journey (e2e/warmup/launch.yaml), with retries.
+for attempt in 1 2 3; do
+  if "$MAESTRO" --device "$udid" test "$ROOT/e2e/warmup/launch.yaml" \
+    > "$OUT/artifacts/warmup.attempt$attempt.log" 2>&1; then
+    echo "e2e: driver ready (warm-up attempt $attempt)"
+    break
+  fi
+  if [[ $attempt -eq 3 ]]; then
+    echo "e2e: the Maestro driver never came up (see $OUT/artifacts/warmup.attempt*.log)" >&2
+    exit 1
+  fi
+done
 status=0
 failed=()
 for flow in "${flows[@]}"; do
@@ -125,12 +142,12 @@ for flow in "${flows[@]}"; do
       if [[ $attempt -eq 1 ]]; then echo "e2e: passed  $name"; else echo "e2e: passed  $name (on retry)"; fi
       break
     fi
-    if [[ $attempt -eq 1 ]] && grep -qE 'DeviceUnreachableException|kAXErrorServerNotFound' "$log"; then
+    if [[ $attempt -eq 1 ]] && grep -qE "$DRIVER_FAILURE" "$log"; then
       echo "e2e: retrying $name: the Maestro driver lost the device (see $log)"
       continue
     fi
     echo "e2e: FAILED  $name (see $log)"
-    grep -E 'Assertion is false|FAILED|Exception' "$log" | head -5 | sed 's/^/        /'
+    grep -E 'Assertion is false|\[Failed\]|Exception' "$log" | head -5 | sed 's/^/        /' || true
     failed+=("$name")
     status=1
     break
