@@ -261,14 +261,30 @@ class ContentRepository:
             values["__name__"] = self._client.collection("feed_items").document(cursor.doc_id)
         return values
 
-    async def get_all_unconsumed_feed_items(self, user_id: str) -> list[FeedItem]:
-        """Fetch all unconsumed feed items for user_id to perform time-first matching."""
+    async def get_unconsumed_feed_items_in_range(
+        self,
+        user_id: str,
+        min_duration: int,
+        max_duration: int,
+        *,
+        limit: int,
+        descending: bool = False,
+    ) -> list[FeedItem]:
+        """Unconsumed feed items with min_duration <= duration_seconds <= max_duration.
+
+        Ordered by duration (ascending, or descending), at most `limit` of them, so the
+        reads are bounded by the result, not by the size of the user's feed.
+        """
+        if min_duration > max_duration:
+            return []
         query = (
             self._client.collection("feed_items")
             .where(filter=FieldFilter("user_id", "==", user_id))
             .where(filter=FieldFilter("consumed", "==", False))
-            .order_by("duration_seconds", direction="ASCENDING")
-            .limit(250)
+            .where(filter=FieldFilter("duration_seconds", ">=", min_duration))
+            .where(filter=FieldFilter("duration_seconds", "<=", max_duration))
+            .order_by("duration_seconds", direction="DESCENDING" if descending else "ASCENDING")
+            .limit(limit)
         )
         snapshots = await query.get()
         return [FeedItem.from_firestore(snap.to_dict() or {}) for snap in snapshots]

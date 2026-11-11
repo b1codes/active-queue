@@ -11,8 +11,10 @@ from app.core.envelopes import ErrorDetail
 from app.core.errors import ConflictError, NotFoundError, ProviderError, ValidationError
 from app.features.activities.schemas import ActivitySchema
 from app.features.content.matcher import (
+    TIME_MATCH_RESULT_LIMIT,
     match_content_to_activities,
     match_time_block_asymmetric,
+    time_match_windows,
 )
 from app.features.content.models import ContentCacheItem, FeedItem, Source
 from app.features.content.repository import decode_cursor
@@ -502,8 +504,24 @@ class ContentService:
         self, user_id: str, target_duration_seconds: int
     ) -> TimeMatchResponse:
         """Match target time block duration against user feed using asymmetric windows per SPEC §5.3 & §9.6."""
-        unconsumed = await self._content_repo.get_all_unconsumed_feed_items(user_id)
-        match_res = match_time_block_asymmetric(target_duration_seconds, unconsumed)
+        # Query each window directly, closest to the block first. Reading the feed and
+        # filtering in memory would need every unconsumed item: any fixed cap on that read
+        # (ordered by duration) would hide the longer windows from users with a big feed.
+        (primary_min, primary_max), (fallback_min, fallback_max) = time_match_windows(
+            target_duration_seconds
+        )
+        candidates = await self._content_repo.get_unconsumed_feed_items_in_range(
+            user_id, primary_min, primary_max, limit=TIME_MATCH_RESULT_LIMIT
+        )
+        if not candidates:
+            candidates = await self._content_repo.get_unconsumed_feed_items_in_range(
+                user_id,
+                fallback_min,
+                fallback_max,
+                limit=TIME_MATCH_RESULT_LIMIT,
+                descending=True,
+            )
+        match_res = match_time_block_asymmetric(target_duration_seconds, candidates)
 
         if not match_res.matched_items:
             return TimeMatchResponse(

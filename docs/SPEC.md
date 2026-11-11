@@ -445,7 +445,7 @@ Fallback window:  B - 120 <= duration_seconds < B
 
 **Why the asymmetry:** content slightly *longer* than the block means the workout ends with a little content left — harmless. Content *shorter* means silence during the last stretch, which is the failure mode the app exists to prevent. So overshoot is strongly preferred and undershoot is capped at 2 minutes.
 
-Both windows are served by the `(user_id, consumed, duration_seconds)` index.
+Each window is its own range query: the primary on the `(user_id, consumed, duration_seconds ASC)` index, the fallback on `(user_id, consumed, duration_seconds DESC)`. At most 50 items come back (`TIME_MATCH_RESULT_LIMIT`), closest to the block first, so a request reads at most 50 feed items and their 50 cache documents however big the feed is. Never read the feed and filter in memory: any cap on that read hides the longer windows from a big feed.
 
 ---
 

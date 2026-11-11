@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, Any
 
 import pytest
 
+from app.features.content.matcher import TIME_MATCH_RESULT_LIMIT
 from app.features.content.models import ContentCacheItem
 
 if TYPE_CHECKING:
@@ -366,6 +367,38 @@ async def test_time_match_windows(
     none = await match(3600)
     assert none["is_valid"] is False
     assert none["rejection_reason"] == "no_content_in_window"
+
+
+async def test_time_match_finds_long_content_in_a_big_feed(
+    api: AsyncClient, alice: EmulatorUser, seed_feed: SeedFeed
+) -> None:
+    """Regression: matching read only the 250 shortest unconsumed items, then filtered.
+
+    In a 1,200-item feed those are all 5- and 15-minute videos, so a 30-minute block found
+    nothing even though about 240 35-minute videos sit in its primary window.
+    """
+    await seed_feed(alice, "fixture-large-playlist")
+    resp = await api.post(
+        "/api/v1/content/match-time",
+        json={"target_duration_seconds": 1800},
+        headers=alice.headers,
+    )
+    assert resp.status_code == 200, resp.text
+    data = resp.json()["data"]
+    assert data["window_type"] == "primary", data["rejection_reason"]
+    durations = [i["duration_seconds"] for i in data["matched_items"]]
+    assert durations
+    assert set(durations) == {2100}
+    assert len(durations) <= TIME_MATCH_RESULT_LIMIT
+
+    # Fallback ranks closest to the block first, so a cap keeps the best candidates.
+    fallback = await api.post(
+        "/api/v1/content/match-time",
+        json={"target_duration_seconds": 2200},  # primary [2200, 2500] empty
+        headers=alice.headers,
+    )
+    assert fallback.json()["data"]["window_type"] == "fallback"
+    assert {i["duration_seconds"] for i in fallback.json()["data"]["matched_items"]} == {2100}
 
 
 @pytest.mark.parametrize(
