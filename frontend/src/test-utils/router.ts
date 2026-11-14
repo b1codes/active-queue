@@ -53,13 +53,28 @@ Navigator.Screen = function Screen({ name, options }: { name?: string; options?:
   );
 };
 
+// Focus effects of the mounted screens, so a test can return to a tab with refocus().
+const focusEffects = new Set<EffectCallback>();
+
+/** Runs every mounted screen's focus effect again, as returning to its tab does. */
+export function refocus(): void {
+  focusEffects.forEach((effect) => effect());
+}
+
 export const expoRouterMock = {
   useRouter: () => router,
   useLocalSearchParams: () => params,
   useSegments: () => segments,
-  // Screens refetch on focus; in tests "focus" is mount.
+  // Screens refetch on focus; in tests "focus" is mount, and again on refocus().
   useFocusEffect: (effect: EffectCallback) => {
-    useEffect(effect, [effect]);
+    useEffect(() => {
+      focusEffects.add(effect);
+      const cleanup = effect();
+      return () => {
+        focusEffects.delete(effect);
+        if (typeof cleanup === 'function') cleanup();
+      };
+    }, [effect]);
   },
   Stack: Navigator,
   Tabs: Navigator,

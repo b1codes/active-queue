@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -35,17 +35,26 @@ export default function HistoryScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Only the newest request may write state. A refresh on focus can start while a next-
+  // page request is in flight; without this, whichever answered last won, and a stale
+  // page 2 could land on top of the fresh page 1 (duplicate rows, wrong cursor).
+  const generation = useRef(0);
+
   const load = useCallback(async (reset: boolean, after: string | null) => {
+    const mine = ++generation.current;
+    const current = () => mine === generation.current;
     setIsLoading(true);
     setError(null);
     try {
       const page = await listSessions(reset ? null : after);
+      if (!current()) return;
       setSessions((prev) => (reset ? page.items : [...prev, ...page.items]));
       setCursor(page.next_cursor);
     } catch (err: unknown) {
+      if (!current()) return;
       setError(err instanceof Error ? err.message : 'Could not load history');
     } finally {
-      setIsLoading(false);
+      if (current()) setIsLoading(false);
     }
   }, []);
 
