@@ -216,8 +216,17 @@ describe('Session checklist', () => {
 
   it('when the session is gone', () => {
     useSessionStore.setState({ currentSession: null });
-    return audit(<SessionScreen />, { 'GET /api/v1/sessions/s_0001': { status: 404, error: { code: 'SESSION_NOT_FOUND', message: 'gone' } } }, () =>
+    return audit(<SessionScreen />, { 'GET /api/v1/sessions/active': { data: null } }, () =>
       screen.findByText('Session not found')
+    );
+  });
+
+  it('when the session cannot be loaded', () => {
+    useSessionStore.setState({ currentSession: null });
+    return audit(
+      <SessionScreen />,
+      { 'GET /api/v1/sessions/active': { status: 503, error: { code: 'SERVICE_UNAVAILABLE', message: 'down' } } },
+      () => screen.findByText("Couldn't load this session")
     );
   });
 

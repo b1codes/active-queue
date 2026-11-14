@@ -2,7 +2,7 @@ import React from 'react';
 import { AppState, Linking } from 'react-native';
 import { act, fireEvent, screen, waitFor } from '@testing-library/react-native';
 import { resetRouter, router, setParams } from '@/test-utils/router';
-import { mockApi, renderWithProviders, resetStores, session } from '@/test-utils';
+import { mockApi, mockNetworkDown, renderWithProviders, resetStores, session } from '@/test-utils';
 import { useSessionStore } from '@/features/sessions/sessionStore';
 import SessionScreen from '@app/(app)/session/[id]';
 
@@ -143,6 +143,17 @@ describe('cold start / deep link into a session', () => {
     await waitFor(() => expect(screen.getByText('Session not found')).toBeTruthy());
     await press('Return to Queue Screen');
     expect(router.replace).toHaveBeenCalledWith('/(app)');
+  });
+
+  it('says it could not load, not that the session ended, when offline; Retry recovers', async () => {
+    mockNetworkDown();
+    await renderWithProviders(<SessionScreen />);
+    expect(await screen.findByText("Couldn't load this session")).toBeTruthy();
+    expect(screen.queryByText('Session not found')).toBeNull();
+
+    mockApi({ 'GET /api/v1/sessions/active': { data: session({ status: 'in_progress', started_at: '2026-01-01T10:00:00Z' }) } });
+    await press('Retry loading session');
+    await waitFor(() => expect(screen.getByText('Workout Target End Time')).toBeTruthy());
   });
 
   it('does not show another session than the one in the route', async () => {

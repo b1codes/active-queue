@@ -34,6 +34,7 @@ export interface SessionStoreActions {
   advanceStep: (from?: ChecklistStep) => void;
   setSessionFromServer: (session: Session) => void;
   checkActiveSession: () => Promise<Session | null>;
+  loadActiveSession: () => Promise<Session | null>;
   clearSession: () => void;
 }
 
@@ -41,15 +42,24 @@ export function setSessionFromServer(session: Session): void {
   store.dispatch(setSessionFromServerAction(session));
 }
 
+/**
+ * Reads the active session into the store. Throws when the request fails, so a caller
+ * can tell "no active session" from "couldn't ask" (offline, say).
+ */
+export async function loadActiveSession(): Promise<Session | null> {
+  const activeSession = await getActiveSession();
+  if (activeSession) {
+    setSessionFromServer(activeSession);
+  } else {
+    store.dispatch(setSessionState({ currentSession: null }));
+  }
+  return activeSession;
+}
+
+/** loadActiveSession for background refreshes: a failure leaves the store as it was. */
 export async function checkActiveSession(): Promise<Session | null> {
   try {
-    const activeSession = await getActiveSession();
-    if (activeSession) {
-      setSessionFromServer(activeSession);
-    } else {
-      store.dispatch(setSessionState({ currentSession: null }));
-    }
-    return activeSession;
+    return await loadActiveSession();
   } catch {
     return null;
   }
@@ -205,6 +215,7 @@ const actions: SessionStoreActions = {
   advanceStep,
   setSessionFromServer,
   checkActiveSession,
+  loadActiveSession,
   clearSession,
 };
 

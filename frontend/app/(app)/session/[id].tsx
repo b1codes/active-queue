@@ -32,7 +32,7 @@ export default function SessionHandoffScreen() {
     skipTrackerStep,
     advanceStep,
     startCurrentSession,
-    checkActiveSession,
+    loadActiveSession,
     completeCurrentSession,
     abandonCurrentSession,
     discardCurrentSession,
@@ -45,6 +45,9 @@ export default function SessionHandoffScreen() {
   const [isResolving, setIsResolving] = useState(
     () => !currentSession || currentSession.id !== routeSessionId
   );
+  // Set when the server couldn't be asked; "not found" is only said when it answered.
+  const [resolveFailed, setResolveFailed] = useState(false);
+  const [resolveAttempt, setResolveAttempt] = useState(0);
 
   // Progress persists across force-quits (SPEC §6.2): if the store doesn't already hold
   // this route's session (cold start, deep link), rebuild it from the server.
@@ -54,15 +57,21 @@ export default function SessionHandoffScreen() {
       return;
     }
     let cancelled = false;
-    checkActiveSession().finally(() => {
-      if (!cancelled) setIsResolving(false);
-    });
+    setIsResolving(true);
+    setResolveFailed(false);
+    loadActiveSession()
+      .catch(() => {
+        if (!cancelled) setResolveFailed(true);
+      })
+      .finally(() => {
+        if (!cancelled) setIsResolving(false);
+      });
     return () => {
       cancelled = true;
     };
-    // Only re-resolve when the route changes, not on every store update.
+    // Only re-resolve when the route changes (or on Retry), not on every store update.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [routeSessionId]);
+  }, [routeSessionId, resolveAttempt]);
 
   // AppState foreground detection per SPEC §6.2
   useEffect(() => {
@@ -126,6 +135,38 @@ export default function SessionHandoffScreen() {
     return (
       <View style={[styles.container, styles.centered]}>
         <ActivityIndicator color={colors.heatCore} accessibilityLabel="Loading session" />
+      </View>
+    );
+  }
+
+  if (resolveFailed && (!currentSession || currentSession.id !== routeSessionId)) {
+    return (
+      <View style={[styles.container, styles.centered, { paddingHorizontal: spacing.lg }]}>
+        <Text style={styles.title} accessibilityRole="header">
+          Couldn&apos;t load this session
+        </Text>
+        <Text style={styles.subtitle} accessibilityRole="alert">
+          We couldn&apos;t reach the server to check on it. Nothing has changed; try again
+          when you&apos;re back online.
+        </Text>
+        <TouchableOpacity
+          style={[styles.doneButton, { marginTop: spacing.lg }]}
+          onPress={() => setResolveAttempt((n) => n + 1)}
+          accessible={true}
+          accessibilityRole="button"
+          accessibilityLabel="Retry loading session"
+        >
+          <Text style={styles.buttonText}>Retry</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.doneButton, { marginTop: spacing.sm }]}
+          onPress={() => router.replace('/(app)')}
+          accessible={true}
+          accessibilityRole="button"
+          accessibilityLabel="Return to Queue Screen"
+        >
+          <Text style={styles.buttonText}>Return to Queue</Text>
+        </TouchableOpacity>
       </View>
     );
   }
