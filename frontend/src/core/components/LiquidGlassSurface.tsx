@@ -73,13 +73,11 @@ export const LiquidGlassSurface: React.FC<LiquidGlassSurfaceProps> = memo(
 
     // Reduce Transparency: an opaque surface on every tier. The native material would go
     // opaque by itself, but the Tier 3 tint would not, so neither is left to chance.
-    if (reduceTransparency) {
-      return (
-        <View testID={testID} style={[styles.container, { borderRadius }, style, styles.solid]}>
-          {children}
-        </View>
-      );
-    }
+    //
+    // The setting resolves after mount and can change live, so it only swaps styling and
+    // decoration, never the element that holds `children`: a different root type would
+    // remount the subtree (a TextInput would lose focus and what was typed in it).
+    const solid = reduceTransparency ? styles.solid : null;
 
     // Tier 1 — native OS material. No Canvas, no measured layout: UIKit composites the
     // blur, vibrancy and edge highlight itself, so the Skia work below is pure overhead
@@ -90,19 +88,20 @@ export const LiquidGlassSurface: React.FC<LiquidGlassSurfaceProps> = memo(
       return (
         <LiquidGlassView
           testID={testID}
-          effect="regular"
+          effect={reduceTransparency ? 'none' : 'regular'}
           colorScheme="dark"
           tintColor={colors.glassSurface}
-          style={[styles.container, { borderRadius }, style]}
+          style={[styles.container, { borderRadius }, style, solid]}
         >
           {children}
         </LiquidGlassView>
       );
     }
 
+    const drawGlass = !reduceTransparency && size.width > 0 && size.height > 0;
     return (
-      <View testID={testID} onLayout={onLayout} style={[styles.container, { borderRadius }, style]}>
-        {size.width > 0 && size.height > 0 ? (
+      <View testID={testID} onLayout={onLayout} style={[styles.container, { borderRadius }, style, solid]}>
+        {drawGlass ? (
           <Canvas style={StyleSheet.absoluteFill} pointerEvents="none">
             <BackdropFilter
               filter={

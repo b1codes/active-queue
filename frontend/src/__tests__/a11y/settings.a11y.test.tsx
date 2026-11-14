@@ -69,6 +69,25 @@ describe('Reduce Transparency', () => {
     expect(screen.getByTestId('glass')).not.toHaveStyle({ backgroundColor: colors.glassSolid });
   });
 
+  it.each([1, 3] as const)('never remounts Tier %s content when the setting changes', async (tier) => {
+    setTier(tier);
+    const toggle = mockSetting('reduceTransparencyChanged', 'isReduceTransparencyEnabled', true);
+    const mounts = jest.fn();
+    function Content() {
+      React.useEffect(() => mounts(), []);
+      return <Text>content</Text>;
+    }
+    await render(
+      <LiquidGlassSurface testID="glass">
+        <Content />
+      </LiquidGlassSurface>
+    );
+    await act(async () => {}); // the setting's initial value arrives after mount
+    await toggle(false);
+    await toggle(true);
+    expect(mounts).toHaveBeenCalledTimes(1);
+  });
+
   it('is off until the setting says otherwise', async () => {
     mockSetting('reduceTransparencyChanged', 'isReduceTransparencyEnabled', false);
     await render(<LiquidGlassSurface testID="glass" />);
