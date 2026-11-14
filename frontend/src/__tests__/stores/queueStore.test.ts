@@ -1,4 +1,4 @@
-import { store } from '@/store';
+import { resetUserScopedState, store } from '@/store';
 import {
   addSource,
   cancelSync,
@@ -155,6 +155,23 @@ describe('startResumableSync', () => {
     await startResumableSync('s');
     expect(calls).toBe(2);
     expect(queue().syncProgress.error).toBe('Sync cancelled');
+  });
+
+  it("stops when the user signs out mid-sync, leaving the next user's state alone", async () => {
+    let calls = 0;
+    const api = mockApi({
+      'POST /api/v1/sources/s/sync': () => {
+        calls += 1;
+        // Sign-out (or an account switch) lands while this chunk is in flight.
+        if (calls === 1) store.dispatch(resetUserScopedState());
+        return { status: 404, error: { code: 'SOURCE_NOT_FOUND', message: 'Source not found' } };
+      },
+      ...refresh,
+    });
+    await startResumableSync('s');
+    expect(calls).toBe(1);
+    expect(queue().syncProgress).toMatchObject({ isSyncing: false, sourceId: null, error: null, errorCode: null });
+    expect(api.callsTo('GET', '/api/v1/content/feed')).toHaveLength(0);
   });
 
   // The API allows 10 sync calls a minute per user (SPEC §10.2), and a 5,000-item playlist

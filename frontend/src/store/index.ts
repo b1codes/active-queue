@@ -1,4 +1,10 @@
-import { combineReducers, configureStore, createAction, UnknownAction } from '@reduxjs/toolkit';
+import {
+  combineReducers,
+  configureStore,
+  createAction,
+  type Middleware,
+  UnknownAction,
+} from '@reduxjs/toolkit';
 import { authSlice } from '../features/auth/authSlice';
 import { queueSlice } from '../features/queue/queueSlice';
 import { sessionSlice } from '../features/sessions/sessionSlice';
@@ -10,6 +16,24 @@ import { sessionSlice } from '../features/sessions/sessionSlice';
  * or active-session banner, even briefly or when the first fetch fails.
  */
 export const resetUserScopedState = createAction('app/resetUserScopedState');
+
+// Work that outlives a render (a sync loop, say) holds no state the reducer can reset, so
+// it registers here to be told when the user changes and must stop.
+const userScopeResetListeners = new Set<() => void>();
+
+/** Calls `listener` after every resetUserScopedState. Returns an unsubscribe. */
+export function onUserScopeReset(listener: () => void): () => void {
+  userScopeResetListeners.add(listener);
+  return () => userScopeResetListeners.delete(listener);
+}
+
+const notifyUserScopeReset: Middleware = () => (next) => (action) => {
+  const result = next(action);
+  if (resetUserScopedState.match(action)) {
+    userScopeResetListeners.forEach((listener) => listener());
+  }
+  return result;
+};
 
 const slices = combineReducers({
   auth: authSlice.reducer,
@@ -32,7 +56,7 @@ export function createAppStore() {
     middleware: (getDefaultMiddleware) =>
       getDefaultMiddleware({
         serializableCheck: false,
-      }),
+      }).concat(notifyUserScopeReset),
   });
 }
 

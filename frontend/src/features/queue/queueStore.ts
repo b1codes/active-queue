@@ -1,4 +1,4 @@
-import { store } from '@/store';
+import { onUserScopeReset, store } from '@/store';
 import { useAppSelector } from '@/store/hooks';
 import { apiClient, ApiError } from '../../core/api/apiClient';
 import { FeedResponse, Source, SyncChunkResponse } from './types';
@@ -110,6 +110,13 @@ export async function addSource(urlOrId: string): Promise<Source | null> {
 // longer current stops at its next check without touching syncProgress, so a cancelled or
 // replaced loop can't keep calling /sync or overwrite the new loop's progress.
 let currentSyncRun = 0;
+
+// Sign-out or an account switch retires the running loop too. Otherwise it would keep
+// syncing the previous user's source with the next user's token and write the 404 into
+// the next user's sync state.
+onUserScopeReset(() => {
+  currentSyncRun += 1;
+});
 
 // The API allows 10 sync calls a minute per user (SPEC §10.2) and a 5,000-item playlist
 // takes 20 chunks, so a long sync is expected to be told to wait. It waits out the
