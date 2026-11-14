@@ -47,7 +47,9 @@ The `API breaking changes` CI job (oasdiff) diffs `openapi.json` against the PR'
 fails on breaking changes: a removed or narrowed response field, a new required request
 field, or a removed endpoint. The installed app can't be updated in lockstep with the API,
 so prefer additive changes. When a break is intended and the app rollout is planned, label
-the PR `api-breaking-ok` and re-run the job.
+the PR `api-breaking-ok` and re-run the job (adding the label doesn't start a run). The
+job reads the label live, and on the push to `main` it reads the merged PR's labels, so
+the merge commit passes too and can be deployed.
 
 ## Third-party contracts
 

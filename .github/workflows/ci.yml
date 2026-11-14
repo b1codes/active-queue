@@ -276,8 +276,14 @@ jobs:
     # The installed app can't be updated in lockstep with the API, so a breaking change to
     # contracts/openapi.json (removed or narrowed response field, new required request
     # field, removed endpoint) fails the PR. Label the PR `api-breaking-ok` once the
-    # rollout plan is agreed, then re-run this job.
+    # rollout plan is agreed, then re-run this job. Labels are read live from the API, not
+    # from the event payload: a re-run reuses the original payload, and a push has no PR
+    # in it. On the push to main the merged PR's label applies, so CI Passed stays green
+    # on that commit and scripts/deploy.sh will deploy it.
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -289,12 +295,23 @@ jobs:
           EVENT: ${{ github.event_name }}
           BASE_REF: ${{ github.base_ref }}
           BEFORE: ${{ github.event.before }}
-          ALLOW_BREAKING: ${{ contains(github.event.pull_request.labels.*.name, 'api-breaking-ok') }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          SHA: ${{ github.sha }}
+          REPO: ${{ github.repository }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           if [ "${EVENT}" = "pull_request" ]; then
             base="$(git merge-base "origin/${BASE_REF}" HEAD)"
+            labels="$(gh api "repos/${REPO}/issues/${PR_NUMBER}/labels" --jq '.[].name')"
           else
             base="${BEFORE}"
+            # The PR this push merged (squash or merge commit).
+            labels="$(gh api "repos/${REPO}/commits/${SHA}/pulls" \
+              --jq '.[] | select(.merged_at != null) | .labels[].name')"
+          fi
+          ALLOW_BREAKING=false
+          if printf '%s\n' "${labels}" | grep -qx 'api-breaking-ok'; then
+            ALLOW_BREAKING=true
           fi
           if ! git cat-file -e "${base}:contracts/openapi.json" 2>/dev/null; then
             echo "::notice::No contracts/openapi.json at base ${base}; nothing to compare."
