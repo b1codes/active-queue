@@ -22,6 +22,13 @@ logger = structlog.get_logger(__name__)
 ABANDONMENT_GRACE_PERIOD_SECONDS = 86400
 
 
+def _is_contention(exc: BaseException) -> bool:
+    """True for a transaction that lost to concurrent writers (see complete_session_transaction)."""
+    return isinstance(exc, Aborted) or (
+        isinstance(exc, ValueError) and isinstance(exc.__cause__, Aborted)
+    )
+
+
 def encode_session_cursor(dt: datetime) -> str:
     """Encode datetime cursor for session pagination."""
     return base64.urlsafe_b64encode(dt.isoformat().encode("utf-8")).decode("utf-8")
@@ -330,7 +337,12 @@ class SessionRepository:
 
         try:
             return await _complete(self._client.transaction(max_attempts=COMPLETE_TXN_ATTEMPTS))
-        except Aborted:
+        except (Aborted, ValueError) as exc:
+            # async_transactional retries Aborted commits and, once max_attempts are spent,
+            # raises ValueError chained from the last Aborted. An Aborted read inside the
+            # transaction is not retried and arrives as-is. Any other ValueError is a bug.
+            if not _is_contention(exc):
+                raise
             # Every attempt lost to a concurrent transaction on the same documents. For a
             # double-tap (SPEC §7.1) the winner was another complete of this session, so the
             # idempotent answer is the session as it now stands, not a 500.
