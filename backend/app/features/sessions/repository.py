@@ -51,7 +51,8 @@ SLOT_CLAIM_ATTEMPTS = 4
 COMPLETE_TXN_ATTEMPTS = 10
 
 
-def _active_session_conflict(active_session_id: str) -> ConflictError:
+def active_session_conflict(active_session_id: str) -> ConflictError:
+    """The 409 for a create while another session is pending or in progress."""
     return ConflictError(
         code="ACTIVE_SESSION_EXISTS",
         message="You already have an active session in progress",
@@ -98,7 +99,7 @@ class SessionRepository:
             holder_id = str((slot_snap.to_dict() or {}).get("session_id", ""))
             holder = await self.get_session(holder_id) if holder_id else None
             if holder is not None and holder.status in ("pending", "in_progress"):
-                raise _active_session_conflict(holder.id)
+                raise active_session_conflict(holder.id)
 
             batch = self._client.batch()
             batch.update(
@@ -114,7 +115,7 @@ class SessionRepository:
                 continue  # another creator reclaimed first; re-evaluate
         else:
             slot_snap = await slot_ref.get()
-            raise _active_session_conflict(str((slot_snap.to_dict() or {}).get("session_id", "")))
+            raise active_session_conflict(str((slot_snap.to_dict() or {}).get("session_id", "")))
 
         logger.info("session_created", session_id=session.id, user_id=session.user_id)
         return session

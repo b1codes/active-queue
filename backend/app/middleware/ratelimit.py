@@ -12,6 +12,7 @@ from app.core.config import settings
 from app.core.envelopes import ErrorBody, ErrorEnvelope
 from app.core.errors import RateLimitError
 from app.core.security import AuthenticatedUser, get_current_user
+from app.features.health.paths import HEALTH_PATHS
 
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable
@@ -39,7 +40,7 @@ ROLE_LIMIT_MULTIPLIERS: dict[str, float] = {
 
 def _get_endpoint_category(method: str, path: str) -> str:
     """Categorize API endpoints into health, sync, heavy, or general rate limit buckets."""
-    if path in ("/health", "/healthz"):
+    if path in HEALTH_PATHS:
         return "health"
     if method == "POST" and path.endswith("/sync"):
         return "sync"
@@ -202,7 +203,7 @@ async def enforce_user_rate_limit(
 
 
 class RateLimitMiddleware(BaseHTTPMiddleware):
-    """Per-IP flood guard in front of everything except /health and /healthz.
+    """Per-IP flood guard in front of everything except HEALTH_PATHS.
 
     It never looks inside the Authorization header: the coarse per-IP budget
     (rate_limit_ip) caps what any one address can send, verified or not, before any token

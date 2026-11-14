@@ -67,13 +67,7 @@ async def _get_provider_status() -> dict[str, str]:
     return {"status": status}
 
 
-# Cloud Run reserves URL paths ending in "z": a request for /healthz to a run.app URL gets
-# a Google 404 and never reaches the container. External callers (the post-deploy smoke
-# check, uptime monitors) use /health. /healthz stays for Cloud Run's own probes, which
-# connect to the container directly, and for local tooling.
-HEALTH_PATHS = ("/health", "/healthz")
-
-
+# One route per path in app/features/health/paths.py HEALTH_PATHS; a test pins the match.
 @router.get(
     "/health",
     response_model=SuccessEnvelope[HealthData],
