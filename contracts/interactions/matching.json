@@ -1,0 +1,333 @@
+{
+  "description": "Content-first and time-first matching (SPEC §5.2, §5.3, §9.6).",
+  "interactions": [
+    {
+      "id": "match.content.valid",
+      "description": "A 25-minute item matches several activities",
+      "states": [
+        "alice has a synced small playlist"
+      ],
+      "request": {
+        "method": "POST",
+        "path": "/api/v1/content/match",
+        "body": {
+          "content_id": "fx:fx_vid_0003"
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "status": "success",
+          "data": {
+            "content_id": "fx:fx_vid_0003",
+            "duration_seconds": 1500,
+            "duration_label": "25m 0s",
+            "matching_activities": [
+              {
+                "id": "running",
+                "name": "Outdoor / Treadmill Run",
+                "category": "cardio",
+                "tracker": "apple_fitness",
+                "min_duration_seconds": 300,
+                "max_duration_seconds": 14400,
+                "default_duration_seconds": 1800,
+                "icon_name": "run",
+                "is_active": true
+              },
+              {
+                "id": "cycling",
+                "name": "Cycling / Spin Workout",
+                "category": "cardio",
+                "tracker": "apple_fitness",
+                "min_duration_seconds": 300,
+                "max_duration_seconds": 14400,
+                "default_duration_seconds": 2700,
+                "icon_name": "bike",
+                "is_active": true
+              },
+              {
+                "id": "strength",
+                "name": "Strength Training",
+                "category": "workout",
+                "tracker": "apple_fitness",
+                "min_duration_seconds": 600,
+                "max_duration_seconds": 7200,
+                "default_duration_seconds": 2700,
+                "icon_name": "dumbbell",
+                "is_active": true
+              },
+              {
+                "id": "yoga",
+                "name": "Yoga & Stretching",
+                "category": "flexibility",
+                "tracker": "youtube",
+                "min_duration_seconds": 300,
+                "max_duration_seconds": 5400,
+                "default_duration_seconds": 1800,
+                "icon_name": "yoga",
+                "is_active": true
+              },
+              {
+                "id": "pilates",
+                "name": "Pilates Session",
+                "category": "flexibility",
+                "tracker": "youtube",
+                "min_duration_seconds": 300,
+                "max_duration_seconds": 5400,
+                "default_duration_seconds": 1800,
+                "icon_name": "mat",
+                "is_active": true
+              },
+              {
+                "id": "hiit",
+                "name": "HIIT Workout",
+                "category": "workout",
+                "tracker": "youtube",
+                "min_duration_seconds": 300,
+                "max_duration_seconds": 3600,
+                "default_duration_seconds": 1200,
+                "icon_name": "lightning",
+                "is_active": true
+              },
+              {
+                "id": "walking",
+                "name": "Walking / Power Walk",
+                "category": "cardio",
+                "tracker": "apple_fitness",
+                "min_duration_seconds": 300,
+                "max_duration_seconds": 14400,
+                "default_duration_seconds": 1800,
+                "icon_name": "walk",
+                "is_active": true
+              },
+              {
+                "id": "rowing",
+                "name": "Rowing Machine",
+                "category": "cardio",
+                "tracker": "apple_fitness",
+                "min_duration_seconds": 300,
+                "max_duration_seconds": 7200,
+                "default_duration_seconds": 1200,
+                "icon_name": "row",
+                "is_active": true
+              },
+              {
+                "id": "meditation",
+                "name": "Mindfulness & Meditation",
+                "category": "mindfulness",
+                "tracker": "spotify",
+                "min_duration_seconds": 180,
+                "max_duration_seconds": 3600,
+                "default_duration_seconds": 600,
+                "icon_name": "lotus",
+                "is_active": true
+              }
+            ],
+            "is_valid": true,
+            "rejection_reason": null
+          },
+          "error": null
+        }
+      },
+      "consumers": [
+        "matchContent"
+      ]
+    },
+    {
+      "id": "match.content.out_of_range",
+      "description": "A 0-second live broadcast fits no activity's duration range",
+      "states": [
+        "a livestream is in the content cache"
+      ],
+      "request": {
+        "method": "POST",
+        "path": "/api/v1/content/match",
+        "body": {
+          "content_id": "fx:fx_live_0001"
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "status": "success",
+          "data": {
+            "content_id": "fx:fx_live_0001",
+            "duration_seconds": 0,
+            "duration_label": "0s",
+            "matching_activities": [],
+            "is_valid": false,
+            "rejection_reason": "duration_out_of_range"
+          },
+          "error": null
+        }
+      },
+      "consumers": [
+        "matchContent"
+      ]
+    },
+    {
+      "id": "match.content.not_found",
+      "description": "Unknown content ID",
+      "request": {
+        "method": "POST",
+        "path": "/api/v1/content/match",
+        "body": {
+          "content_id": "fx:does_not_exist"
+        }
+      },
+      "response": {
+        "status": 404,
+        "body": {
+          "status": "error",
+          "data": null,
+          "error": {
+            "code": "CONTENT_NOT_FOUND",
+            "message": "Content item 'fx:does_not_exist' not found in cache",
+            "details": []
+          }
+        }
+      },
+      "consumers": [
+        "matchContent.error"
+      ]
+    },
+    {
+      "id": "match.time.primary",
+      "description": "Items in the primary window [B, B+300]",
+      "states": [
+        "alice has a synced small playlist"
+      ],
+      "request": {
+        "method": "POST",
+        "path": "/api/v1/content/match-time",
+        "body": {
+          "target_duration_seconds": 1800
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "status": "success",
+          "data": {
+            "target_duration_seconds": 1800,
+            "target_duration_label": "30m 0s",
+            "matched_items": [
+              {
+                "id": "uid_alice_fx:fx_vid_0004",
+                "content_id": "fx:fx_vid_0004",
+                "source_id": "src_1",
+                "title": "Fixture Workout Video #4 — High Intensity Cardio",
+                "provider": "fixture",
+                "external_id": "fx_vid_0004",
+                "duration_seconds": 2100,
+                "duration_label": "35m 0s",
+                "published_at": "2026-01-01T00:00:00Z",
+                "thumbnail_url": "https://img.youtube.com/vi/fx_vid_0004/hqdefault.jpg",
+                "video_url": "https://www.youtube.com/watch?v=fx_vid_0004",
+                "consumed": false
+              },
+              {
+                "id": "uid_alice_fx:fx_vid_0009",
+                "content_id": "fx:fx_vid_0009",
+                "source_id": "src_1",
+                "title": "Fixture Workout Video #9 — High Intensity Cardio",
+                "provider": "fixture",
+                "external_id": "fx_vid_0009",
+                "duration_seconds": 2100,
+                "duration_label": "35m 0s",
+                "published_at": "2026-01-01T00:00:00Z",
+                "thumbnail_url": "https://img.youtube.com/vi/fx_vid_0009/hqdefault.jpg",
+                "video_url": "https://www.youtube.com/watch?v=fx_vid_0009",
+                "consumed": false
+              },
+              {
+                "id": "uid_alice_fx:fx_vid_0014",
+                "content_id": "fx:fx_vid_0014",
+                "source_id": "src_1",
+                "title": "Fixture Workout Video #14 — High Intensity Cardio",
+                "provider": "fixture",
+                "external_id": "fx_vid_0014",
+                "duration_seconds": 2100,
+                "duration_label": "35m 0s",
+                "published_at": "2026-01-01T00:00:00Z",
+                "thumbnail_url": "https://img.youtube.com/vi/fx_vid_0014/hqdefault.jpg",
+                "video_url": "https://www.youtube.com/watch?v=fx_vid_0014",
+                "consumed": false
+              }
+            ],
+            "window_type": "primary",
+            "is_valid": true,
+            "rejection_reason": null
+          },
+          "error": null
+        }
+      },
+      "dynamic": [
+        "data.matched_items[*].published_at"
+      ],
+      "consumers": [
+        "matchTimeBlock"
+      ]
+    },
+    {
+      "id": "match.time.no_content",
+      "description": "Nothing queued in either window",
+      "request": {
+        "method": "POST",
+        "path": "/api/v1/content/match-time",
+        "body": {
+          "target_duration_seconds": 1800
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "status": "success",
+          "data": {
+            "target_duration_seconds": 1800,
+            "target_duration_label": "30m 0s",
+            "matched_items": [],
+            "window_type": null,
+            "is_valid": false,
+            "rejection_reason": "no_content_in_window"
+          },
+          "error": null
+        }
+      },
+      "consumers": [
+        "matchTimeBlock"
+      ]
+    },
+    {
+      "id": "match.time.invalid",
+      "description": "Target below the 300s minimum",
+      "request": {
+        "method": "POST",
+        "path": "/api/v1/content/match-time",
+        "body": {
+          "target_duration_seconds": 10
+        }
+      },
+      "response": {
+        "status": 400,
+        "body": {
+          "status": "error",
+          "data": null,
+          "error": {
+            "code": "VALIDATION_FAILED",
+            "message": "The request contains invalid input parameters.",
+            "details": [
+              {
+                "field": "target_duration_seconds",
+                "issue": "Input should be greater than or equal to 300"
+              }
+            ]
+          }
+        }
+      },
+      "consumers": [
+        "matchTimeBlock.error"
+      ]
+    }
+  ]
+}

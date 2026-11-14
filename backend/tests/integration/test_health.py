@@ -12,12 +12,17 @@ if TYPE_CHECKING:
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("path", ["/health", "/healthz"])
 async def test_healthz_returns_200_when_firestore_reachable(
     client: AsyncClient,
     mock_firestore_client: MagicMock,
+    path: str,
 ) -> None:
-    """GET /healthz returns 200 with healthy status when Firestore is reachable."""
-    response = await client.get("/healthz")
+    """GET /health and /healthz return 200 with healthy status when Firestore is reachable.
+
+    /health exists because Cloud Run doesn't route paths ending in "z" to the container.
+    """
+    response = await client.get(path)
     assert response.status_code == 200
 
     data = response.json()

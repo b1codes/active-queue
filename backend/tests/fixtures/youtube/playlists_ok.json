@@ -1,0 +1,25 @@
+{
+  "kind": "youtube#playlistListResponse",
+  "etag": "fixture",
+  "pageInfo": {"totalResults": 1, "resultsPerPage": 5},
+  "items": [
+    {
+      "kind": "youtube#playlist",
+      "etag": "fixture",
+      "id": "PLfixture123",
+      "snippet": {
+        "publishedAt": "2025-03-01T10:00:00Z",
+        "channelId": "UCfixture",
+        "title": "Morning Run Podcasts",
+        "description": "Long-form episodes for long runs",
+        "thumbnails": {
+          "default": {"url": "https://i.ytimg.com/vi/aaa/default.jpg", "width": 120, "height": 90},
+          "medium": {"url": "https://i.ytimg.com/vi/aaa/mqdefault.jpg", "width": 320, "height": 180},
+          "high": {"url": "https://i.ytimg.com/vi/aaa/hqdefault.jpg", "width": 480, "height": 360}
+        },
+        "channelTitle": "Fixture Channel"
+      },
+      "contentDetails": {"itemCount": 3}
+    }
+  ]
+}

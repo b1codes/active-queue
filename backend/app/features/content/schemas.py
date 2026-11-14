@@ -3,9 +3,11 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import Field, field_validator
 
-from app.core.sanitizer import sanitize_identifier, sanitize_text
+from app.core.dependencies import DocumentId
+from app.core.envelopes import JsonInt, RequestSchema, ResponseSchema
+from app.core.sanitizer import sanitize_text
 from app.features.activities.schemas import ActivitySchema
 from app.features.content.models import Source
 
@@ -35,7 +37,7 @@ def format_duration_label(duration_seconds: int) -> str:
     return f"{seconds}s"
 
 
-class CreateSourceRequest(BaseModel):
+class CreateSourceRequest(RequestSchema):
     """Request payload for adding a content source per SPEC §9.3."""
 
     url_or_id: str = Field(
@@ -55,7 +57,7 @@ class CreateSourceRequest(BaseModel):
         return sanitized
 
 
-class SourceSchema(BaseModel):
+class SourceSchema(ResponseSchema):
     """API response schema for a content source per SPEC §9.3."""
 
     id: str
@@ -88,13 +90,27 @@ class SourceSchema(BaseModel):
         )
 
 
-class SourceListResponse(BaseModel):
+class SourceListResponse(ResponseSchema):
     """API response payload for GET /sources list."""
 
     items: list[SourceSchema]
 
 
-class SyncResponse(BaseModel):
+class DeleteSourceResponse(ResponseSchema):
+    """API response payload for DELETE /sources/{source_id}."""
+
+    source_id: str
+    deleted: bool
+
+
+class HideFeedItemResponse(ResponseSchema):
+    """API response payload for POST /content/feed/{content_id}/hide."""
+
+    content_id: str
+    hidden: bool
+
+
+class SyncResponse(ResponseSchema):
     """API response payload for POST /sources/{source_id}/sync per SPEC §9.4."""
 
     source_id: str
@@ -105,7 +121,7 @@ class SyncResponse(BaseModel):
     message: str | None = None
 
 
-class FeedItemSchema(BaseModel):
+class FeedItemSchema(ResponseSchema):
     """API response schema for an enriched feed item per SPEC §9.2."""
 
     id: str
@@ -122,7 +138,7 @@ class FeedItemSchema(BaseModel):
     consumed: bool = False
 
 
-class FeedResponse(BaseModel):
+class FeedResponse(ResponseSchema):
     """API response payload for GET /feed per SPEC §9.2."""
 
     items: list[FeedItemSchema]
@@ -130,26 +146,15 @@ class FeedResponse(BaseModel):
     total_unconsumed: int | None = None
 
 
-class ContentMatchRequest(BaseModel):
+class ContentMatchRequest(RequestSchema):
     """Request payload for POST /content/match per SPEC §9.6."""
 
-    content_id: str = Field(
-        ...,
-        min_length=1,
-        max_length=200,
-        description="Namespaced content ID, e.g. yt:video123 or fx:item1",
+    content_id: DocumentId = Field(
+        ..., description="Namespaced content ID, e.g. yt:video123 or fx:item1"
     )
 
-    @field_validator("content_id")
-    @classmethod
-    def sanitize_content_id(cls, v: str) -> str:
-        sanitized = sanitize_identifier(v, max_length=200)
-        if not sanitized:
-            raise ValueError("content_id must not be empty or contain invalid characters")
-        return sanitized
 
-
-class ContentMatchResponse(BaseModel):
+class ContentMatchResponse(ResponseSchema):
     """Response payload for POST /content/match per SPEC §9.6."""
 
     content_id: str
@@ -160,10 +165,10 @@ class ContentMatchResponse(BaseModel):
     rejection_reason: Literal["duration_out_of_range", "no_matching_activity"] | None = None
 
 
-class TimeMatchRequest(BaseModel):
+class TimeMatchRequest(RequestSchema):
     """Request payload for POST /content/match-time per SPEC §9.6."""
 
-    target_duration_seconds: int = Field(
+    target_duration_seconds: JsonInt = Field(
         ...,
         ge=300,
         le=10800,
@@ -172,7 +177,7 @@ class TimeMatchRequest(BaseModel):
     )
 
 
-class TimeMatchResponse(BaseModel):
+class TimeMatchResponse(ResponseSchema):
     """Response payload for POST /content/match-time per SPEC §9.6."""
 
     target_duration_seconds: int

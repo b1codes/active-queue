@@ -1,0 +1,130 @@
+{
+  "description": "Profile and preferences (SPEC §4.2).",
+  "interactions": [
+    {
+      "id": "users.me.first_login",
+      "description": "First call provisions the profile and authorization docs",
+      "states": [
+        "alice is not provisioned"
+      ],
+      "request": {
+        "method": "GET",
+        "path": "/api/v1/users/me"
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "status": "success",
+          "data": {
+            "user": {
+              "uid": "uid_alice",
+              "email": "alice@example.com",
+              "display_name": "Alice",
+              "photo_url": null,
+              "created_at": "2026-01-01T00:00:00Z",
+              "updated_at": "2026-01-01T00:00:00Z",
+              "preferences": {
+                "preferred_activity_types": [],
+                "preferred_tracker_app": null,
+                "default_time_block_seconds": 2700,
+                "hide_completed": false,
+                "dark_mode": true,
+                "sync_enabled": true,
+                "notifications_enabled": true
+              }
+            },
+            "authorization": {
+              "uid": "uid_alice",
+              "role": "user",
+              "status": "active",
+              "disabled": false,
+              "scopes": [
+                "read",
+                "write"
+              ]
+            }
+          },
+          "error": null
+        }
+      },
+      "dynamic": [
+        "data.user.created_at",
+        "data.user.updated_at"
+      ],
+      "consumers": [],
+      "consumer_note": "Not called by the app yet; provider-verified only."
+    },
+    {
+      "id": "users.preferences.update",
+      "description": "Partial preferences update returns the full profile",
+      "request": {
+        "method": "PATCH",
+        "path": "/api/v1/users/me/preferences",
+        "body": {
+          "default_time_block_seconds": 1800,
+          "dark_mode": false
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "status": "success",
+          "data": {
+            "uid": "uid_alice",
+            "email": "alice@example.com",
+            "display_name": "Alice",
+            "photo_url": null,
+            "created_at": "2026-01-01T00:00:00Z",
+            "updated_at": "2026-01-01T00:00:00Z",
+            "preferences": {
+              "preferred_activity_types": [],
+              "preferred_tracker_app": null,
+              "default_time_block_seconds": 1800,
+              "hide_completed": false,
+              "dark_mode": false,
+              "sync_enabled": true,
+              "notifications_enabled": true
+            }
+          },
+          "error": null
+        }
+      },
+      "dynamic": [
+        "data.created_at",
+        "data.updated_at"
+      ],
+      "consumers": [],
+      "consumer_note": "Not called by the app yet; provider-verified only."
+    },
+    {
+      "id": "users.preferences.invalid",
+      "description": "Out-of-range preference is a 400 with field details",
+      "request": {
+        "method": "PATCH",
+        "path": "/api/v1/users/me/preferences",
+        "body": {
+          "default_time_block_seconds": 10
+        }
+      },
+      "response": {
+        "status": 400,
+        "body": {
+          "status": "error",
+          "data": null,
+          "error": {
+            "code": "VALIDATION_FAILED",
+            "message": "The request contains invalid input parameters.",
+            "details": [
+              {
+                "field": "default_time_block_seconds",
+                "issue": "Input should be greater than or equal to 300"
+              }
+            ]
+          }
+        }
+      },
+      "consumers": [],
+      "consumer_note": "Not called by the app yet; provider-verified only."
+    }
+  ]
+}

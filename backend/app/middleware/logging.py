@@ -9,7 +9,6 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from structlog.contextvars import bind_contextvars, clear_contextvars
 
 from app.core.config import settings
-from app.core.errors import AppError
 
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable
@@ -46,23 +45,24 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
             trace_id = trace.split("/")[0]
             bind_contextvars(trace=f"projects/{settings.gcp_project_id}/traces/{trace_id}")
 
-        uid = getattr(request.state, "uid", None)
-        if uid:
-            bind_contextvars(uid=str(uid))
-
         logger.info("request_started")
         start = time.perf_counter()
 
         try:
             response: Response = await call_next(request)
-        except AppError:
-            raise
         except Exception:
+            # Only reachable for failures outside ErrorHandlingMiddleware (which turns
+            # everything inside it into an envelope), e.g. in the rate limiter.
             logger.exception("request_unhandled_exception")
             raise
 
         latency_ms = round((time.perf_counter() - start) * 1000, 2)
         bind_contextvars(status_code=response.status_code, latency_ms=latency_ms)
+        # Auth runs inside call_next and sets request.state.uid (shared scope state), so
+        # uid can only be bound for the completion log line, not request_started.
+        uid = getattr(request.state, "uid", None)
+        if uid:
+            bind_contextvars(uid=str(uid))
 
         log_level = "warning" if response.status_code >= 400 else "info"
         getattr(logger, log_level)("request_finished")

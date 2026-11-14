@@ -1,0 +1,8 @@
+# Maestro workspace for the E2E journeys (ClickUp 86bcxruy6). e2e/run.sh runs every flow
+# here against the real app, API and Firebase emulators; see docs/testing.md#e2e-tests.
+# Subflows in common/ are not journeys on their own.
+flows:
+  - "*.yaml"
+# `skip` marks a journey the app can't do yet; each names its ClickUp task.
+excludeTags:
+  - skip

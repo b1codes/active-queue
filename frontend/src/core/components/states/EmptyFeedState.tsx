@@ -1,5 +1,6 @@
 import React from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Text } from '../Text';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, rounded, spacing, typography } from '../../theme';
 
@@ -13,17 +14,13 @@ export const EmptyFeedState: React.FC<EmptyFeedStateProps> = ({
   onAddSourcePress,
 }) => {
   return (
-    <View
-      style={styles.container}
-      accessible={true}
-      accessibilityLabel="You are all caught up. No unconsumed feed items available."
-    >
+    <View style={styles.container}>
       <View style={styles.cardWrapper}>
-        <View style={styles.iconBadge}>
+        <View style={styles.iconBadge} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
           <Ionicons name="sparkles-outline" size={30} color={colors.heatCore} />
         </View>
 
-        <Text style={styles.title}>You're All Caught Up!</Text>
+        <Text style={styles.title} accessibilityRole="header">You're All Caught Up!</Text>
         <Text style={styles.subtitle}>
           All content items in your sources have been completed or marked consumed.
         </Text>

@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/react-native';
 import React from 'react';
-import { FlatList, StyleSheet, Text, View } from 'react-native';
+import { FlatList, StyleSheet, View } from 'react-native';
+import { Text } from './Text';
 import { fn } from 'storybook/test';
 import { ThermalGlowTouchable } from './ThermalGlowTouchable';
 import { colors, rounded, spacing, typography } from '../theme';

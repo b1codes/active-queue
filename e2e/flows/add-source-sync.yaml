@@ -1,0 +1,71 @@
+# Journey: a playlist the provider can't find is refused with a reason; a 1,200-item
+# playlist syncs in chunks with visible progress, and its items fill the queue.
+appId: com.b1codes.activequeue
+name: Add a source and watch it sync
+---
+- runFlow:
+    file: common/new-user.yaml
+    env:
+      NAME: syncer
+- retry:
+    maxRetries: 3
+    commands:
+      - tapOn:
+          text: "Add Source"
+          optional: true
+      - extendedWaitUntil:
+          visible:
+            id: add-source-url
+          timeout: 30000
+- retry:
+    maxRetries: 3
+    commands:
+      - tapOn:
+          id: add-source-url
+      - waitForAnimationToEnd
+      - eraseText: 60
+      - inputText: "fixture-unavailable"
+      - waitForAnimationToEnd
+      - assertVisible:
+          id: add-source-url
+          text: "fixture-unavailable"
+- retry:
+    maxRetries: 3
+    commands:
+      - tapOn:
+          text: "Add source"
+          optional: true
+      - extendedWaitUntil:
+          visible: ".*fixture-unavailable.* not found or private"
+          timeout: 30000
+- retry:
+    maxRetries: 3
+    commands:
+      - tapOn:
+          id: add-source-url
+      - waitForAnimationToEnd
+      - eraseText: 60
+      - inputText: "fixture-large-playlist"
+      - waitForAnimationToEnd
+      - assertVisible:
+          id: add-source-url
+          text: "fixture-large-playlist"
+- retry:
+    maxRetries: 3
+    commands:
+      - tapOn:
+          text: "Add source"
+          optional: true
+      - extendedWaitUntil:
+          visible: ".*items synced.*"
+          timeout: 30000
+- extendedWaitUntil:
+    visible: "Fixture Workout Video #1200 — High Intensity Cardio.*"
+    timeout: 120000
+- extendedWaitUntil:
+    notVisible: "Syncing Content Source..."
+    timeout: 120000
+# All 1,197 playable items are queued (3 fixture entries are private, deleted or live).
+- extendedWaitUntil:
+    visible: "1.2k"
+    timeout: 30000

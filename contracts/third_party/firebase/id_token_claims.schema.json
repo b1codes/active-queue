@@ -1,0 +1,87 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Firebase Auth ID token payload",
+  "description": "Claims firebase_admin.auth.verify_id_token checks and app.core.security.get_current_user reads. Extra claims are allowed.",
+  "type": "object",
+  "required": [
+    "iss",
+    "aud",
+    "auth_time",
+    "user_id",
+    "sub",
+    "iat",
+    "exp",
+    "firebase"
+  ],
+  "properties": {
+    "iss": {
+      "type": "string",
+      "pattern": "^https://securetoken\\.google\\.com/[a-z0-9-]+$"
+    },
+    "aud": {
+      "type": "string",
+      "pattern": "^[a-z0-9-]+$"
+    },
+    "auth_time": {
+      "type": "integer"
+    },
+    "iat": {
+      "type": "integer"
+    },
+    "exp": {
+      "type": "integer"
+    },
+    "sub": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "user_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "email": {
+      "type": "string",
+      "format": "email"
+    },
+    "email_verified": {
+      "type": "boolean"
+    },
+    "name": {
+      "type": "string"
+    },
+    "picture": {
+      "type": "string",
+      "format": "uri"
+    },
+    "firebase": {
+      "type": "object",
+      "required": [
+        "identities",
+        "sign_in_provider"
+      ],
+      "properties": {
+        "identities": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "sign_in_provider": {
+          "type": "string",
+          "enum": [
+            "apple.com",
+            "password",
+            "google.com",
+            "anonymous",
+            "custom"
+          ]
+        }
+      }
+    }
+  }
+}

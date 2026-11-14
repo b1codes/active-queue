@@ -66,3 +66,18 @@ describe('Deep Link Tracker Registry & Launcher', () => {
   });
 });
 
+
+describe('mediaTargetForContent', () => {
+  const { mediaTargetForContent } = jest.requireActual('../features/sessions/deepLinks');
+  it.each([
+    ['yt:dQw4w9WgXcQ', { provider: 'youtube', externalId: 'dQw4w9WgXcQ' }],
+    ['fx:fx_vid_1', { provider: 'youtube', externalId: 'fx_vid_1' }],
+    ['sp:ep:1', { provider: 'spotify', externalId: 'ep:1' }],
+    ['zz:1', { provider: 'custom' }],
+    ['no-prefix', { provider: 'custom' }],
+    [null, { provider: 'custom' }],
+    [undefined, { provider: 'custom' }],
+  ])('%s -> %o', (input, expected) => {
+    expect(mediaTargetForContent(input)).toEqual(expected);
+  });
+});

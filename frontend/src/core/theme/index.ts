@@ -1,6 +1,6 @@
 import { colors } from './colors';
 import { spacing, rounded } from './spacing';
-import { typography } from './typography';
+import { fontScale, typography } from './typography';
 
-export { colors, spacing, rounded, typography };
+export { colors, spacing, rounded, typography, fontScale };
 export type { ColorToken } from './colors';

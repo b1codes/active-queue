@@ -1,5 +1,6 @@
 import React from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Text } from '../Text';
 import { colors, rounded, spacing, typography } from '../../theme';
 
 interface SyncResumableCardProps {
@@ -14,15 +15,11 @@ export const SyncResumableCard: React.FC<SyncResumableCardProps> = ({
   onDismissPress,
 }) => {
   return (
-    <View
-      style={styles.card}
-      accessible={true}
-      accessibilityLabel={`Sync incomplete for ${sourceTitle}. Tap to finish syncing items.`}
-    >
+    <View style={styles.card}>
       <View style={styles.contentRow}>
-        <Text style={styles.icon}>⚡</Text>
+        <Text style={styles.icon} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">⚡</Text>
         <View style={styles.textContainer}>
-          <Text style={styles.title}>Resume Playlist Sync</Text>
+          <Text style={styles.title} accessibilityRole="header">Resume Playlist Sync</Text>
           <Text style={styles.body} numberOfLines={2}>
             Finish syncing items for "{sourceTitle}"
           </Text>
@@ -101,7 +98,7 @@ const styles = StyleSheet.create({
     borderRadius: rounded.xs,
     flex: 1,
     justifyContent: 'center',
-    minHeight: 40,
+    minHeight: 44,
   },
   primaryButtonText: {
     ...typography.label,
@@ -116,7 +113,7 @@ const styles = StyleSheet.create({
     borderRadius: rounded.xs,
     borderWidth: 1,
     justifyContent: 'center',
-    minHeight: 40,
+    minHeight: 44,
     paddingHorizontal: spacing.md,
   },
   secondaryButtonText: {

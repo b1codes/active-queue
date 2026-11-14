@@ -13,6 +13,8 @@ ERROR_CODES: dict[str, int] = {
     "AUTH_TOKEN_EXPIRED": 401,
     "ACCOUNT_DISABLED": 403,
     "SESSION_NOT_FOUND": 404,
+    "ACTIVITY_NOT_FOUND": 404,
+    "USER_NOT_FOUND": 404,
     "CONTENT_NOT_FOUND": 404,
     "SOURCE_NOT_FOUND": 404,
     "SOURCE_URL_UNPARSEABLE": 422,
@@ -21,6 +23,7 @@ ERROR_CODES: dict[str, int] = {
     "SOURCE_ALREADY_ADDED": 409,
     "ACTIVE_SESSION_EXISTS": 409,
     "SESSION_NOT_STARTED": 409,
+    "SESSION_ALREADY_STARTED": 409,
     "SESSION_ALREADY_TERMINAL": 409,
     "DURATION_OUT_OF_RANGE": 422,
     "ACTIVITY_DURATION_MISMATCH": 422,
@@ -40,12 +43,14 @@ class AppError(Exception):
         message: str,
         status_code: int = 400,
         details: list[ErrorDetail] | None = None,
+        headers: dict[str, str] | None = None,
     ) -> None:
         super().__init__(message)
         self.code = code
         self.message = message
         self.status_code = ERROR_CODES.get(code, status_code)
         self.details = details or []
+        self.headers = headers or {}
 
 
 class ValidationError(AppError):
@@ -74,8 +79,14 @@ class ConflictError(AppError):
 
 
 class RateLimitError(AppError):
-    def __init__(self, code: str, message: str, details: list[ErrorDetail] | None = None) -> None:
-        super().__init__(code, message, 429, details)
+    def __init__(
+        self,
+        code: str,
+        message: str,
+        details: list[ErrorDetail] | None = None,
+        headers: dict[str, str] | None = None,
+    ) -> None:
+        super().__init__(code, message, 429, details, headers)
 
 
 class ProviderError(AppError):

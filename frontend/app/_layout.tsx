@@ -1,6 +1,6 @@
 import React, { useEffect } from "react";
-import { View, ActivityIndicator, StyleSheet } from "react-native";
-import { Stack, useRouter, useSegments } from "expo-router";
+import { View, StyleSheet } from "react-native";
+import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { Provider } from "react-redux";
@@ -13,27 +13,11 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 
 function AppNavigation() {
   const { initAuth, isAuthenticated, isLoading } = useAuthStore();
-  const segments = useSegments();
-  const router = useRouter();
 
   useEffect(() => {
     const unsubscribe = initAuth();
     return () => unsubscribe();
   }, [initAuth]);
-
-  useEffect(() => {
-    if (isLoading) return;
-
-    const inAuthGroup = segments[0] === "(auth)";
-
-    if (!isAuthenticated && !inAuthGroup) {
-      // Redirect unauthenticated user to sign-in screen
-      router.replace("/(auth)/sign-in");
-    } else if (isAuthenticated && inAuthGroup) {
-      // Redirect authenticated user to main app tabs
-      router.replace("/(app)");
-    }
-  }, [isAuthenticated, isLoading, segments, router]);
 
   if (isLoading) {
     return (
@@ -55,8 +39,15 @@ function AppNavigation() {
           contentStyle: { backgroundColor: colors.void },
         }}
       >
-        <Stack.Screen name="(auth)" options={{ headerShown: false }} />
-        <Stack.Screen name="(app)" options={{ headerShown: false }} />
+        {/* Only the group a user may be in is registered, so a signed-out launch never
+            mounts the queue (it used to, fetching with no token before a redirect), and
+            signing in or out moves to the other group. */}
+        <Stack.Protected guard={!isAuthenticated}>
+          <Stack.Screen name="(auth)" options={{ headerShown: false }} />
+        </Stack.Protected>
+        <Stack.Protected guard={isAuthenticated}>
+          <Stack.Screen name="(app)" options={{ headerShown: false }} />
+        </Stack.Protected>
       </Stack>
     </SafeAreaProvider>
   );

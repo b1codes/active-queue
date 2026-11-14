@@ -1,0 +1,2 @@
+# Ruff for loadtest/ (CI `terraform` job lints it with scripts/). Same rules as the backend.
+extend = "../backend/pyproject.toml"

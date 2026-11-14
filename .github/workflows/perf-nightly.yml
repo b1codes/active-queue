@@ -1,0 +1,167 @@
+name: Performance (nightly)
+
+# API load tests with k6 (loadtest/api.js, ClickUp 86bcxrv0j). See docs/testing.md.
+#
+# load-local    The API under uvicorn on the Firestore and Auth emulators: 20 users for
+#               3 minutes, plus an abusive user and an IP flood. Latency budgets here are
+#               regression tripwires (the emulator scans a collection for every query);
+#               rate limiting, 5xx and throttling of legitimate users are held exactly.
+# load-staging  The same journeys against staging on real Firestore, held to SPEC §1.4's
+#               400 ms p95 for the feed. It also times the first request of the night,
+#               which is normally a cold start (staging runs min_instances = 0). It needs
+#               these repository variables, and reports a notice and passes until they
+#               are all set:
+#                 STAGING_API_URL                  e.g. https://api-staging.example.com
+#                 GCP_WORKLOAD_IDENTITY_PROVIDER   projects/<n>/locations/global/workloadIdentityPools/<pool>/providers/<p>
+#                 LOAD_TEST_SERVICE_ACCOUNT        the identity the job impersonates; it must be
+#                                                  in TF_VAR_smoke_test_signers for staging
+#                 LOAD_SIGNER                      activequeue-smoke-staging@<project>.iam.gserviceaccount.com
+#                 FIREBASE_WEB_API_KEY             staging's Web API key (public)
+#                 LOAD_PLAYLIST_ID                 a small public YouTube playlist each load user syncs
+on:
+  schedule:
+    - cron: "17 5 * * *" # before the other nightlies, so staging has been idle for hours
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  PYTHON_VERSION: "3.12"
+  NODE_VERSION: "22"
+  UV_VERSION: "0.13.2"
+  FIREBASE_TOOLS_VERSION: "15.33.0"
+
+jobs:
+  load-local:
+    name: API load (emulator stack)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e  # v6.8.0
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+          cache-dependency-glob: backend/uv.lock
+
+      - name: Set up Node.js (Firebase emulators)
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Set up Java (Firestore emulator)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Cache Firebase emulator binaries
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/firebase/emulators
+          key: firebase-emulators-${{ env.FIREBASE_TOOLS_VERSION }}
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: uv sync --frozen
+
+      - name: k6 load test
+        run: |
+          npx -y "firebase-tools@${FIREBASE_TOOLS_VERSION}" emulators:exec \
+            --config firebase.test.json --project demo-activequeue-local --only auth,firestore \
+            "loadtest/run.sh local"
+
+      - name: Summary
+        if: always()
+        run: |
+          if [ -f loadtest/out/summary.json ]; then
+            python3 loadtest/summary.py loadtest/out/summary.json "API load (emulator stack)" >> "${GITHUB_STEP_SUMMARY}"
+          fi
+
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: load-local
+          path: |
+            loadtest/out/*.json
+            loadtest/out/*.log
+            !loadtest/out/tokens.json
+
+  load-staging:
+    name: API load (staging)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      id-token: write # Workload Identity Federation
+    env:
+      STAGING_API_URL: ${{ vars.STAGING_API_URL }}
+      CONFIGURED: >-
+        ${{ vars.STAGING_API_URL != '' && vars.GCP_WORKLOAD_IDENTITY_PROVIDER != ''
+        && vars.LOAD_TEST_SERVICE_ACCOUNT != '' && vars.LOAD_SIGNER != ''
+        && vars.FIREBASE_WEB_API_KEY != '' && vars.LOAD_PLAYLIST_ID != '' }}
+      # SPEC §13 expects a 2-4 s Python cold start; this adds the network round trip.
+      COLD_START_BUDGET_SECONDS: "6"
+    steps:
+      - name: Skip until staging is configured
+        if: env.CONFIGURED != 'true'
+        run: echo "::notice::Staging load test variables are not all set (see this workflow's header); skipping."
+
+      - name: Checkout repository
+        if: env.CONFIGURED == 'true'
+        uses: actions/checkout@v4
+
+      - name: First request of the night (usually a cold start)
+        if: env.CONFIGURED == 'true'
+        run: |
+          seconds="$(curl -s -o /dev/null -w '%{time_total}' --max-time 60 "${STAGING_API_URL}/health")"
+          echo "First /health took ${seconds} s (budget ${COLD_START_BUDGET_SECONDS} s)."
+          echo "First request of the night: ${seconds} s (budget ${COLD_START_BUDGET_SECONDS} s)" >> "${GITHUB_STEP_SUMMARY}"
+          awk -v s="${seconds}" -v b="${COLD_START_BUDGET_SECONDS}" 'BEGIN { exit !(s <= b) }' \
+            || { echo "::error::first request took ${seconds} s, over ${COLD_START_BUDGET_SECONDS} s"; exit 1; }
+
+      - name: Authenticate to Google Cloud
+        if: env.CONFIGURED == 'true'
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093  # v3.0.0
+        with:
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.LOAD_TEST_SERVICE_ACCOUNT }}
+
+      - name: Set up gcloud
+        if: env.CONFIGURED == 'true'
+        uses: google-github-actions/setup-gcloud@aa5489c8933f4cc7a4f7d45035b3b1440c9c10db  # v3.0.1
+
+      - name: k6 load test
+        if: env.CONFIGURED == 'true'
+        env:
+          LOAD_SIGNER: ${{ vars.LOAD_SIGNER }}
+          FIREBASE_WEB_API_KEY: ${{ vars.FIREBASE_WEB_API_KEY }}
+          LOAD_PLAYLIST: ${{ vars.LOAD_PLAYLIST_ID }}
+        run: loadtest/run.sh staging
+
+      - name: Summary
+        if: always() && env.CONFIGURED == 'true'
+        run: |
+          if [ -f loadtest/out/summary.json ]; then
+            python3 loadtest/summary.py loadtest/out/summary.json "API load (staging)" >> "${GITHUB_STEP_SUMMARY}"
+          fi
+
+      - name: Upload results
+        if: always() && env.CONFIGURED == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: load-staging
+          path: |
+            loadtest/out/*.json
+            loadtest/out/*.log
+            !loadtest/out/tokens.json

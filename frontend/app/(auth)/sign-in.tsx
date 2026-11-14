@@ -4,15 +4,16 @@ import {
   KeyboardAvoidingView,
   Platform,
   StyleSheet,
-  Text,
   TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { ThermalGlowTouchable } from "@/core/components";
+import { Text } from "@/core/components/Text";
 import { colors, rounded, spacing, typography } from "@/core/theme";
 import { useAuthStore } from "@/features/auth/authStore";
+import { isDevToolsEnabled } from "@/core/config/devTools";
 
 export default function SignInScreen() {
   const [email, setEmail] = useState("");
@@ -33,6 +34,12 @@ export default function SignInScreen() {
   };
 
   const isButtonDisabled = isLoading || !email || !password;
+  // One message for the eye and for VoiceOver: the banner is a single accessible element,
+  // so its label is all a screen reader hears, and it must not be Firebase's raw error.
+  const errorMessage =
+    error && /user-not-found|wrong-password|invalid-credential/.test(error)
+      ? "Invalid email address or password. Please verify your details."
+      : error;
 
   return (
     <KeyboardAvoidingView
@@ -57,14 +64,10 @@ export default function SignInScreen() {
             accessible={true}
             accessibilityRole="alert"
             accessibilityLiveRegion="polite"
-            accessibilityLabel={`Authentication error: ${error}`}
+            accessibilityLabel={`Authentication error: ${errorMessage}`}
           >
             <Ionicons name="alert-circle-outline" size={20} color={colors.ink} />
-            <Text style={styles.errorText}>
-              {error.includes("user-not-found") || error.includes("wrong-password") || error.includes("invalid-credential")
-                ? "Invalid email address or password. Please verify your details."
-                : error}
-            </Text>
+            <Text style={styles.errorText}>{errorMessage}</Text>
           </View>
         ) : null}
 
@@ -83,6 +86,7 @@ export default function SignInScreen() {
               autoCorrect={false}
               accessible={true}
               accessibilityLabel="Email address"
+              testID="sign-in-email"
               accessibilityHint="Enter your account email address"
             />
           </View>
@@ -98,6 +102,7 @@ export default function SignInScreen() {
               secureTextEntry
               accessible={true}
               accessibilityLabel="Password"
+              testID="sign-in-password"
               accessibilityHint="Enter your account password"
             />
           </View>
@@ -115,6 +120,7 @@ export default function SignInScreen() {
             accessibilityRole="button"
             accessibilityLabel="Sign in"
             accessibilityHint="Double tap to authenticate and access your queue"
+            accessibilityState={{ busy: isLoading }}
           >
             {isLoading ? (
               <ActivityIndicator color={colors.void} size="small" />
@@ -123,7 +129,9 @@ export default function SignInScreen() {
             )}
           </ThermalGlowTouchable>
 
-          {/* Development Shortcut Section */}
+          {/* Development Shortcut Section — never rendered in production builds */}
+          {isDevToolsEnabled() ? (
+          <>
           <View style={styles.dividerContainer}>
             <View style={styles.dividerLine} />
             <Text style={styles.dividerText}>Development testing</Text>
@@ -143,6 +151,8 @@ export default function SignInScreen() {
             <Ionicons name="flash-outline" size={18} color={colors.signalVerified} />
             <Text style={styles.emulatorButtonText}>Quick sign in (emulator)</Text>
           </TouchableOpacity>
+          </>
+          ) : null}
         </View>
       </View>
     </KeyboardAvoidingView>

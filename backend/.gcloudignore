@@ -1,0 +1,11 @@
+# `gcloud builds submit backend/` uploads only what this file allows (gitignore syntax).
+# Without it gcloud would upload the whole directory, including .venv and test caches.
+# Keep it in step with .dockerignore; Cloud Build also needs the Dockerfile itself.
+/*
+!/Dockerfile
+!/.dockerignore
+!/pyproject.toml
+!/uv.lock
+!/app/
+__pycache__/
+*.pyc

@@ -4,3 +4,4 @@ export * from './LiquidGlassSurface';
 export * from './ThermalGlowTouchable';
 export * from './states';
 
+export * from './Text';

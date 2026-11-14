@@ -1,0 +1,96 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "YouTube Data API v3 playlistItems.list (part=snippet,contentDetails)",
+  "description": "Fields YouTubeProvider.fetch_playlist_items reads from each page.",
+  "type": "object",
+  "required": [
+    "items",
+    "pageInfo"
+  ],
+  "properties": {
+    "nextPageToken": {
+      "type": "string",
+      "minLength": 1
+    },
+    "pageInfo": {
+      "type": "object",
+      "required": [
+        "totalResults"
+      ],
+      "properties": {
+        "totalResults": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "items": {
+      "type": "array",
+      "maxItems": 50,
+      "items": {
+        "type": "object",
+        "required": [
+          "snippet",
+          "contentDetails"
+        ],
+        "properties": {
+          "snippet": {
+            "type": "object",
+            "required": [
+              "title",
+              "resourceId"
+            ],
+            "properties": {
+              "title": {
+                "type": "string"
+              },
+              "publishedAt": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "resourceId": {
+                "type": "object",
+                "required": [
+                  "videoId"
+                ],
+                "properties": {
+                  "videoId": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                }
+              },
+              "thumbnails": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "object",
+                  "required": [
+                    "url"
+                  ],
+                  "properties": {
+                    "url": {
+                      "type": "string",
+                      "format": "uri"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "contentDetails": {
+            "type": "object",
+            "required": [
+              "videoId"
+            ],
+            "properties": {
+              "videoId": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

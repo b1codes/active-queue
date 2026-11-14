@@ -11,9 +11,12 @@ const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
 
 export const auth = (() => {
   try {
+    // Lazy require: getReactNativePersistence only exists in Firebase's React Native
+    // build, so a static import would break the web/Jest bundles.
+    /* eslint-disable @typescript-eslint/no-require-imports */
     const AsyncStorage = require("@react-native-async-storage/async-storage").default;
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
     const { getReactNativePersistence } = require("firebase/auth");
+    /* eslint-enable @typescript-eslint/no-require-imports */
     if (typeof getReactNativePersistence === "function") {
       return initializeAuth(app, {
         persistence: getReactNativePersistence(AsyncStorage),

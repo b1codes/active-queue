@@ -1,0 +1,30 @@
+# Types FORM_EMAIL and FORM_PASSWORD into the sign-in form, as one attempt that's retried
+# whole. A tap that lands while the keyboard is still animating in can miss, and the text then
+# goes to the field that still has focus. A missed password tap once left the email reading
+# "e2ee2e-password-1" (eraseText cut the email, then the password was typed after it).
+# Retrying only the password can't repair that, so every attempt refills both fields and
+# confirms the email by its value (a secure field's value can't be read back).
+appId: com.b1codes.activequeue
+---
+- retry:
+    maxRetries: 3
+    commands:
+      - tapOn:
+          id: sign-in-email
+      - waitForAnimationToEnd
+      - eraseText: 80
+      - inputText: ${FORM_EMAIL}
+      - waitForAnimationToEnd
+      - assertVisible:
+          id: sign-in-email
+          text: ${FORM_EMAIL}
+      - tapOn:
+          id: sign-in-password
+      - waitForAnimationToEnd
+      - eraseText: 40
+      - inputText: ${FORM_PASSWORD}
+      - waitForAnimationToEnd
+      # Still exactly the email: the password didn't land in it.
+      - assertVisible:
+          id: sign-in-email
+          text: ${FORM_EMAIL}

@@ -50,10 +50,9 @@ async def test_multiuser_session_isolation(mock_firestore_client: MagicMock) -> 
             assert resp_start.status_code == 404
             assert resp_start.json()["error"]["code"] == "SESSION_NOT_FOUND"
 
-            # User A tries to complete User B's session -> 404
-            resp_complete = await client.post("/api/v1/sessions/s_user_B_123/complete")
-            assert resp_complete.status_code == 404
-            assert resp_complete.json()["error"]["code"] == "SESSION_NOT_FOUND"
+            # complete runs in a Firestore transaction, which a MagicMock client cannot
+            # emulate; cross-user complete is covered against the real emulator in
+            # tests/emulator/test_sessions_emulator.py::test_cross_user_session_access_is_404.
 
             # User A tries to abandon User B's session -> 404
             resp_abandon = await client.post("/api/v1/sessions/s_user_B_123/abandon")

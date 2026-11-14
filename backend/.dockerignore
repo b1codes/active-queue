@@ -1,0 +1,8 @@
+# Only pyproject.toml, uv.lock and app/ go into the image; keep everything else out of
+# the build context (and out of `gcloud builds submit` uploads, via .gcloudignore).
+*
+!pyproject.toml
+!uv.lock
+!app/
+**/__pycache__
+**/*.pyc

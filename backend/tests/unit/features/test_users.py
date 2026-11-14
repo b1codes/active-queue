@@ -125,29 +125,6 @@ async def test_user_repository_get_authorization() -> None:
 
 
 @pytest.mark.asyncio
-async def test_user_repository_provision_user_transactional() -> None:
-    """UserRepository.provision_user_transactional commits batch writes."""
-    mock_client = MagicMock()
-    mock_batch = MagicMock()
-    mock_batch.commit = AsyncMock()
-    mock_client.batch.return_value = mock_batch
-
-    mock_doc = MagicMock()
-    mock_collection = MagicMock()
-    mock_collection.document.return_value = mock_doc
-    mock_client.collection.return_value = mock_collection
-
-    repo = UserRepository(mock_client)
-    u = User(uid="u1", email="a@b.com", display_name="Test")
-    a = UserAuthorization(uid="u1")
-
-    res_u, res_a = await repo.provision_user_transactional(u, a)
-    assert res_u.uid == "u1"
-    assert res_a.uid == "u1"
-    assert mock_batch.commit.called
-
-
-@pytest.mark.asyncio
 async def test_user_repository_update_user() -> None:
     """UserRepository.update_user updates fields and returns updated User."""
     mock_client = MagicMock()

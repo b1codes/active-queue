@@ -26,11 +26,15 @@ services:
       - ./firestore.indexes.json:/workspace/firestore.indexes.json:ro
       # Named volume so emulator data persists across restarts
       - firebase-data:/workspace/.firebase-data
-    command: >
-      firebase emulators:start
-      --project demo-activequeue-local
-      --only auth,firestore
-      --export-on-exit /workspace/.firebase-data
+    # Export into a subdirectory: the volume's mount point itself can't be replaced
+    # (EBUSY). Import it on the next start when a previous export exists.
+    command:
+      - sh
+      - -c
+      - >-
+        if [ -d /workspace/.firebase-data/export ]; then set -- --import /workspace/.firebase-data/export; fi;
+        exec firebase emulators:start --project demo-activequeue-local --only auth,firestore
+        --export-on-exit /workspace/.firebase-data/export "$$@"
     ports:
       - "9099:9099"   # Firebase Auth emulator
       - "9090:9090"   # Firestore emulator

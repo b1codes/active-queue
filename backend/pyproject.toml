@@ -23,6 +23,13 @@ dev = [
     "ruff>=0.12",
     "mypy>=1.16",
     "coverage>=7.8",
+    "respx>=0.23.1",
+    "pytest-randomly>=5.0.0",
+    "jsonschema>=4.23",
+    "rfc3339-validator>=0.1.4",
+    "rfc3986-validator>=0.1.1",
+    "hypothesis>=6.140",
+    "schemathesis>=4",
 ]
 
 [tool.ruff]
@@ -44,12 +51,42 @@ select = [
     "SIM",  # flake8-simplify
     "TCH",  # flake8-type-checking
     "RUF",  # ruff-specific rules
+    "S",    # flake8-bandit (security)
+    "BLE",  # blind except
+    "DTZ",  # naive datetimes
+    "ASYNC",# blocking calls in async code
+    "ARG",  # unused arguments
+    "RET",  # return hygiene
+    "PIE",  # misc lints
+    "PERF", # performance anti-patterns
+    "FURB", # refurb modernisations
+    "PLE",  # pylint errors
+    "PLW",  # pylint warnings
+    "TRY",  # exception-handling anti-patterns
+    "T20",  # stray print()
+    "PT",   # pytest style
 ]
 ignore = [
-    "E501",  # line length handled by formatter
-    "B008",  # function call in argument defaults (FastAPI Depends)
-    "TC001", # move import into type-checking block (Pydantic needs runtime types)
-    "TC003", # move stdlib import into type-checking block
+    "E501",    # line length handled by formatter
+    "B008",    # function call in argument defaults (FastAPI Depends)
+    "TC001",   # move import into type-checking block (Pydantic needs runtime types)
+    "TC003",   # move stdlib import into type-checking block
+    "TRY003",  # long messages on AppError subclasses are the API's error text
+    "PLW0603", # module-level singletons (_client, caches) are set via `global` by design
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = [
+    "S101",    # assert is how pytest works
+    "S105",    # fake credentials in fixtures
+    "S106",
+    "ARG001",  # fixtures requested for their side effects
+    "ARG002",
+]
+"app/cli/seed.py" = [
+    "T201",    # CLI prints its summary
+    "S105",    # published emulator-only test password
+    "S106",
 ]
 
 [tool.ruff.lint.isort]
@@ -73,6 +110,10 @@ ignore_missing_imports = true
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
+markers = [
+    "emulator: runs against the Firestore + Auth emulators (tests/emulator/)",
+    "live: calls real third-party services; nightly only (tests/contract/thirdparty/)",
+]
 filterwarnings = [
     "error",
     "ignore::DeprecationWarning",
@@ -80,14 +121,12 @@ filterwarnings = [
 
 [tool.coverage.run]
 source = ["app"]
-omit = [
-    "app/main.py",
-    "app/features/activities/*",
-    "app/features/sessions/*",
-]
+branch = true
 
 [tool.coverage.report]
-fail_under = 80
+# The single backend coverage gate (branch coverage over all of app/). CI,
+# `make test-backend`, and scripts/deploy.sh all run `pytest --cov` and read it here.
+fail_under = 95
 exclude_lines = [
     "pragma: no cover",
     "if TYPE_CHECKING:",

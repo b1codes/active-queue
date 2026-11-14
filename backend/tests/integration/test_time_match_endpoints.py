@@ -27,7 +27,7 @@ async def test_post_content_match_time_endpoint(mock_firestore_client: AsyncMock
     with (
         patch("firebase_admin.auth.verify_id_token", return_value=mock_decoded),
         patch(
-            "app.features.content.repository.ContentRepository.get_all_unconsumed_feed_items",
+            "app.features.content.repository.ContentRepository.get_unconsumed_feed_items_in_range",
             AsyncMock(return_value=[item]),
         ),
         patch(

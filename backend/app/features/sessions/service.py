@@ -6,11 +6,14 @@ from typing import TYPE_CHECKING, Any
 
 import structlog
 
-from app.core.envelopes import ErrorDetail
 from app.core.errors import AppError, ConflictError, NotFoundError, ValidationError
 from app.features.activities.service import ActivityService
 from app.features.sessions.models import MatchMode, Session
-from app.features.sessions.repository import SessionRepository, decode_session_cursor
+from app.features.sessions.repository import (
+    SessionRepository,
+    active_session_conflict,
+    decode_session_cursor,
+)
 from app.features.sessions.schemas import SessionListResponse, SessionSchema
 
 if TYPE_CHECKING:
@@ -30,7 +33,7 @@ class SessionService:
     - Bare time-first duration validated against predefined 7-block allowlist.
     - Single active session guardrail (ACTIVE_SESSION_EXISTS, 409).
     - Idempotent session start preserving original started_at timestamp.
-    - Single transaction session completion (updates session, feed_item.consumed, and user.consumed_content).
+    - Single transaction session completion (updates session, feed_item.consumed, and user.consumed_content_ids).
     - Idempotent completion (completing completed session returns 200).
     - Completing pending session returns SESSION_NOT_STARTED (409).
     - Lazy abandonment evaluation on read (now > created_at + duration_seconds + 24h).
@@ -90,16 +93,7 @@ class SessionService:
         # Step 2: Single active session guardrail (evaluates lazy abandonment on read)
         existing_active = await self._session_repo.get_active_user_session(user_id)
         if existing_active:
-            raise ConflictError(
-                code="ACTIVE_SESSION_EXISTS",
-                message="You already have an active session in progress",
-                details=[
-                    ErrorDetail(
-                        field="active_session_id",
-                        issue=existing_active.id,
-                    )
-                ],
-            )
+            raise active_session_conflict(existing_active.id)
 
         # Step 3: Determine session duration
         duration_seconds: int = 0

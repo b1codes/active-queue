@@ -1,0 +1,30 @@
+{
+  "kind": "youtube#videoListResponse",
+  "etag": "fixture",
+  "pageInfo": {
+    "totalResults": 1,
+    "resultsPerPage": 1
+  },
+  "items": [
+    {
+      "kind": "youtube#video",
+      "etag": "fixture",
+      "id": "vidLive1",
+      "snippet": {
+        "publishedAt": "2025-01-04T08:00:00Z",
+        "title": "24/7 lofi radio",
+        "thumbnails": {
+          "high": {
+            "url": "https://i.ytimg.com/vi/vidLive1/hqdefault.jpg"
+          }
+        }
+      },
+      "contentDetails": {
+        "duration": "P0D",
+        "dimension": "2d",
+        "definition": "hd",
+        "caption": "false"
+      }
+    }
+  ]
+}

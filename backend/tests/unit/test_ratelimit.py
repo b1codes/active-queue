@@ -119,3 +119,15 @@ def test_rate_limiter_heavy_endpoint_category() -> None:
     assert allowed is False
     assert limit == 30
     assert remaining == 0
+
+
+def test_every_health_route_is_exempt_from_rate_limiting() -> None:
+    from fastapi.routing import APIRoute
+
+    from app.features.health.paths import HEALTH_PATHS
+    from app.features.health.router import router
+    from app.middleware.ratelimit import _get_endpoint_category
+
+    served = {route.path for route in router.routes if isinstance(route, APIRoute)}
+    assert served == set(HEALTH_PATHS)
+    assert {_get_endpoint_category("GET", p) for p in served} == {"health"}

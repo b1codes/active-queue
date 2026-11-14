@@ -21,26 +21,30 @@ DANGEROUS_SCHEME_RE = re.compile(r"^\s*(javascript|data|vbscript|file):", re.IGN
 PATH_TRAVERSAL_RE = re.compile(r"\.\.[/\\]")
 
 
+def _strip_markup_once(text: str) -> str:
+    cleaned = SCRIPT_TAG_RE.sub("", text)
+    cleaned = CONTROL_CHAR_RE.sub("", cleaned)
+    cleaned = HTML_TAG_RE.sub("", cleaned)
+    return DANGEROUS_SCHEME_RE.sub("", cleaned).strip()
+
+
 def sanitize_text(text: str | None, max_length: int | None = None) -> str | None:
-    """Sanitize free-text input by stripping control chars, null bytes, HTML tags, and trailing spaces."""
+    """Sanitize free text: strip control chars, HTML tags, and leading dangerous schemes.
+
+    The passes repeat until nothing changes. A single pass can be defeated by nesting,
+    because removing one construct can assemble another: "jav<b>ascript:javascript:x"
+    loses its tag and then one scheme, which leaves "javascript:x". Every pass that
+    changes anything makes the string shorter, so the loop terminates. The result is
+    idempotent, so re-sanitizing stored data never changes it again.
+    """
     if text is None:
         return None
 
     cleaned = text.strip()
-    if not cleaned:
-        return ""
-
-    # Strip script/style/iframe tags and their content
-    cleaned = SCRIPT_TAG_RE.sub("", cleaned)
-
-    # Strip null bytes and control characters
-    cleaned = CONTROL_CHAR_RE.sub("", cleaned)
-
-    # Strip remaining HTML tags
-    cleaned = HTML_TAG_RE.sub("", cleaned)
-
-    # Remove inline dangerous script protocols if present
-    cleaned = DANGEROUS_SCHEME_RE.sub("", cleaned)
+    previous = None
+    while cleaned != previous:
+        previous = cleaned
+        cleaned = _strip_markup_once(cleaned)
 
     if max_length is not None and len(cleaned) > max_length:
         cleaned = cleaned[:max_length]
@@ -58,16 +62,18 @@ def sanitize_url(url: str | None, max_length: int = 2048) -> str | None:
         return None
 
     # Strip control chars and null bytes
-    cleaned = CONTROL_CHAR_RE.sub("", cleaned)
-
-    if len(cleaned) > max_length:
+    cleaned = CONTROL_CHAR_RE.sub("", cleaned).strip()
+    if not cleaned or len(cleaned) > max_length:
         return None
 
     # Reject dangerous schemes
     if DANGEROUS_SCHEME_RE.search(cleaned):
         return None
 
-    parsed = urlparse(cleaned)
+    try:
+        parsed = urlparse(cleaned)
+    except ValueError:  # e.g. "http://[" (unterminated IPv6 literal)
+        return None
     if parsed.scheme and parsed.scheme.lower() not in ("http", "https"):
         return None
 
@@ -86,13 +92,39 @@ def sanitize_identifier(identifier: str | None, max_length: int = 200) -> str | 
     # Strip control chars
     cleaned = CONTROL_CHAR_RE.sub("", cleaned)
 
-    # Strip path traversal elements
-    cleaned = PATH_TRAVERSAL_RE.sub("", cleaned)
+    # Strip path traversal elements until none are left: one pass turns "....//" into "../".
+    previous = None
+    while cleaned != previous:
+        previous = cleaned
+        cleaned = PATH_TRAVERSAL_RE.sub("", cleaned)
 
     if len(cleaned) > max_length:
         cleaned = cleaned[:max_length]
 
     return cleaned.strip()
+
+
+# Firestore document ID rules: no "/", not "." or "..", not matching __.*__ (reserved).
+# IDs here are interpolated into document paths (content_cache/{id},
+# feed_items/{uid}_{id}), so an invalid one would otherwise surface as a 500.
+DOCUMENT_ID_RE = re.compile(r"^[A-Za-z0-9_\-.:]+$")
+RESERVED_DOCUMENT_ID_RE = re.compile(r"^__.*__$")
+
+
+# The same rule as one ECMA-262 pattern, published in the API contract (contracts/openapi.json)
+# so clients and schema-driven fuzzers know which IDs the API accepts.
+# tests/unit/test_sanitizer_properties.py holds the two definitions to each other.
+DOCUMENT_ID_PATTERN = r"^(?!\.\.?$)(?!__.*__$)[A-Za-z0-9_\-.:]+$"
+
+
+def is_valid_document_id(identifier: str) -> bool:
+    """Return True if identifier is safe to use as (part of) a Firestore document ID."""
+    # fullmatch, not match: `$` also matches before a trailing newline, so "abc\n" passed.
+    return (
+        bool(DOCUMENT_ID_RE.fullmatch(identifier))
+        and identifier not in (".", "..")
+        and not RESERVED_DOCUMENT_ID_RE.match(identifier)
+    )
 
 
 def sanitize_string_list(

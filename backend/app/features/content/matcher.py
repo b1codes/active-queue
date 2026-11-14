@@ -13,6 +13,10 @@ GLOBAL_MAX_DURATION_SECONDS = 10800  # 3 hours per SPEC §5.2
 PRIMARY_WINDOW_OFFSET_SECONDS = 300  # +5 minutes [B, B+300] per SPEC §5.3
 FALLBACK_WINDOW_OFFSET_SECONDS = 120  # -2 minutes [B-120, B) per SPEC §5.3
 
+# At most this many items come back from a time-first match, closest to the block first.
+# The user picks one; the cap is what keeps the request's reads bounded (SPEC §5.3).
+TIME_MATCH_RESULT_LIMIT = 50
+
 RejectionReason = Literal["duration_out_of_range", "no_matching_activity", "no_content_in_window"]
 WindowType = Literal["primary", "fallback"]
 
@@ -91,6 +95,17 @@ def match_content_to_activities(
     )
 
 
+def time_match_windows(target_duration_seconds: int) -> tuple[tuple[int, int], tuple[int, int]]:
+    """The inclusive (min, max) duration bounds of the primary and fallback windows (SPEC §5.3).
+
+    The fallback window is empty (min > max) when the block is at or under the 5-minute floor.
+    """
+    b = target_duration_seconds
+    primary = (b, b + PRIMARY_WINDOW_OFFSET_SECONDS)
+    fallback = (max(GLOBAL_MIN_DURATION_SECONDS, b - FALLBACK_WINDOW_OFFSET_SECONDS), b - 1)
+    return primary, fallback
+
+
 def match_time_block_asymmetric(
     target_duration_seconds: int,
     unconsumed_feed: list[FeedItem],
@@ -103,11 +118,9 @@ def match_time_block_asymmetric(
     Overshoot preferred ([B, B+300]), undershoot capped at 2 mins ([B-120, B)).
     """
     b = target_duration_seconds
+    (primary_min, primary_max), (fallback_min, fallback_max) = time_match_windows(b)
 
     # 1. Primary Window: [B, B+300]
-    primary_min = b
-    primary_max = b + PRIMARY_WINDOW_OFFSET_SECONDS
-
     primary_candidates = [
         item for item in unconsumed_feed if primary_min <= item.duration_seconds <= primary_max
     ]
@@ -124,9 +137,6 @@ def match_time_block_asymmetric(
         )
 
     # 2. Fallback Window: [B-120, B)
-    fallback_min = max(300, b - FALLBACK_WINDOW_OFFSET_SECONDS)
-    fallback_max = b - 1
-
     fallback_candidates = [
         item for item in unconsumed_feed if fallback_min <= item.duration_seconds <= fallback_max
     ]

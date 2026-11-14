@@ -1,0 +1,7 @@
+# hadolint config for every Dockerfile in the repo (ci.yml `container` job).
+failure-threshold: warning
+ignored:
+  # Pinning apt package versions breaks the build whenever Debian/Ubuntu publishes a
+  # security fix, because the archive keeps only the latest version. Base images are
+  # pinned by digest instead, and the API image runs `apt-get upgrade` for fixes.
+  - DL3008

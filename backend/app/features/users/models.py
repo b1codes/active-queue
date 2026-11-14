@@ -3,11 +3,14 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class UserPreferences(BaseModel):
     """User preferences stored inside users/{uid}.preferences document field per SPEC §4.2."""
+
+    # Also serialized in GET /users/me; see app.core.envelopes.ResponseSchema.
+    model_config = ConfigDict(json_schema_serialization_defaults_required=True)
 
     preferred_activity_types: list[str] = Field(default_factory=list)
     preferred_tracker_app: str | None = None

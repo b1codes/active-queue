@@ -1,1 +1,1 @@
-export { apiClient, ApiError, type ApiErrorDetail } from "@/core/api/apiClient";
+export { apiClient, ApiError, NETWORK_UNAVAILABLE, type ApiErrorDetail } from "@/core/api/apiClient";

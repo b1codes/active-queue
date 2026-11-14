@@ -1,0 +1,7 @@
+{
+  "error": {
+    "code": 403,
+    "message": "The playlist identified with the request's playlistId parameter cannot be accessed.",
+    "errors": [{"message": "Forbidden", "domain": "youtube.playlistItem", "reason": "playlistItemsNotAccessible"}]
+  }
+}

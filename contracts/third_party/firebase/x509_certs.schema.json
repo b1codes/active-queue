@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Firebase ID token signing certificates",
+  "description": "https://www.googleapis.com/robot/v1/metadata/x509/securetoken@system.gserviceaccount.com, fetched and cached by firebase_admin to verify ID token signatures (kid -> PEM certificate).",
+  "type": "object",
+  "minProperties": 1,
+  "additionalProperties": {
+    "type": "string",
+    "pattern": "^-----BEGIN CERTIFICATE-----\\n[\\s\\S]+\\n-----END CERTIFICATE-----\\n?$"
+  }
+}

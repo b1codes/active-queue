@@ -23,3 +23,8 @@ expo-env.d.ts
 # @end expo-cli
 *storybook.log
 storybook-static
+coverage/
+dist-ios/
+
+# Simulator builds and screenshot runs (scripts/ios-sim-build.sh, scripts/screenshots)
+build/

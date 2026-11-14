@@ -1,0 +1,11 @@
+# gitleaks configuration: the default rules, plus narrow allowlists for reviewed false
+# positives. Each allowlist must say why it is safe; never allowlist a file wholesale.
+title = "ActiveQueue gitleaks config"
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Provider pagination cursors (page_token=...) are not credentials"
+regexTarget = "line"
+regexes = ['''\bpage_token=''']

@@ -9,6 +9,12 @@ from app.features.content.models import Source
 from app.features.content.service import ContentService
 
 
+def _user_repo(consumed: set[str] | None = None) -> AsyncMock:
+    repo = AsyncMock()
+    repo.get_consumed_content_ids.return_value = consumed or set()
+    return repo
+
+
 @pytest.mark.asyncio
 async def test_provider_quota_degradation_preserves_cursor() -> None:
     """When YouTube Data API returns PROVIDER_QUOTA_EXCEEDED, source status becomes quota_paused and next_page_token cursor is preserved per SPEC §8.3."""
@@ -32,7 +38,7 @@ async def test_provider_quota_degradation_preserves_cursor() -> None:
         message="YouTube Data API quota limit exceeded",
     )
 
-    service = ContentService(source_repo=mock_source_repo, content_repo=mock_content_repo)
+    service = ContentService(mock_source_repo, mock_content_repo, _user_repo())
 
     with (
         patch("app.features.content.service.get_provider", return_value=mock_provider),

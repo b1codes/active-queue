@@ -1,0 +1,464 @@
+{
+  "description": "Workout session lifecycle (SPEC §7, §9.5, §9.6).",
+  "interactions": [
+    {
+      "id": "sessions.create.content_first",
+      "description": "Content-first session takes its duration from the content cache",
+      "states": [
+        "alice has a synced small playlist"
+      ],
+      "request": {
+        "method": "POST",
+        "path": "/api/v1/sessions",
+        "body": {
+          "activity_id": "strength",
+          "match_mode": "content_first",
+          "content_id": "fx:fx_vid_0003",
+          "target_duration_seconds": null
+        }
+      },
+      "response": {
+        "status": 201,
+        "body": {
+          "status": "success",
+          "data": {
+            "id": "sess_new",
+            "user_id": "uid_alice",
+            "activity_id": "strength",
+            "match_mode": "content_first",
+            "content_id": "fx:fx_vid_0003",
+            "duration_seconds": 1500,
+            "status": "pending",
+            "checklist_completed": false,
+            "started_at": null,
+            "completed_at": null,
+            "abandoned_at": null,
+            "created_at": "2026-01-01T00:00:00Z",
+            "updated_at": "2026-01-01T00:00:00Z"
+          },
+          "error": null
+        }
+      },
+      "dynamic": [
+        "data.id",
+        "data.created_at",
+        "data.updated_at"
+      ],
+      "consumers": [
+        "createSession"
+      ]
+    },
+    {
+      "id": "sessions.create.time_first",
+      "description": "Bare time-first session",
+      "request": {
+        "method": "POST",
+        "path": "/api/v1/sessions",
+        "body": {
+          "activity_id": "running",
+          "match_mode": "time_first",
+          "content_id": null,
+          "target_duration_seconds": 1800
+        }
+      },
+      "response": {
+        "status": 201,
+        "body": {
+          "status": "success",
+          "data": {
+            "id": "sess_new",
+            "user_id": "uid_alice",
+            "activity_id": "running",
+            "match_mode": "time_first",
+            "content_id": null,
+            "duration_seconds": 1800,
+            "status": "pending",
+            "checklist_completed": false,
+            "started_at": null,
+            "completed_at": null,
+            "abandoned_at": null,
+            "created_at": "2026-01-01T00:00:00Z",
+            "updated_at": "2026-01-01T00:00:00Z"
+          },
+          "error": null
+        }
+      },
+      "dynamic": [
+        "data.id",
+        "data.created_at",
+        "data.updated_at"
+      ],
+      "consumers": [
+        "createSession"
+      ]
+    },
+    {
+      "id": "sessions.create.conflict",
+      "description": "A second non-terminal session is refused; details name the active one",
+      "states": [
+        "alice has a pending session"
+      ],
+      "request": {
+        "method": "POST",
+        "path": "/api/v1/sessions",
+        "body": {
+          "activity_id": "running",
+          "match_mode": "time_first",
+          "content_id": null,
+          "target_duration_seconds": 1800
+        }
+      },
+      "response": {
+        "status": 409,
+        "body": {
+          "status": "error",
+          "data": null,
+          "error": {
+            "code": "ACTIVE_SESSION_EXISTS",
+            "message": "You already have an active session in progress",
+            "details": [
+              {
+                "field": "active_session_id",
+                "issue": "sess_1"
+              }
+            ]
+          }
+        }
+      },
+      "consumers": [
+        "createNewSession.conflict"
+      ]
+    },
+    {
+      "id": "sessions.active.none",
+      "description": "No active session",
+      "request": {
+        "method": "GET",
+        "path": "/api/v1/sessions/active"
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "status": "success",
+          "data": null,
+          "error": null
+        }
+      },
+      "consumers": [
+        "getActiveSession"
+      ]
+    },
+    {
+      "id": "sessions.active.pending",
+      "description": "The current pending session",
+      "states": [
+        "alice has a pending session"
+      ],
+      "request": {
+        "method": "GET",
+        "path": "/api/v1/sessions/active"
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "status": "success",
+          "data": {
+            "id": "sess_1",
+            "user_id": "uid_alice",
+            "activity_id": "running",
+            "match_mode": "time_first",
+            "content_id": null,
+            "duration_seconds": 1800,
+            "status": "pending",
+            "checklist_completed": false,
+            "started_at": null,
+            "completed_at": null,
+            "abandoned_at": null,
+            "created_at": "2026-01-01T00:00:00Z",
+            "updated_at": "2026-01-01T00:00:00Z"
+          },
+          "error": null
+        }
+      },
+      "dynamic": [
+        "data.created_at",
+        "data.updated_at"
+      ],
+      "consumers": [
+        "getActiveSession"
+      ]
+    },
+    {
+      "id": "sessions.start",
+      "description": "Start a pending session",
+      "states": [
+        "alice has a pending session"
+      ],
+      "request": {
+        "method": "POST",
+        "path": "/api/v1/sessions/sess_1/start"
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "status": "success",
+          "data": {
+            "id": "sess_1",
+            "user_id": "uid_alice",
+            "activity_id": "running",
+            "match_mode": "time_first",
+            "content_id": null,
+            "duration_seconds": 1800,
+            "status": "in_progress",
+            "checklist_completed": true,
+            "started_at": "2026-01-01T00:00:00Z",
+            "completed_at": null,
+            "abandoned_at": null,
+            "created_at": "2026-01-01T00:00:00Z",
+            "updated_at": "2026-01-01T00:00:00Z"
+          },
+          "error": null
+        }
+      },
+      "dynamic": [
+        "data.created_at",
+        "data.updated_at",
+        "data.started_at"
+      ],
+      "consumers": [
+        "startSession"
+      ]
+    },
+    {
+      "id": "sessions.complete",
+      "description": "Complete a started session (the app sends no body)",
+      "states": [
+        "alice has an in-progress session"
+      ],
+      "request": {
+        "method": "POST",
+        "path": "/api/v1/sessions/sess_1/complete"
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "status": "success",
+          "data": {
+            "id": "sess_1",
+            "user_id": "uid_alice",
+            "activity_id": "running",
+            "match_mode": "time_first",
+            "content_id": null,
+            "duration_seconds": 1800,
+            "status": "completed",
+            "checklist_completed": true,
+            "started_at": "2026-01-01T00:00:00Z",
+            "completed_at": "2026-01-01T00:00:00Z",
+            "abandoned_at": null,
+            "created_at": "2026-01-01T00:00:00Z",
+            "updated_at": "2026-01-01T00:00:00Z"
+          },
+          "error": null
+        }
+      },
+      "dynamic": [
+        "data.created_at",
+        "data.updated_at",
+        "data.started_at",
+        "data.completed_at"
+      ],
+      "consumers": [
+        "completeSession"
+      ]
+    },
+    {
+      "id": "sessions.complete.not_started",
+      "description": "Completing a pending session",
+      "states": [
+        "alice has a pending session"
+      ],
+      "request": {
+        "method": "POST",
+        "path": "/api/v1/sessions/sess_1/complete"
+      },
+      "response": {
+        "status": 409,
+        "body": {
+          "status": "error",
+          "data": null,
+          "error": {
+            "code": "SESSION_NOT_STARTED",
+            "message": "Session has not been started yet and cannot be completed",
+            "details": []
+          }
+        }
+      },
+      "consumers": [
+        "completeSession.error"
+      ]
+    },
+    {
+      "id": "sessions.abandon",
+      "description": "Abandon a started session",
+      "states": [
+        "alice has an in-progress session"
+      ],
+      "request": {
+        "method": "POST",
+        "path": "/api/v1/sessions/sess_1/abandon"
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "status": "success",
+          "data": {
+            "id": "sess_1",
+            "user_id": "uid_alice",
+            "activity_id": "running",
+            "match_mode": "time_first",
+            "content_id": null,
+            "duration_seconds": 1800,
+            "status": "abandoned",
+            "checklist_completed": true,
+            "started_at": "2026-01-01T00:00:00Z",
+            "completed_at": null,
+            "abandoned_at": "2026-01-01T00:00:00Z",
+            "created_at": "2026-01-01T00:00:00Z",
+            "updated_at": "2026-01-01T00:00:00Z"
+          },
+          "error": null
+        }
+      },
+      "dynamic": [
+        "data.created_at",
+        "data.updated_at",
+        "data.started_at",
+        "data.abandoned_at"
+      ],
+      "consumers": [
+        "abandonSession"
+      ]
+    },
+    {
+      "id": "sessions.discard",
+      "description": "Discard a pending session",
+      "states": [
+        "alice has a pending session"
+      ],
+      "request": {
+        "method": "DELETE",
+        "path": "/api/v1/sessions/sess_1"
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "status": "success",
+          "data": {
+            "session_id": "sess_1",
+            "discarded": true
+          },
+          "error": null
+        }
+      },
+      "consumers": [
+        "discardSession"
+      ]
+    },
+    {
+      "id": "sessions.discard.started",
+      "description": "Discarding a started session must use abandon instead",
+      "states": [
+        "alice has an in-progress session"
+      ],
+      "request": {
+        "method": "DELETE",
+        "path": "/api/v1/sessions/sess_1"
+      },
+      "response": {
+        "status": 409,
+        "body": {
+          "status": "error",
+          "data": null,
+          "error": {
+            "code": "SESSION_ALREADY_STARTED",
+            "message": "Cannot discard a session that is already in progress. Use abandon instead.",
+            "details": []
+          }
+        }
+      },
+      "consumers": [
+        "discardSession.error"
+      ]
+    },
+    {
+      "id": "sessions.not_found",
+      "description": "Another user's (or a missing) session",
+      "request": {
+        "method": "POST",
+        "path": "/api/v1/sessions/sess_missing/start"
+      },
+      "response": {
+        "status": 404,
+        "body": {
+          "status": "error",
+          "data": null,
+          "error": {
+            "code": "SESSION_NOT_FOUND",
+            "message": "Session 'sess_missing' not found",
+            "details": []
+          }
+        }
+      },
+      "consumers": [
+        "startSession.error"
+      ]
+    },
+    {
+      "id": "sessions.history",
+      "description": "Session history, newest first",
+      "states": [
+        "alice has a completed session"
+      ],
+      "request": {
+        "method": "GET",
+        "path": "/api/v1/sessions?limit=20"
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "status": "success",
+          "data": {
+            "items": [
+              {
+                "id": "sess_1",
+                "user_id": "uid_alice",
+                "activity_id": "running",
+                "match_mode": "time_first",
+                "content_id": null,
+                "duration_seconds": 1800,
+                "status": "completed",
+                "checklist_completed": true,
+                "started_at": "2026-01-01T00:00:00Z",
+                "completed_at": "2026-01-01T00:00:00Z",
+                "abandoned_at": null,
+                "created_at": "2026-01-01T00:00:00Z",
+                "updated_at": "2026-01-01T00:00:00Z"
+              }
+            ],
+            "next_cursor": null
+          },
+          "error": null
+        }
+      },
+      "dynamic": [
+        "data.items[*].created_at",
+        "data.items[*].updated_at",
+        "data.items[*].started_at",
+        "data.items[*].completed_at"
+      ],
+      "consumers": [
+        "listSessions"
+      ]
+    }
+  ]
+}

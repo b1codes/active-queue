@@ -21,6 +21,7 @@ describe('useQueueStore & Sync Loop Driver', () => {
         iterationCount: 0,
         isCancelled: false,
         error: null,
+        errorCode: null,
       },
       addSourceError: null,
       isAddingSource: false,
@@ -36,7 +37,7 @@ describe('useQueueStore & Sync Loop Driver', () => {
         has_more: true,
         next_page_token: '250',
         message: null,
-      } as any)
+      } as never)
       .mockResolvedValueOnce({
         source_id: 'src1',
         status: 'active',
@@ -44,12 +45,12 @@ describe('useQueueStore & Sync Loop Driver', () => {
         has_more: false,
         next_page_token: null,
         message: null,
-      } as any)
+      } as never)
       .mockResolvedValueOnce({
         items: [],
         next_cursor: null,
         total_unconsumed: 350,
-      } as any);
+      } as never);
 
     const store = useQueueStore.getState();
     await store.startResumableSync('src1', 350);
@@ -69,7 +70,7 @@ describe('useQueueStore & Sync Loop Driver', () => {
       has_more: true,
       next_page_token: 'token',
       message: null,
-    } as any);
+    } as never);
 
     const store = useQueueStore.getState();
     await store.startResumableSync('src_bug', 10000);
@@ -92,7 +93,7 @@ describe('useQueueStore & Sync Loop Driver', () => {
         has_more: true,
         next_page_token: '250',
         message: null,
-      } as any;
+      } as never;
     });
 
     const store = useQueueStore.getState();

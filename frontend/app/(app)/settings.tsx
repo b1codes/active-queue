@@ -2,14 +2,15 @@ import React from 'react';
 import {
   Alert,
   StyleSheet,
-  Text,
   TouchableOpacity,
   View,
 } from 'react-native';
+import { Text } from '@/core/components/Text';
 import { Ionicons } from '@expo/vector-icons';
 import { GlassHeader, useGlassHeaderHeight } from '@/core/components';
 import { colors, rounded, spacing, typography } from '@/core/theme';
 import { useAuthStore } from '@/features/auth/authStore';
+import { isDevToolsEnabled } from '@/core/config/devTools';
 
 export default function SettingsScreen() {
   const [headerHeight, setHeaderHeight] = useGlassHeaderHeight();
@@ -37,9 +38,10 @@ export default function SettingsScreen() {
       <View style={[styles.content, { paddingTop: headerHeight + spacing.lg }]}>
         {/* User Account Card */}
         <View style={styles.card}>
-          <Text style={styles.cardSectionTitle}>Account profile</Text>
+          <Text style={styles.cardSectionTitle} accessibilityRole="header">Account profile</Text>
 
-          <View style={styles.infoRow}>
+          {/* One element per row, so VoiceOver reads "User ID (UID), u-123" together. */}
+          <View style={styles.infoRow} accessible={true}>
             <Ionicons name="person-circle-outline" size={24} color={colors.ink} />
             <View style={styles.infoTextContainer}>
               <Text style={styles.infoLabel}>User ID (UID)</Text>
@@ -51,7 +53,7 @@ export default function SettingsScreen() {
 
           <View style={styles.divider} />
 
-          <View style={styles.infoRow}>
+          <View style={styles.infoRow} accessible={true}>
             <Ionicons name="mail-outline" size={22} color={colors.inkSecondary} />
             <View style={styles.infoTextContainer}>
               <Text style={styles.infoLabel}>Email address</Text>
@@ -62,9 +64,10 @@ export default function SettingsScreen() {
           </View>
         </View>
 
-        {/* Local Dev & Emulator Shortcuts */}
+        {/* Local Dev & Emulator Shortcuts — never rendered in production builds */}
+        {isDevToolsEnabled() ? (
         <View style={styles.card}>
-          <Text style={styles.cardSectionTitle}>Local development & testing</Text>
+          <Text style={styles.cardSectionTitle} accessibilityRole="header">Local development & testing</Text>
 
           <TouchableOpacity
             style={styles.emulatorButton}
@@ -81,6 +84,7 @@ export default function SettingsScreen() {
             </Text>
           </TouchableOpacity>
         </View>
+        ) : null}
 
         {/* Sign Out Action */}
         <TouchableOpacity

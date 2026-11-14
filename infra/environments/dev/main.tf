@@ -13,29 +13,20 @@ provider "google" {
   region  = var.gcp_region
 }
 
-variable "gcp_project_id" {
-  type        = string
-  description = "GCP Project ID for Dev environment"
-  default     = "activequeue-dev"
-}
-
-variable "gcp_region" {
-  type        = string
-  description = "GCP Region for Dev environment"
-  default     = "us-central1"
-}
-
 module "dev_app" {
   source = "../../modules/activequeue_app"
 
   gcp_project_id   = var.gcp_project_id
   gcp_region       = var.gcp_region
   env              = "dev"
-  min_instances    = 0
+  container_image  = var.container_image
+  min_instances    = 0 # Scale to zero between uses
   max_instances    = 10
   content_provider = "youtube"
-}
 
-output "cloud_run_url" {
-  value = module.dev_app.cloud_run_url
+  google_oauth_client_id     = var.google_oauth_client_id
+  google_oauth_client_secret = var.google_oauth_client_secret
+  apple_services_id          = var.apple_services_id
+  apple_client_secret        = var.apple_client_secret
+  smoke_test_signers         = var.smoke_test_signers
 }

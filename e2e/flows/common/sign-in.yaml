@@ -1,0 +1,22 @@
+# Signs in through the real sign-in screen as output[NAME] (see create-account.js).
+# fill-sign-in.yaml types both fields and checks them, retrying the pair together.
+appId: com.b1codes.activequeue
+---
+- extendedWaitUntil:
+    visible:
+      id: sign-in-email
+    timeout: 30000
+- runFlow:
+    file: fill-sign-in.yaml
+    env:
+      FORM_EMAIL: ${output[NAME]}
+      FORM_PASSWORD: ${PASSWORD}
+- retry:
+    maxRetries: 3
+    commands:
+      - tapOn:
+          text: "Sign in"
+          optional: true
+      - extendedWaitUntil:
+          visible: "Active Queue"
+          timeout: 30000

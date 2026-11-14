@@ -1,0 +1,17 @@
+{
+  "name": "activequeue-firestore-rules-tests",
+  "private": true,
+  "description": "Tests the deployed Firestore security rules (SPEC §4.9) on the emulator.",
+  "type": "module",
+  "packageManager": "pnpm@11.22.0",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "test": "node --test --test-reporter=spec rules.test.mjs"
+  },
+  "devDependencies": {
+    "@firebase/rules-unit-testing": "6.0.0",
+    "firebase": "13.2.0"
+  }
+}

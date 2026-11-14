@@ -1,11 +1,10 @@
 import { Platform } from "react-native";
-import { __resetGlassTierCacheForTests, useGlassTier } from "../core/hooks/useGlassTier";
+import { __resetGlassTierCacheForTests, overrideGlassTier, useGlassTier } from "../core/hooks/useGlassTier";
 
 jest.mock("@callstack/liquid-glass", () => ({
   isLiquidGlassSupported: false,
 }));
 
-// eslint-disable-next-line @typescript-eslint/no-require-imports
 const liquidGlass = require("@callstack/liquid-glass") as { isLiquidGlassSupported: boolean };
 
 const globalWithFabric = globalThis as { nativeFabricUIManager?: unknown };
@@ -58,5 +57,25 @@ describe("useGlassTier", () => {
     liquidGlass.isLiquidGlassSupported = true;
     const second = useGlassTier();
     expect(second).toBe(first);
+  });
+
+  describe("overrideGlassTier (screenshot harness)", () => {
+    it("forces Tier 3 where the native material is available", () => {
+      liquidGlass.isLiquidGlassSupported = true;
+      overrideGlassTier(3);
+      expect(useGlassTier()).toBe(3);
+    });
+
+    it("forces Tier 1 where the native material is available", () => {
+      liquidGlass.isLiquidGlassSupported = true;
+      overrideGlassTier(3);
+      overrideGlassTier(1);
+      expect(useGlassTier()).toBe(1);
+    });
+
+    it("refuses Tier 1 where the native material isn't available, which would render nothing", () => {
+      expect(() => overrideGlassTier(1)).toThrow("Tier 1 needs iOS 26+");
+      expect(useGlassTier()).toBe(3);
+    });
   });
 });

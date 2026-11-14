@@ -1,0 +1,35 @@
+{
+  "kind": "youtube#playlistItemListResponse",
+  "etag": "fixture",
+  "pageInfo": {
+    "totalResults": 5,
+    "resultsPerPage": 2
+  },
+  "items": [
+    {
+      "kind": "youtube#playlistItem",
+      "etag": "fixture",
+      "id": "PI_vidB002",
+      "snippet": {
+        "publishedAt": "2025-01-05T08:00:00Z",
+        "title": "Episode 2",
+        "description": "",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/vidB002/default.jpg"
+          }
+        },
+        "playlistId": "PLfixture123",
+        "position": 0,
+        "resourceId": {
+          "kind": "youtube#video",
+          "videoId": "vidB002"
+        }
+      },
+      "contentDetails": {
+        "videoId": "vidB002",
+        "videoPublishedAt": "2025-01-05T08:00:00Z"
+      }
+    }
+  ]
+}

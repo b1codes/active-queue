@@ -50,4 +50,6 @@ export interface SyncProgressState {
   iterationCount: number;
   isCancelled: boolean;
   error: string | null;
+  /** ApiError code of the failure, e.g. PROVIDER_QUOTA_EXCEEDED. */
+  errorCode: string | null;
 }

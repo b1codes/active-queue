@@ -144,7 +144,7 @@ async def seed_firebase_auth(users: list[dict[str, str]], quiet: bool = False) -
                     print(f"  ✓ Created Firebase Auth user: {display_name} ({target_uid})")
 
             seeded_count += 1
-        except Exception as err:
+        except Exception as err:  # noqa: BLE001 - best effort per user; report and continue
             logger.warning("firebase_auth_seed_failed", uid=target_uid, error=str(err))
             if not quiet:
                 print(f"  ⚠ Failed to seed Auth user {target_uid}: {err}")
@@ -161,6 +161,7 @@ async def clear_collections(db: Any, quiet: bool = False) -> None:
         "content_cache",
         "feed_items",
         "sessions",
+        "active_session_slots",
     ]
     if not quiet:
         print("🧹 Clearing existing test data from Firestore collections...")
@@ -524,34 +525,37 @@ async def seed_db(
             created_at=now - timedelta(minutes=15),
             updated_at=now - timedelta(minutes=15),
         ),
-        # Pending sessions — not yet started
+        # The in-progress session above is the primary user's ONE non-terminal session
+        # (SPEC §7.1). Extra history variety comes from abandoned sessions instead.
         Session(
-            id="session_seed_pending_01",
+            id="session_seed_abandoned_pending_01",
             user_id=primary_user_id,
             activity_id="pilates",
             match_mode="time_first",
             content_id="fx:fx_vid_0008",  # 2400s
             duration_seconds=2400,
-            status="pending",
+            status="abandoned",
             checklist_completed=False,
             started_at=None,
             completed_at=None,
-            created_at=now,
-            updated_at=now,
+            abandoned_at=now - timedelta(days=3),
+            created_at=now - timedelta(days=5),
+            updated_at=now - timedelta(days=3),
         ),
         Session(
-            id="session_seed_pending_02",
+            id="session_seed_abandoned_pending_02",
             user_id=primary_user_id,
             activity_id="hiit",
             match_mode="content_first",
             content_id="fx:fx_vid_0005",  # 1500s
             duration_seconds=1500,
-            status="pending",
+            status="abandoned",
             checklist_completed=False,
             started_at=None,
             completed_at=None,
-            created_at=now,
-            updated_at=now,
+            abandoned_at=now - timedelta(days=1),
+            created_at=now - timedelta(days=3),
+            updated_at=now - timedelta(days=1),
         ),
         # Demo user sessions
         Session(
@@ -587,6 +591,12 @@ async def seed_db(
     batch_sessions = db.batch()
     for s in sessions_list:
         batch_sessions.set(db.collection("sessions").document(s.id), s.to_firestore())
+        if s.status in ("pending", "in_progress"):
+            # Claim the per-user active slot the API uses to enforce one active session.
+            batch_sessions.set(
+                db.collection("active_session_slots").document(s.user_id),
+                {"session_id": s.id, "updated_at": s.created_at},
+            )
     await batch_sessions.commit()
 
     await close_firestore()
@@ -653,7 +663,7 @@ def main() -> None:
                 quiet=args.quiet,
             )
         )
-    except Exception as err:
+    except Exception as err:  # noqa: BLE001 - CLI entrypoint: any failure exits 1
         print(f"\n❌ Error during database seeding: {err}", file=sys.stderr)
         sys.exit(1)
 

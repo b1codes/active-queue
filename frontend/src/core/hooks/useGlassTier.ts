@@ -71,3 +71,16 @@ export function useGlassTier(): GlassTier {
 export function __resetGlassTierCacheForTests(): void {
   cachedTier = null;
 }
+
+/**
+ * Screenshot harness only (.rnstorybook/screenshots): renders every glass surface through
+ * `tier` until the next override, so one iOS 26 simulator can capture both the Tier 1
+ * native material and the Tier 3 Skia fallback. Asking for Tier 1 where the native
+ * material isn't available is refused: it would render nothing. Not used by app code.
+ */
+export function overrideGlassTier(tier: GlassTier): void {
+  if (tier === 1 && !isNativeMaterialSupported()) {
+    throw new Error('overrideGlassTier: Tier 1 needs iOS 26+ (isLiquidGlassSupported is false)');
+  }
+  cachedTier = tier;
+}

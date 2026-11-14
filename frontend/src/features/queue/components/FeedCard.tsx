@@ -3,19 +3,22 @@ import {
   Alert,
   Image,
   StyleSheet,
-  Text,
   TouchableOpacity,
   View,
 } from 'react-native';
+import { Text } from '../../../core/components/Text';
 import { Ionicons } from '@expo/vector-icons';
 import { ThermalGlowTouchable } from '../../../core/components';
 import { colors, rounded, spacing, typography } from '../../../core/theme';
+import { formatDuration } from '../../../core/utils';
 import { useQueueStore } from '../queueStore';
 import { FeedItem } from '../types';
 
 interface FeedCardProps {
   item: FeedItem;
   isMatched?: boolean;
+  /** Tap: open the content-first match for this item. */
+  onPress?: (item: FeedItem) => void;
 }
 
 /**
@@ -24,12 +27,7 @@ interface FeedCardProps {
  */
 function formatTabularDuration(seconds: number, fallbackLabel?: string): string {
   if (seconds && seconds > 0) {
-    const hrs = Math.floor(seconds / 3600);
-    const mins = Math.floor((seconds % 3600) / 60);
-    const secs = seconds % 60;
-    const mStr = hrs > 0 ? String(mins).padStart(2, '0') : String(mins);
-    const sStr = String(secs).padStart(2, '0');
-    return hrs > 0 ? `${hrs}:${mStr}:${sStr}` : `${mStr}:${sStr}`;
+    return formatDuration(seconds);
   }
   if (fallbackLabel && fallbackLabel.includes(':')) {
     return fallbackLabel.trim();
@@ -37,8 +35,12 @@ function formatTabularDuration(seconds: number, fallbackLabel?: string): string 
   return '--:--';
 }
 
-export const FeedCard: React.FC<FeedCardProps> = memo(({ item, isMatched = false }) => {
+export const FeedCard: React.FC<FeedCardProps> = memo(({ item, isMatched = false, onPress }) => {
   const hideFeedItem = useQueueStore((state) => state.hideFeedItem);
+
+  const handlePress = useCallback(() => {
+    if (onPress) onPress(item);
+  }, [onPress, item]);
 
   const handleHide = useCallback(() => {
     if (item?.content_id) {
@@ -84,13 +86,15 @@ export const FeedCard: React.FC<FeedCardProps> = memo(({ item, isMatched = false
     <View style={styles.cardContainer}>
       <View style={[styles.card, isMatched && styles.cardMatched]}>
         <ThermalGlowTouchable
+          testID={`feed-card-${item?.content_id}`}
           style={styles.cardMainTouchable}
+          onPress={handlePress}
           onLongPress={showOptions}
           borderRadius={rounded.md}
           accessible={true}
           accessibilityRole="button"
           accessibilityLabel={`${safeTitle}, duration ${formattedDuration}, from ${safeProvider}${isMatched ? ', duration matched' : ''}`}
-          accessibilityHint="Double tap to view, long press for options"
+          accessibilityHint="Double tap to pick an activity, long press for options"
         >
           {/* Thumbnail with 16:9 Aspect Ratio & Refractive Edge */}
           {item?.thumbnail_url ? (
