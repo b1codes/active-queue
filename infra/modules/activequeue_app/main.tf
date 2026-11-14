@@ -8,8 +8,9 @@ terraform {
   }
 }
 
-# Service Account with least-privilege roles per SPEC §10.5: roles/datastore.user is its
-# only project-level role. Secret access is granted per secret, below.
+# Service Account with least-privilege roles per SPEC §10.5: roles/datastore.user and
+# roles/firebaseauth.viewer are its only project-level roles. Secret access is granted per
+# secret, below.
 resource "google_service_account" "api_sa" {
   account_id   = "activequeue-api-sa-${var.env}"
   display_name = "ActiveQueue API Service Account (${var.env})"
@@ -19,6 +20,15 @@ resource "google_service_account" "api_sa" {
 resource "google_project_iam_member" "datastore_user" {
   project = var.gcp_project_id
   role    = "roles/datastore.user"
+  member  = "serviceAccount:${google_service_account.api_sa.email}"
+}
+
+# app/core/security.py reads the Firebase Auth user record (auth.get_user, Identity Toolkit
+# accounts:lookup) to reject revoked tokens and disabled accounts. Without
+# firebaseauth.users.get every lookup is PERMISSION_DENIED and that check fails open.
+resource "google_project_iam_member" "firebaseauth_viewer" {
+  project = var.gcp_project_id
+  role    = "roles/firebaseauth.viewer"
   member  = "serviceAccount:${google_service_account.api_sa.email}"
 }
 

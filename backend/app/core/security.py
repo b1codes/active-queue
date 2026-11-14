@@ -10,7 +10,7 @@ import structlog
 from fastapi import Depends, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from firebase_admin import auth
-from firebase_admin.exceptions import FirebaseError
+from firebase_admin.exceptions import FirebaseError, PermissionDeniedError
 from pydantic import BaseModel
 
 from app.core.cache import TTLCache
@@ -64,6 +64,12 @@ async def enforce_account_status(uid: str, decoded_token: dict[str, Any]) -> Non
                 code="AUTH_TOKEN_INVALID",
                 message="Auth token is invalid",
             ) from exc
+        except PermissionDeniedError:
+            # Not transient: the service account is missing roles/firebaseauth.viewer
+            # (infra/modules/activequeue_app). Still fail open, but loudly, so the
+            # misconfiguration alerts instead of hiding among transient warnings.
+            logger.error("account_status_permission_denied", uid=uid, exc_info=True)
+            return
         except (FirebaseError, ValueError):
             logger.warning("account_status_unavailable", uid=uid, exc_info=True)
             return

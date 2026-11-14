@@ -14,6 +14,7 @@ import datetime as dt
 import json
 import time
 from typing import TYPE_CHECKING, Any
+from unittest.mock import patch
 
 import firebase_admin
 import google.oauth2.id_token
@@ -304,6 +305,21 @@ async def test_identity_toolkit_outage_fails_open_and_is_not_cached(
     assert await _get(client, _sign(_claims())) == (200, "OK")
     assert calls == ["token-user", "token-user"]
     assert account_status_cache.get("token-user") is None
+
+
+async def test_missing_auth_iam_role_fails_open_but_logs_an_error(
+    client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # What a deployed API sees when its service account lacks roles/firebaseauth.viewer.
+    monkeypatch.setattr(
+        "app.core.security.fetch_account_status",
+        _record(auth.InsufficientPermissionError("caller lacks firebaseauth.users.get", None, None), []),
+    )
+    with patch("app.core.security.logger") as log:
+        assert await _get(client, _sign(_claims())) == (200, "OK")
+    log.error.assert_called_once()
+    assert log.error.call_args.args == ("account_status_permission_denied",)
+    log.warning.assert_not_called()
 
 
 async def test_bad_signature_never_reaches_the_user_record_lookup(

@@ -71,7 +71,15 @@ run "api_service_account_is_least_privilege" {
 
   assert {
     condition     = google_project_iam_member.datastore_user.role == "roles/datastore.user"
-    error_message = "SPEC §10.5: roles/datastore.user is the API service account's only project role."
+    error_message = "SPEC §10.5: the API service account reads and writes Firestore through roles/datastore.user."
+  }
+
+  assert {
+    condition = (
+      google_project_iam_member.firebaseauth_viewer.role == "roles/firebaseauth.viewer" &&
+      google_project_iam_member.firebaseauth_viewer.member == "serviceAccount:${google_service_account.api_sa.email}"
+    )
+    error_message = "The revocation/disabled-account check calls auth.get_user; without roles/firebaseauth.viewer it is PERMISSION_DENIED and fails open."
   }
 
   assert {

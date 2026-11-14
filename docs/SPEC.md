@@ -980,7 +980,7 @@ The Apple Developer account is in hand, so no Apple-side work is blocked — but
 
 ### 10.5 Infrastructure (Terraform)
 
-Three isolated GCP projects (`dev`, `staging`, `prod`) per the house standard, each provisioning: Cloud Run service, Firestore database + indexes + rules, Secret Manager secrets, service account with least-privilege IAM (`roles/datastore.user` only), Artifact Registry, and `google_identity_platform_config` with its OAuth clients. No `gcloud identity-platform` CLI is used — it does not exist.
+Three isolated GCP projects (`dev`, `staging`, `prod`) per the house standard, each provisioning: Cloud Run service, Firestore database + indexes + rules, Secret Manager secrets, service account with least-privilege IAM (`roles/datastore.user`, plus `roles/firebaseauth.viewer` so the API can read user records for the revocation and disabled-account check in §3.1), Artifact Registry, and `google_identity_platform_config` with its OAuth clients. No `gcloud identity-platform` CLI is used — it does not exist.
 
 Cloud Run: `min_instances = 0` in dev/staging, `1` in prod (cold start on a Python container is 2–4 s, which is visible on app launch), `max_instances = 10`, concurrency 80.
 
