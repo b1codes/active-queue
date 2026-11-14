@@ -7,6 +7,9 @@ import { SyncProgressBar } from '@/features/queue/components/SyncProgressBar';
 import { useQueueStore } from '@/features/queue/queueStore';
 import { feedItem, mockApi, renderWithProviders, resetStores, source } from '@/test-utils';
 
+// The add-source field's exact placeholder: an exact match, not a pattern over a URL.
+const SOURCE_URL_PLACEHOLDER = 'https://www.youtube.com/playlist?list=...';
+
 beforeEach(() => resetStores());
 
 describe('FeedCard', () => {
@@ -72,7 +75,7 @@ describe('AddSourceModal', () => {
 
     const add = screen.getByRole('button', { name: 'Add source' });
     expect(add.props.accessibilityState?.disabled).toBe(true);
-    await fireEvent.changeText(screen.getByPlaceholderText(/youtube.com\/playlist/), '  PL123  ');
+    await fireEvent.changeText(screen.getByPlaceholderText(SOURCE_URL_PLACEHOLDER), '  PL123  ');
     await fireEvent.press(screen.getByRole('button', { name: 'Add source' }));
     expect(api.calls[0].body).toEqual({ url_or_id: 'PL123' });
     expect(onClose).toHaveBeenCalled();
@@ -84,23 +87,23 @@ describe('AddSourceModal', () => {
       'POST /api/v1/sources': { status: 409, error: { code: 'SOURCE_ALREADY_ADDED', message: 'Already added' } },
     });
     await renderWithProviders(<AddSourceModal visible={true} onClose={onClose} />);
-    await fireEvent.changeText(screen.getByPlaceholderText(/youtube.com\/playlist/), 'PL1');
+    await fireEvent.changeText(screen.getByPlaceholderText(SOURCE_URL_PLACEHOLDER), 'PL1');
     await fireEvent.press(screen.getByRole('button', { name: 'Add source' }));
     expect(screen.getByText('Already added')).toBeTruthy();
     expect(onClose).not.toHaveBeenCalled();
     // Typing clears the error.
-    await fireEvent.changeText(screen.getByPlaceholderText(/youtube.com\/playlist/), 'PL2');
+    await fireEvent.changeText(screen.getByPlaceholderText(SOURCE_URL_PLACEHOLDER), 'PL2');
     expect(screen.queryByText('Already added')).toBeNull();
   });
 
   it('shows the dedicated Watch Later state for SOURCE_UNSUPPORTED, regardless of wording', async () => {
     mockApi({ 'POST /api/v1/sources': { status: 422, error: { code: 'SOURCE_UNSUPPORTED', message: 'reworded' } } });
     await renderWithProviders(<AddSourceModal visible={true} onClose={jest.fn()} />);
-    await fireEvent.changeText(screen.getByPlaceholderText(/youtube.com\/playlist/), 'WL');
+    await fireEvent.changeText(screen.getByPlaceholderText(SOURCE_URL_PLACEHOLDER), 'WL');
     await fireEvent.press(screen.getByRole('button', { name: 'Add source' }));
     expect(screen.getByText('System Playlist Restricted')).toBeTruthy();
     await fireEvent.press(screen.getByRole('button', { name: 'Got it, try another URL' }));
-    expect(screen.getByPlaceholderText(/youtube.com\/playlist/)).toBeTruthy();
+    expect(screen.getByPlaceholderText(SOURCE_URL_PLACEHOLDER)).toBeTruthy();
   });
 
   it('cancel clears state and closes', async () => {
