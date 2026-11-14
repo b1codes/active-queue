@@ -141,8 +141,13 @@ log "Deploying Firestore rules and indexes..."
 firebase deploy --only firestore:rules,firestore:indexes --project "$PROJECT_ID"
 
 # --- 5. Reviewed Terraform plan ----------------------------------------------------------
+# Roll back to the revision serving traffic now, not status.latestReadyRevisionName: after
+# a failed deploy the failed revision stays Ready (with no traffic), so the newest Ready
+# revision can be the known-bad one. With a split, take the largest share.
 PREVIOUS_REVISION="$(gcloud run services describe "$SERVICE" --region "$REGION" \
-  --project "$PROJECT_ID" --format 'value(status.latestReadyRevisionName)' 2>/dev/null || true)"
+  --project "$PROJECT_ID" --flatten 'status.traffic[]' \
+  --format 'csv[no-heading](status.traffic.percent,status.traffic.revisionName)' 2>/dev/null |
+  sort -t, -k1,1nr | awk -F, '$1 > 0 && $2 != "" { print $2; exit }' || true)"
 
 log "Planning Terraform for ${ENV}..."
 terraform_plan "$IMAGE"

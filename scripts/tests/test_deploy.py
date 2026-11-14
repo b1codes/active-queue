@@ -47,7 +47,9 @@ STUB = (
           *" artifacts repositories describe "*) [[ -z "${FIRST_DEPLOY:-}" ]] || exit 1 ;;
           *" builds submit "*) exit 0 ;;
           *" artifacts docker images describe "*) echo "__DIGEST__" ;;
-          *" run services describe "*) [[ -n "${FIRST_DEPLOY:-}" ]] || echo "activequeue-api-dev-00007-old" ;;
+          *" run services describe "*)
+            [[ "$args" == *" --flatten status.traffic[] "* ]] || { echo "describe must read status.traffic" >&2; exit 98; }
+            [[ -n "${FIRST_DEPLOY:-}" ]] || printf '%b\n' "${SERVING_TRAFFIC:-100,activequeue-api-dev-00007-old}" ;;
           *" run services update-traffic "*) exit 0 ;;
           *) echo "unexpected gcloud call: $*" >&2; exit 99 ;;
         esac ;;
@@ -167,6 +169,27 @@ class DeployScriptTest(unittest.TestCase):
         rollback = [c for c in self.calls("gcloud") if "update-traffic" in c]
         self.assertEqual(len(rollback), 1, self.calls("gcloud"))
         self.assertIn("--to-revisions activequeue-api-dev-00007-old=100", rollback[0])
+
+    def test_rollback_targets_the_serving_revision_not_the_newest_ready_one(self) -> None:
+        # A previous deploy failed: 00008-bad is the newest Ready revision but serves
+        # nothing, and traffic is still on 00007. A second failure must go back to 00007.
+        result = self.deploy(
+            SMOKE_EXIT="1",
+            SERVING_TRAFFIC="0,activequeue-api-dev-00008-bad\\n100,activequeue-api-dev-00007-old",
+        )
+        self.assertEqual(result.returncode, 1)
+        rollback = [c for c in self.calls("gcloud") if "update-traffic" in c]
+        self.assertEqual(len(rollback), 1, self.calls("gcloud"))
+        self.assertIn("--to-revisions activequeue-api-dev-00007-old=100", rollback[0])
+
+    def test_rollback_with_a_traffic_split_takes_the_largest_share(self) -> None:
+        result = self.deploy(
+            SMOKE_EXIT="1",
+            SERVING_TRAFFIC="10,activequeue-api-dev-00006-canary\\n90,activequeue-api-dev-00005-main",
+        )
+        rollback = [c for c in self.calls("gcloud") if "update-traffic" in c]
+        self.assertEqual(len(rollback), 1, result.stderr)
+        self.assertIn("--to-revisions activequeue-api-dev-00005-main=100", rollback[0])
 
     # --- Refusals before anything changes -----------------------------------------------
 
