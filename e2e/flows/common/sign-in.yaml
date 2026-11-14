@@ -1,37 +1,16 @@
 # Signs in through the real sign-in screen as output[NAME] (see create-account.js).
-# A tap that lands while the keyboard is still animating in can miss, and the text then
-# goes to the wrong field, so each field is checked by its value and retyped if wrong.
+# fill-sign-in.yaml types both fields and checks them, retrying the pair together.
 appId: com.b1codes.activequeue
 ---
 - extendedWaitUntil:
     visible:
       id: sign-in-email
     timeout: 30000
-- retry:
-    maxRetries: 3
-    commands:
-      - tapOn:
-          id: sign-in-email
-      - waitForAnimationToEnd
-      - eraseText: 80
-      - inputText: ${output[NAME]}
-      - waitForAnimationToEnd
-      - assertVisible:
-          id: sign-in-email
-          text: ${output[NAME]}
-- retry:
-    maxRetries: 3
-    commands:
-      - tapOn:
-          id: sign-in-password
-      - waitForAnimationToEnd
-      - eraseText: 40
-      - inputText: ${PASSWORD}
-      - waitForAnimationToEnd
-      # Still exactly the email: the password didn't land in it.
-      - assertVisible:
-          id: sign-in-email
-          text: ${output[NAME]}
+- runFlow:
+    file: fill-sign-in.yaml
+    env:
+      FORM_EMAIL: ${output[NAME]}
+      FORM_PASSWORD: ${PASSWORD}
 - retry:
     maxRetries: 3
     commands:

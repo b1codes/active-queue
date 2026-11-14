@@ -13,31 +13,11 @@ name: Sign in and out
     visible:
       id: sign-in-email
     timeout: 30000
-# Same checks as common/sign-in.yaml: each field is confirmed by its value.
-- retry:
-    maxRetries: 3
-    commands:
-      - tapOn:
-          id: sign-in-email
-      - waitForAnimationToEnd
-      - eraseText: 80
-      - inputText: ${output.alice}
-      - waitForAnimationToEnd
-      - assertVisible:
-          id: sign-in-email
-          text: ${output.alice}
-- retry:
-    maxRetries: 3
-    commands:
-      - tapOn:
-          id: sign-in-password
-      - waitForAnimationToEnd
-      - eraseText: 40
-      - inputText: "not-the-password"
-      - waitForAnimationToEnd
-      - assertVisible:
-          id: sign-in-email
-          text: ${output.alice}
+- runFlow:
+    file: common/fill-sign-in.yaml
+    env:
+      FORM_EMAIL: ${output.alice}
+      FORM_PASSWORD: "not-the-password"
 - retry:
     maxRetries: 3
     commands:

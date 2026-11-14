@@ -398,8 +398,10 @@ Sign in with Apple, stay in [manual-qa.md](manual-qa.md#platform-hand-offs).
 Selectors are accessibility labels where the app has them, which keeps them honest: a
 label VoiceOver can't use is one a journey can't either. Text inputs have `testID`s,
 because a label also matches the field's visible caption. Taps that can land mid-animation
-(the keyboard coming up) are verified and retried: `common/sign-in.yaml` checks each
-field's value after typing.
+(the keyboard coming up) are verified and retried. `common/fill-sign-in.yaml` types the
+email and the password as one attempt and checks the email's value after each field. A
+missed tap sends text into the field that still has focus, so a retry refills both
+fields, never just the one that looked wrong.
 
 ```sh
 make e2e MAESTRO=<path to maestro>                         # build, then every journey
