@@ -167,7 +167,11 @@ async function png() {
   return PNG;
 }
 
-/** Screenshots until two in a row are pixel-identical, then returns that frame. */
+/**
+ * Screenshots until two in a row are pixel-identical, then returns that frame. It gives up
+ * only after comparing two frames: on CI one screenshot has taken longer than the whole
+ * settle window, and a story can't be called unsettled before it was looked at twice.
+ */
 async function settledCapture(udid, file) {
   const PNG = await png();
   const tmp = `${file}.tmp.png`;
@@ -181,7 +185,7 @@ async function settledCapture(udid, file) {
       fs.renameSync(tmp, file);
       return frame;
     }
-    if (Date.now() - started > SETTLE_TIMEOUT_MS) {
+    if (previous && Date.now() - started > SETTLE_TIMEOUT_MS) {
       // Keep the last two frames and what changed between them, for diagnosis.
       const base = file.replace(/\.png$/, '');
       fs.renameSync(tmp, `${base}.unsettled-last.png`);
