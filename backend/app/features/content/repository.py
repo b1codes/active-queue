@@ -42,13 +42,30 @@ def encode_cursor(dt: datetime, doc_id: str | None = None) -> str:
     return base64.urlsafe_b64encode(raw.encode("utf-8")).decode("utf-8")
 
 
+def _is_document_id(value: object) -> bool:
+    """Whether Firestore accepts `value` as a document id (a cursor's id is client-supplied)."""
+    return (
+        isinstance(value, str)
+        and 0 < len(value.encode("utf-8")) <= 1500
+        and "/" not in value
+        and value not in (".", "..")
+        and not (value.startswith("__") and value.endswith("__"))
+    )
+
+
 def decode_cursor(cursor_str: str) -> FeedCursor | None:
-    """Decode an opaque cursor. Accepts the legacy timestamp-only format too."""
+    """Decode an opaque cursor. Accepts the legacy timestamp-only format too.
+
+    Anything undecodable, including an id Firestore would refuse as a document id,
+    returns None, and the feed starts from the first page.
+    """
     try:
         raw_str = base64.urlsafe_b64decode(cursor_str.encode("utf-8")).decode("utf-8")
         if raw_str.startswith("{"):
             payload = json.loads(raw_str)
-            return FeedCursor(datetime.fromisoformat(payload["t"]), str(payload["id"]))
+            if not _is_document_id(payload["id"]):
+                return None
+            return FeedCursor(datetime.fromisoformat(payload["t"]), payload["id"])
         return FeedCursor(datetime.fromisoformat(raw_str))
     except (ValueError, KeyError, TypeError):  # bad base64/UTF-8/JSON/ISO all raise these
         return None
@@ -220,6 +237,9 @@ class ContentRepository:
         batch_size = 100 if filtered else limit + 1
 
         results: list[FeedItem] = []
+        # Cursors are built from the snapshot id, never the document's own `id` field,
+        # which can be missing and would degrade the cursor to timestamp-only.
+        last_result: FeedCursor | None = None
         position = cursor
         scanned = 0
         while True:
@@ -236,21 +256,19 @@ class ContentRepository:
                 ):
                     position = FeedCursor(item.published_at, snap.id)
                     continue
-                if len(results) == limit:
+                if last_result is not None and len(results) == limit:
                     # A further match exists, so there is definitely a next page.
-                    last = results[-1]
-                    return results, encode_cursor(last.published_at, last.id)
+                    return results, encode_cursor(last_result.published_at, last_result.doc_id)
                 results.append(item)
-                position = FeedCursor(item.published_at, snap.id)
+                position = last_result = FeedCursor(item.published_at, snap.id)
 
             if len(snapshots) < batch_size:
                 return results, None  # exhausted
             if scanned >= MAX_FEED_SCAN_PER_REQUEST or not filtered:
                 break
 
-        if len(results) == limit:
-            last = results[-1]
-            return results, encode_cursor(last.published_at, last.id)
+        if last_result is not None and len(results) == limit:
+            return results, encode_cursor(last_result.published_at, last_result.doc_id)
         if position is None:  # pragma: no cover - a scan that read nothing has exhausted
             return results, None
         return results, encode_cursor(position.published_at, position.doc_id)
@@ -314,6 +332,17 @@ class ContentRepository:
 
         await batch.commit()
         logger.info("feed_item_manually_hidden", user_id=user_id, content_id=content_id)
+
+    async def mark_feed_items_consumed(self, user_id: str, content_ids: list[str]) -> None:
+        """Set consumed = True on feed docs that exist (sync just wrote them)."""
+        now = datetime.now(UTC)
+        chunk_size = 450
+        for i in range(0, len(content_ids), chunk_size):
+            batch = self._client.batch()
+            for content_id in content_ids[i : i + chunk_size]:
+                ref = self._client.collection("feed_items").document(f"{user_id}_{content_id}")
+                batch.update(ref, {"consumed": True, "updated_at": now})
+            await batch.commit()
 
     async def mark_feed_item_consumed(self, user_id: str, content_id: str) -> None:
         """Mark feed item as consumed by setting consumed = True."""

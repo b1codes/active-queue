@@ -180,3 +180,30 @@ async def test_content_repository_mark_feed_item_consumed() -> None:
 
     mock_collection.document.assert_called_with("u1_fx:100")
     mock_doc.update.assert_called_with({"consumed": True})
+
+
+def _cursor(payload: object) -> str:
+    import base64
+    import json
+
+    return base64.urlsafe_b64encode(json.dumps(payload).encode()).decode()
+
+
+@pytest.mark.parametrize(
+    "doc_id",
+    ["a/b", "", ".", "..", "__reserved__", None, 7, "x" * 1501],
+    ids=["slash", "empty", "dot", "dotdot", "reserved", "null", "number", "too-long"],
+)
+def test_decode_cursor_refuses_ids_firestore_would_reject(doc_id: object) -> None:
+    from app.features.content.repository import decode_cursor
+
+    assert decode_cursor(_cursor({"t": "2026-01-01T00:00:00+00:00", "id": doc_id})) is None
+
+
+def test_decode_cursor_keeps_a_valid_id() -> None:
+    from app.features.content.repository import FeedCursor, decode_cursor, encode_cursor
+
+    when = datetime(2026, 1, 1, tzinfo=UTC)
+    assert decode_cursor(encode_cursor(when, "u1_fx:fx_vid_0001")) == FeedCursor(
+        when, "u1_fx:fx_vid_0001"
+    )

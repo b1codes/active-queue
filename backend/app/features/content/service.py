@@ -298,10 +298,14 @@ class ContentService:
             found = await self._content_repo.get_content_cache_batch(
                 [format_content_id(source.provider, e) for e in external_ids]
             )
+            # A row cached with no duration (written before live streams and deleted
+            # videos were kept out of the cache) is not a hit: refetching it either finds
+            # a real duration or drops it through the unplayable check below, instead of
+            # turning it into a zero-length feed item.
             hits = {
                 c.external_id: c
                 for c in found.values()
-                if c.is_available and c.updated_at >= fresh_after
+                if c.is_available and c.duration_seconds > 0 and c.updated_at >= fresh_after
             }
             cached.update(hits)
             return set(hits)
@@ -421,6 +425,7 @@ class ContentService:
 
         await self._content_repo.upsert_content_cache_batch(chunk_cache_items)
         await self._content_repo.upsert_feed_items_batch(chunk_feed_items)
+        await self._reapply_consumed_since(user_id, consumed_ids, chunk_feed_items)
 
         is_complete = current_token is None
         new_status = "active" if is_complete else "syncing"
@@ -523,6 +528,25 @@ class ContentService:
             next_cursor=next_cursor,
             total_unconsumed=total_unconsumed,
         )
+
+    async def _reapply_consumed_since(
+        self, user_id: str, consumed_at_start: set[str], written: list[FeedItem]
+    ) -> None:
+        """Re-mark items consumed while this chunk was fetching pages.
+
+        `consumed` was projected from the record read at the start of the chunk, and the
+        upsert replaces each feed doc. A hide or session complete in that window writes
+        feed_items.consumed and users.consumed_content_ids in one commit, so if the upsert
+        overwrote its feed doc, the consumed record read now already shows it.
+        """
+        written_unconsumed = {fi.content_id for fi in written if not fi.consumed}
+        if not written_unconsumed:
+            return
+        consumed_now = await self._user_repo.get_consumed_content_ids(user_id)
+        resurfaced = written_unconsumed & (consumed_now - consumed_at_start)
+        if resurfaced:
+            await self._content_repo.mark_feed_items_consumed(user_id, sorted(resurfaced))
+            logger.info("sync_reapplied_consumed", user_id=user_id, count=len(resurfaced))
 
     async def hide_feed_item(self, user_id: str, content_id: str) -> dict[str, Any]:
         """Manually hide feed item per SPEC §9.1 & §9.2."""

@@ -6,6 +6,7 @@ from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING, Any
 
 import pytest
+from google.cloud.firestore import DELETE_FIELD
 
 from app.features.content.matcher import TIME_MATCH_RESULT_LIMIT
 from app.features.content.models import ContentCacheItem
@@ -465,6 +466,7 @@ async def test_garbage_and_legacy_cursors(
     api: AsyncClient, alice: EmulatorUser, seed_feed: SeedFeed
 ) -> None:
     import base64
+    import json
 
     items = await seed_feed(alice)
     garbage = await api.get("/api/v1/content/feed?cursor=%%%not-base64", headers=alice.headers)
@@ -478,5 +480,50 @@ async def test_garbage_and_legacy_cursors(
     ]
     assert page["items"][0]["content_id"] == items[3]["content_id"]
 
+    # A cursor id Firestore refuses as a document id ('/' would be a path) also falls back.
+    hostile = base64.urlsafe_b64encode(
+        json.dumps({"t": items[2]["published_at"], "id": "a/b"}).encode()
+    ).decode()
+    page = await api.get(f"/api/v1/content/feed?cursor={hostile}", headers=alice.headers)
+    assert page.status_code == 200, page.text
+    assert page.json()["data"]["items"][0]["content_id"] == items[0]["content_id"]
+
     sessions = await api.get("/api/v1/sessions?cursor=bm90LWEtZGF0ZQ==", headers=alice.headers)
     assert sessions.status_code == 200
+
+
+async def test_pagination_cursor_uses_the_document_id_not_its_id_field(
+    api: AsyncClient, db: FirestoreAsyncClient, alice: EmulatorUser, seed_feed: SeedFeed
+) -> None:
+    # Three items share a published_at and none carries its `id` field. A cursor built
+    # from the missing field is timestamp-only and skips the page's same-time neighbours.
+    items = await seed_feed(alice)
+    same_time = datetime(2020, 1, 1, tzinfo=UTC)
+    for item in items[:3]:
+        ref = db.collection("feed_items").document(f"{alice.uid}_{item['content_id']}")
+        await ref.update({"published_at": same_time, "id": DELETE_FIELD})
+
+    seen: list[str] = []
+    cursor = ""
+    for _ in range(len(items)):
+        resp = await api.get(f"/api/v1/content/feed?limit=1{cursor}", headers=alice.headers)
+        data = resp.json()["data"]
+        seen += [i["content_id"] for i in data["items"]]
+        if not data["next_cursor"]:
+            break
+        cursor = f"&cursor={data['next_cursor']}"
+    assert sorted(seen) == sorted(i["content_id"] for i in items)
+
+
+async def test_mark_feed_items_consumed_takes_them_out_of_the_feed(
+    api: AsyncClient, db: FirestoreAsyncClient, alice: EmulatorUser, seed_feed: SeedFeed
+) -> None:
+    from app.features.content.repository import ContentRepository
+
+    items = await seed_feed(alice)
+    gone = [items[0]["content_id"], items[1]["content_id"]]
+    await ContentRepository(db).mark_feed_items_consumed(alice.uid, gone)
+
+    feed = (await api.get("/api/v1/content/feed?limit=100", headers=alice.headers)).json()
+    assert not set(gone) & {i["content_id"] for i in feed["data"]["items"]}
+    assert feed["data"]["total_unconsumed"] == len(items) - 2
