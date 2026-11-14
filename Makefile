@@ -17,7 +17,7 @@ RESET   := \033[0m
         seed-db seed \
         check contracts test test-backend test-backend-fast test-emulator test-frontend \
         test-firestore-rules test-container fuzz-api \
-        test-screenshots screenshots e2e \
+        test-screenshots screenshots e2e protect-main \
         lint lint-backend lint-frontend \
         typecheck typecheck-backend typecheck-frontend \
         format format-backend \
@@ -63,6 +63,7 @@ help:
 	@echo "  $(GREEN)test-screenshots$(RESET)  Screenshot every story on both glass tiers and diff (macOS + Xcode)"
 	@echo "  $(GREEN)screenshots$(RESET)       Update screenshot baselines (RUN=<ci-run-id> takes a CI run's)"
 	@echo "  $(GREEN)contracts$(RESET)         Regenerate API contract files after an API change"
+	@echo "  $(GREEN)protect-main$(RESET)      Apply the main-branch ruleset (CHECK=1 compares it with the live one)"
 	@echo ""
 	@echo "  $(GREEN)lint$(RESET)              Run linting & typechecking across full stack"
 	@echo "  $(GREEN)lint-backend$(RESET)      Run ruff lint on backend"
@@ -304,6 +305,11 @@ contracts:
 	cd backend && UPDATE_CONTRACTS=1 uv run pytest -p no:randomly tests/contract/test_openapi_snapshot.py
 	cd frontend && npx -y openapi-typescript@$(OPENAPI_TS_VERSION) ../contracts/openapi.json \
 		-o src/__tests__/contracts/openapi.gen.ts
+
+## protect-main: Apply .github/rulesets/main.json to the repo (PRs only, `CI Passed` required,
+## no force push or deletion). `make protect-main CHECK=1` reports drift instead. Repo admin.
+protect-main:
+	scripts/protect-main.sh $(if $(CHECK),--check,)
 
 ## test-frontend: Run Jest test suite on frontend (random order, coverage gate)
 test-frontend:

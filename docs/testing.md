@@ -28,6 +28,7 @@ Run `make check` before pushing. It runs the same gates as CI (`.github/workflow
 | API image: hadolint (every Dockerfile), Trivy (fixable HIGH/CRITICAL fail), non-root user, then started **read-only** against the emulators and smoke-checked | `container` job in `ci.yml`, `.hadolint.yaml`, `scripts/container-smoke.sh`, `scripts/smoke_test.py` | `make test-container` |
 | Terraform: fmt, `validate` of every environment root (locked providers), tflint (Google ruleset), Trivy config scan of Terraform and Dockerfiles | `terraform` job in `ci.yml`, `infra/.tflint.hcl` | CI only |
 | `scripts/deploy.sh` decisions with gcloud/terraform stubbed: deploys the built digest via a reviewed plan, refuses unsafe states before changing anything, rolls back on a failed smoke check; and `scripts/smoke_test.py` fails for each fault it targets | `scripts/tests/` | `python3 -m unittest discover -s scripts/tests` |
+| Branch protection: the `main` ruleset requires a PR whose `CI Passed` (GitHub Actions) succeeded, blocks force pushes and deletion, no bypass; its required check is the `ci-passed` job, which always runs and waits on every other job; `scripts/protect-main.sh` applies it | `.github/rulesets/main.json`, `scripts/tests/test_protect_main.py` | `python3 -m unittest discover -s scripts/tests`, `make protect-main CHECK=1` |
 | Terraform module behavior with a mocked Google provider: the deployed image is the one passed in and pinned by digest, public invoker, least-privilege IAM, no emulator/DEBUG env, startup probe, scaling, real OAuth credentials | `infra/modules/activequeue_app/tests/` | `cd infra/modules/activequeue_app && terraform init -backend=false && terraform test` |
 | Dependency audit (pip-audit, pnpm audit at high+) and gitleaks over full history | `security-scans` job in `ci.yml` | see [Security tests](#security-tests) |
 | CodeQL (Python, TypeScript, Actions; security-extended) | `.github/workflows/codeql.yml` | CI only |
@@ -43,7 +44,14 @@ Run `make check` before pushing. It runs the same gates as CI (`.github/workflow
 | API image under Cloud Run's 1 vCPU / 512 MiB: cold start, first signed-in request, peak memory, plus the 45 s k6 load smoke against it | `container` job in `ci.yml`, `scripts/container-perf.sh`, `loadtest/api.js` | `make test-container` |
 | k6 API load: 20 users for 3 min with p95 budgets per endpoint, no 5xx, no throttled legitimate user, abuser and IP flood limited (nightly, emulator stack and staging) | `.github/workflows/perf-nightly.yml`, `loadtest/` | `make load-test` |
 
-`CI Passed` is the single aggregate check to mark as required in branch protection.
+`CI Passed` is the single required check on `main`. The `main` ruleset
+(`.github/rulesets/main.json`) requires it, so a pull request merges only once every CI job
+succeeded. Changes to `main` go through a pull request, and nobody can bypass the ruleset,
+force-push `main` or delete it. The branch doesn't have to be up to date with `main` before
+merging, because the macOS jobs take about an hour. When you add a CI job, add it to
+`ci-passed`'s `needs`, or `scripts/tests/test_protect_main.py` fails. To change the ruleset,
+edit the JSON and run `make protect-main` as a repo admin. `make protect-main CHECK=1`
+reports whether the live ruleset still matches the file.
 `scripts/deploy.sh` refuses to deploy a commit without a successful CI run on a push, applies
 only a reviewed plan, and smoke-checks the result with rollback (see
 [the deployment guide](deployment/cloud_run_deployment.md#3-deploying)).
