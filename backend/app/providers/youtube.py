@@ -53,6 +53,24 @@ def parse_iso8601_duration(duration_str: str | None) -> int:
     return days * 86400 + hours * 3600 + minutes * 60 + seconds
 
 
+def _json_object(resp: httpx.Response) -> dict[str, Any] | None:
+    """The response body if it is a JSON object, else None (HTML, an array, a string...)."""
+    try:
+        body = resp.json()
+    except ValueError:
+        return None
+    return body if isinstance(body, dict) else None
+
+
+def _error_reason(body: dict[str, Any] | None) -> str:
+    """errors[0].reason from a Data API error envelope, or "" when it isn't one."""
+    error = (body or {}).get("error")
+    errors = error.get("errors") if isinstance(error, dict) else None
+    first = errors[0] if isinstance(errors, list) and errors else None
+    reason = first.get("reason") if isinstance(first, dict) else None
+    return reason if isinstance(reason, str) else ""
+
+
 class YouTubeProvider(ContentProvider):
     """YouTube Data API v3 provider adapter per SPEC §8.1-§8.4.
 
@@ -110,15 +128,17 @@ class YouTubeProvider(ContentProvider):
             ) from err
 
         if resp.status_code == 200:
-            body: dict[str, Any] = resp.json()
+            body = _json_object(resp)
+            if body is None:
+                # A proxy or captive-portal page served with 200, say.
+                logger.warning("youtube_unparseable_body", url=url)
+                raise ProviderError(
+                    code="PROVIDER_UNAVAILABLE",
+                    message="YouTube API returned an unreadable response",
+                )
             return body
 
-        try:
-            error_body = resp.json().get("error", {}) or {}
-        except ValueError:
-            error_body = {}
-        errors = error_body.get("errors") or [{}]
-        reason = errors[0].get("reason", "")
+        reason = _error_reason(_json_object(resp))
 
         if resp.status_code == 403 and reason in ("quotaExceeded", "dailyLimitExceeded"):
             raise ProviderError(

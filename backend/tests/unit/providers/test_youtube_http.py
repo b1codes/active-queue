@@ -69,6 +69,41 @@ async def test_metadata_error_mapping(
     assert exc.value.status_code == 503
 
 
+@pytest.mark.parametrize(
+    ("status", "content"),
+    [
+        (502, "[1, 2]"),
+        (502, '"bad gateway"'),
+        (503, '{"error": "backend down"}'),
+        (403, '{"error": {"errors": "quota"}}'),
+        (403, '{"error": {"errors": ["quotaExceeded"]}}'),
+        (403, '{"error": {"errors": [{"reason": 7}]}}'),
+        (200, "<html>sign in to the network</html>"),
+        (200, "[]"),
+    ],
+    ids=[
+        "array",
+        "string",
+        "error-is-string",
+        "errors-is-string",
+        "errors-of-strings",
+        "reason-not-string",
+        "200-html",
+        "200-array",
+    ],
+)
+@respx.mock
+async def test_unexpected_bodies_are_provider_unavailable(
+    yt: YouTubeProvider, status: int, content: str
+) -> None:
+    respx.get(f"{API_BASE}/playlists").respond(
+        status, content=content, headers={"content-type": "application/json"}
+    )
+    with pytest.raises(ProviderError) as exc:
+        await yt.get_playlist_metadata("PL1")
+    assert exc.value.code == "PROVIDER_UNAVAILABLE"
+
+
 @respx.mock
 async def test_daily_limit_exceeded_is_quota(yt: YouTubeProvider) -> None:
     body = fx("error_quota")
