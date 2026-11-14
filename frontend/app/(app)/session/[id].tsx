@@ -1,44 +1,75 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   AppState,
   AppStateStatus,
   ScrollView,
   StyleSheet,
-  Text,
   TouchableOpacity,
   View,
 } from 'react-native';
+import { Text } from '@/core/components/Text';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { colors, rounded, spacing, typography } from '@/core/theme';
-import { launchTrackerApp } from '@/features/sessions/deepLinks';
+import { launchTrackerApp, mediaTargetForContent } from '@/features/sessions/deepLinks';
 import { useSessionStore } from '@/features/sessions/sessionStore';
+import { useIsMounted } from '@/core/hooks';
 
 export default function SessionHandoffScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { id: routeSessionId } = useLocalSearchParams<{ id: string }>();
 
   const {
     currentSession,
     currentStep,
     isLoading,
     mediaError,
+    error,
+    errorCode,
     skipTrackerStep,
     advanceStep,
     startCurrentSession,
+    checkActiveSession,
+    completeCurrentSession,
+    abandonCurrentSession,
+    discardCurrentSession,
   } = useSessionStore();
 
   const [trackerLaunched, setTrackerLaunched] = useState(false);
+  const launchingTracker = useRef(false);
+  const mounted = useIsMounted();
   const [trackerError, setTrackerError] = useState<string | null>(null);
+  const [isResolving, setIsResolving] = useState(
+    () => !currentSession || currentSession.id !== routeSessionId
+  );
+
+  // Progress persists across force-quits (SPEC §6.2): if the store doesn't already hold
+  // this route's session (cold start, deep link), rebuild it from the server.
+  useEffect(() => {
+    if (currentSession && currentSession.id === routeSessionId) {
+      setIsResolving(false);
+      return;
+    }
+    let cancelled = false;
+    checkActiveSession().finally(() => {
+      if (!cancelled) setIsResolving(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+    // Only re-resolve when the route changes, not on every store update.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [routeSessionId]);
 
   // AppState foreground detection per SPEC §6.2
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (nextAppState: AppStateStatus) => {
       if (nextAppState === 'active') {
         if (trackerLaunched && currentStep === 1) {
-          advanceStep();
+          advanceStep(1);
         }
       }
     });
@@ -49,23 +80,77 @@ export default function SessionHandoffScreen() {
   }, [trackerLaunched, currentStep, advanceStep]);
 
   const handleLaunchTracker = async () => {
+    // A double tap would open the tracker twice.
+    if (launchingTracker.current) return;
+    launchingTracker.current = true;
     setTrackerError(null);
     const trackerId = currentSession?.activity_id === 'running' ? 'apple_fitness' : 'custom';
-    const res = await launchTrackerApp(trackerId);
-
-    if (res.success) {
-      setTrackerLaunched(true);
-      advanceStep();
-    } else {
-      setTrackerError(res.error || 'Failed to launch tracker app');
+    try {
+      const res = await launchTrackerApp(trackerId);
+      if (res.success) {
+        setTrackerLaunched(true);
+        advanceStep(1);
+      } else {
+        setTrackerError(res.error || 'Failed to launch tracker app');
+      }
+    } finally {
+      launchingTracker.current = false;
     }
   };
 
   const handleLaunchMedia = async () => {
-    const provider = currentSession?.content_id?.split(':')[0] === 'yt' ? 'youtube' : 'spotify';
-    const externalId = currentSession?.content_id?.split(':')[1];
+    const { provider, externalId } = mediaTargetForContent(currentSession?.content_id);
     await startCurrentSession(provider, externalId);
   };
+
+  const handleComplete = async () => {
+    if ((await completeCurrentSession()) && mounted.current) router.replace('/(app)/history');
+  };
+
+  const handleAbandon = async () => {
+    if ((await abandonCurrentSession()) && mounted.current) router.replace('/(app)');
+  };
+
+  const handleDiscard = async () => {
+    if ((await discardCurrentSession()) && mounted.current) router.replace('/(app)');
+  };
+
+  const isPending = currentSession?.status === 'pending';
+  const isInProgress = currentSession?.status === 'in_progress';
+  const transitionError =
+    errorCode === 'SESSION_NOT_STARTED'
+      ? 'Open your media first (step 2), or discard this session.'
+      : error;
+
+  if (isResolving) {
+    return (
+      <View style={[styles.container, styles.centered]}>
+        <ActivityIndicator color={colors.heatCore} accessibilityLabel="Loading session" />
+      </View>
+    );
+  }
+
+  if (!currentSession || currentSession.id !== routeSessionId) {
+    return (
+      <View style={[styles.container, styles.centered, { paddingHorizontal: spacing.lg }]}>
+        <Text style={styles.title} accessibilityRole="header">
+          Session not found
+        </Text>
+        <Text style={styles.subtitle}>
+          This session has ended or belongs to another account.
+        </Text>
+        <TouchableOpacity
+          style={[styles.doneButton, { marginTop: spacing.lg }]}
+          onPress={() => router.replace('/(app)')}
+          accessible={true}
+          accessibilityRole="button"
+          accessibilityLabel="Return to Queue Screen"
+        >
+          <Text style={styles.buttonText}>Return to Queue</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
 
   // Format computed target end time label (SPEC §6.2: label, not live timer)
   const formatTargetEndTime = (): string => {
@@ -91,9 +176,11 @@ export default function SessionHandoffScreen() {
     >
       <View style={styles.cardWrapper}>
         <View style={styles.header}>
-          <Text style={styles.title}>Workout Handoff</Text>
+          <Text style={styles.title} accessibilityRole="header">
+            Workout Handoff
+          </Text>
           <Text style={styles.subtitle}>
-            Guided 3-step setup for your active workout session
+            Guided 4-step setup for your active workout session
           </Text>
         </View>
 
@@ -110,12 +197,15 @@ export default function SessionHandoffScreen() {
         )}
 
         {/* Step 1 Card: Tracker Handoff */}
-        <View
-          style={[styles.stepCard, currentStep === 1 && styles.activeStepCard]}
-          accessible={true}
-          accessibilityLabel={`Step 1 of 3: Start Activity Tracker. ${currentStep > 1 ? 'Completed or skipped' : 'Active step'}`}
-        >
-          <View style={styles.stepHeader}>
+        <View style={[styles.stepCard, currentStep === 1 && styles.activeStepCard]}>
+          {/* The step summary sits on the header, not the card: an accessible card would hide
+              the step's buttons from VoiceOver. */}
+          <View
+            style={styles.stepHeader}
+            accessible={true}
+            accessibilityRole="header"
+            accessibilityLabel={`Step 1 of 4: Start Activity Tracker. ${currentStep > 1 ? 'Completed or skipped' : 'Active step'}`}
+          >
             <Text style={styles.stepNumber}>1</Text>
             <Text style={styles.stepTitle}>Start Activity Tracker</Text>
           </View>
@@ -154,19 +244,24 @@ export default function SessionHandoffScreen() {
           )}
           {currentStep > 1 && (
             <View style={styles.completedBadgeRow}>
-              <Ionicons name="checkmark-circle" size={16} color={colors.signalVerified} />
+              <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+                <Ionicons name="checkmark-circle" size={16} color={colors.signalVerified} />
+              </View>
               <Text style={styles.completedBadge}>Completed / Skipped</Text>
             </View>
           )}
         </View>
 
         {/* Step 2 Card: Media Launch & Server Start */}
-        <View
-          style={[styles.stepCard, currentStep === 2 && styles.activeStepCard]}
-          accessible={true}
-          accessibilityLabel={`Step 2 of 3: Launch Media and Start Session. ${currentStep > 2 ? 'Session Started' : currentStep === 2 ? 'Active step' : 'Pending'}`}
-        >
-          <View style={styles.stepHeader}>
+        <View style={[styles.stepCard, currentStep === 2 && styles.activeStepCard]}>
+          {/* The step summary sits on the header, not the card: an accessible card would hide
+              the step's buttons from VoiceOver. */}
+          <View
+            style={styles.stepHeader}
+            accessible={true}
+            accessibilityRole="header"
+            accessibilityLabel={`Step 2 of 4: Launch Media and Start Session. ${currentStep > 2 ? 'Session Started' : currentStep === 2 ? 'Active step' : 'Pending'}`}
+          >
             <Text style={styles.stepNumber}>2</Text>
             <Text style={styles.stepTitle}>Launch Media & Start Session</Text>
           </View>
@@ -199,6 +294,7 @@ export default function SessionHandoffScreen() {
               accessibilityRole="button"
               accessibilityLabel="Launch Media and Start Workout Session"
               accessibilityHint="Launches target media player app and starts session timestamp on server"
+              accessibilityState={{ disabled: isLoading, busy: isLoading }}
             >
               {isLoading ? (
                 <ActivityIndicator color={colors.void} />
@@ -209,19 +305,22 @@ export default function SessionHandoffScreen() {
           )}
           {currentStep > 2 && (
             <View style={styles.completedBadgeRow}>
-              <Ionicons name="checkmark-circle" size={16} color={colors.signalVerified} />
+              <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+                <Ionicons name="checkmark-circle" size={16} color={colors.signalVerified} />
+              </View>
               <Text style={styles.completedBadge}>Session Started</Text>
             </View>
           )}
         </View>
 
         {/* Step 3 Card: Session Target End Time */}
-        <View
-          style={[styles.stepCard, currentStep === 3 && styles.activeStepCard]}
-          accessible={true}
-          accessibilityLabel={`Step 3 of 3: Session In Progress. ${currentStep === 3 ? `Target end time is ${formatTargetEndTime()}` : 'Pending step 2 completion'}`}
-        >
-          <View style={styles.stepHeader}>
+        <View style={[styles.stepCard, currentStep === 3 && styles.activeStepCard]}>
+          <View
+            style={styles.stepHeader}
+            accessible={true}
+            accessibilityRole="header"
+            accessibilityLabel={`Step 3 of 4: Session In Progress. ${currentStep === 3 ? `Target end time is ${formatTargetEndTime()}` : 'Pending step 2 completion'}`}
+          >
             <Text style={styles.stepNumber}>3</Text>
             <Text style={styles.stepTitle}>Session In Progress</Text>
           </View>
@@ -248,6 +347,69 @@ export default function SessionHandoffScreen() {
             <Text style={styles.pendingText}>Pending media launch in Step 2...</Text>
           )}
         </View>
+
+        {/* Step 4 Card: Mark Complete (SPEC §6.2) */}
+        <View style={[styles.stepCard, currentStep === 3 && styles.activeStepCard]}>
+          <View
+            style={styles.stepHeader}
+            accessible={true}
+            accessibilityRole="header"
+            accessibilityLabel="Step 4 of 4: Mark Complete"
+          >
+            <Text style={styles.stepNumber}>4</Text>
+            <Text style={styles.stepTitle}>Mark Complete</Text>
+          </View>
+          <Text style={styles.stepDescription}>
+            Finished? Completing removes this content from your queue.
+          </Text>
+
+          {transitionError ? (
+            <Text style={styles.errorText} accessibilityRole="alert">
+              {transitionError}
+            </Text>
+          ) : null}
+
+          <TouchableOpacity
+            style={[styles.primaryButton, (!isInProgress || isLoading) && styles.disabledButton]}
+            onPress={handleComplete}
+            disabled={!isInProgress || isLoading}
+            activeOpacity={0.8}
+            accessible={true}
+            accessibilityRole="button"
+            accessibilityLabel="Mark session complete"
+            accessibilityState={{ disabled: !isInProgress || isLoading }}
+          >
+            <Text style={styles.buttonText}>Mark Complete</Text>
+          </TouchableOpacity>
+
+          <View style={[styles.buttonRow, { marginTop: spacing.sm }]}>
+            {isPending ? (
+              <TouchableOpacity
+                style={styles.secondaryButton}
+                onPress={handleDiscard}
+                disabled={isLoading}
+                accessible={true}
+                accessibilityRole="button"
+                accessibilityLabel="Discard session"
+                accessibilityHint="Deletes this session before it starts"
+              >
+                <Text style={styles.secondaryButtonText}>Discard</Text>
+              </TouchableOpacity>
+            ) : (
+              <TouchableOpacity
+                style={styles.secondaryButton}
+                onPress={handleAbandon}
+                disabled={isLoading}
+                accessible={true}
+                accessibilityRole="button"
+                accessibilityLabel="Abandon session"
+                accessibilityHint="Ends the session without consuming the content"
+              >
+                <Text style={styles.secondaryButtonText}>Abandon</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        </View>
       </View>
     </ScrollView>
   );
@@ -257,6 +419,10 @@ const styles = StyleSheet.create({
   container: {
     backgroundColor: colors.void,
     flex: 1,
+  },
+  centered: {
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   contentContainer: {
     padding: spacing.lg,

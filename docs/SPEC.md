@@ -174,6 +174,10 @@ Per `.claude/context/007_identity-platform-guide.md`.
 3. Client sends: Authorization: Bearer <ID token>
 4. Backend middleware calls firebase_admin.auth.verify_id_token(token).
    → Validates RS256 signature, iss, aud, exp. Never hand-rolled.
+   → Then checks the Firebase user record (cached per uid for auth_cache_ttl_seconds):
+     a deleted user or a token issued before revoke_refresh_tokens → 401
+     AUTH_TOKEN_INVALID; a disabled user → 403 ACCOUNT_DISABLED. A transient
+     Identity Toolkit failure fails open, since the token itself is already verified.
 5. Backend extracts `sub` (the uid) and resolves authorization (§3.2).
 6. On 401 with code AUTH_TOKEN_EXPIRED, the client force-refreshes
    (getIdToken(true)) and retries the request exactly once.
@@ -208,7 +212,7 @@ One role: `member`. The `role` field exists because the standard requires it and
 
 ### 3.4 Public routes
 
-Only `GET /api/v1/healthz` is unauthenticated. Everything else requires a valid token.
+Only `GET /health` and its alias `GET /healthz` are unauthenticated. Everything else requires a valid token.
 
 ---
 
@@ -329,7 +333,7 @@ Provider metadata, keyed by namespaced content ID and **shared across all users*
 | `fetched_at` | timestamp | |
 | `ttl_expires_at` | timestamp | `fetched_at + 30d` |
 
-Duration never changes, so an expired TTL only refreshes title/availability. A stale-but-present cache entry is always preferable to a failed request: on a provider error during refresh, serve the stale entry and log a warning.
+Duration never changes, so an expired TTL only refreshes title/availability. The implementation derives expiry from the entry's `updated_at` (`content_cache_ttl_days`, 30) rather than storing `ttl_expires_at`; a sync asks the cache before `videos.list` and fetches details only for missing or expired entries. A stale-but-present cache entry is always preferable to a failed request: on a provider error during refresh, serve the stale entry and log a warning.
 
 ### 4.7 `feed_items/{userId}_{contentId}`
 
@@ -351,15 +355,17 @@ The join between a user and a cached content item, denormalized so the feed can 
 
 ### 4.8 Composite indexes
 
-Firestore requires these to be declared in `firestore.indexes.json`; a missing index is a runtime failure, not a slow query.
+Firestore requires these to be declared in `firestore.indexes.json`; a missing index is a runtime failure, not a slow query. The emulator serves every query regardless, so the emulator test tier checks each query it runs against `firestore.indexes.json` and fails on a query production would reject, or on an index no query uses (`backend/tests/firestore_indexes.py`).
 
 | Collection | Fields | Serves |
 |------------|--------|--------|
-| `feed_items` | `user_id` ASC, `consumed` ASC, `duration_seconds` ASC | Feed with duration range filter |
-| `feed_items` | `user_id` ASC, `consumed` ASC, `added_at` DESC | Feed, default ordering |
+| `feed_items` | `user_id` ASC, `consumed` ASC, `duration_seconds` ASC | Duration match candidates |
+| `feed_items` | `user_id` ASC, `consumed` ASC, `published_at` DESC | Feed, default ordering |
 | `sessions` | `user_id` ASC, `created_at` DESC | History |
-| `sessions` | `user_id` ASC, `status` ASC, `created_at` DESC | Active-session lookup |
-| `content_sources` | `user_id` ASC, `created_at` ASC | Source list |
+| `sessions` | `user_id` ASC, `status` ASC, `created_at` DESC | History filtered by status |
+| `sources` | `user_id` ASC, `updated_at` DESC | Source list |
+
+The active-session lookup (`user_id ==`, `status in [...]`, no sort) and the unconsumed feed count need no composite index: Firestore merges single-field indexes for equality-only queries.
 
 ### 4.9 Security rules
 
@@ -439,7 +445,7 @@ Fallback window:  B - 120 <= duration_seconds < B
 
 **Why the asymmetry:** content slightly *longer* than the block means the workout ends with a little content left — harmless. Content *shorter* means silence during the last stretch, which is the failure mode the app exists to prevent. So overshoot is strongly preferred and undershoot is capped at 2 minutes.
 
-Both windows are served by the `(user_id, consumed, duration_seconds)` index.
+Each window is its own range query: the primary on the `(user_id, consumed, duration_seconds ASC)` index, the fallback on `(user_id, consumed, duration_seconds DESC)`. At most 50 items come back (`TIME_MATCH_RESULT_LIMIT`), closest to the block first, so a request reads at most 50 feed items and their 50 cache documents however big the feed is. Never read the feed and filter in memory: any cap on that read hides the longer windows from a big feed.
 
 ---
 
@@ -685,7 +691,7 @@ All authenticated responses carry `X-RateLimit-Limit`, `X-RateLimit-Remaining`, 
 
 | Method | Path | Purpose |
 |--------|------|---------|
-| GET | `/healthz` | Health contract (§9.8). Unauthenticated |
+| GET | `/health`, `/healthz` | Health contract (§9.8). Unauthenticated |
 | GET | `/me` | Current user profile + preferences |
 | PATCH | `/me/preferences` | Partial preferences update |
 | GET | `/sources` | List content sources |
@@ -798,6 +804,7 @@ do {
 
 - `items_total_estimate` comes from the preflight `itemCount` and is an estimate — private and deleted entries still count toward it upstream, so the bar may finish slightly short of 100%. The client renders "250 of ~1,284."
 - **The 40-iteration guard is required**, not defensive decoration: 40 × 250 items covers the 5,000-item cap with margin, and without it a server bug that never sets `complete` becomes an infinite client loop burning quota.
+- **A long sync is expected to be rate-limited.** The 5,000-item cap is 20 chunks and the sync limit is 10 a minute (§10.2), so a `429` with `Retry-After` mid-sync is waited out, not shown as an error: the client sleeps for `Retry-After` (at most 60 s, cancellable) and continues, up to 3 refusals in a row. A refused request synced nothing, so it doesn't count toward the 40-iteration guard.
 - The loop is cancellable. Abandoning it mid-way is safe and resumable — that is the entire point of persisting the cursor (§4.5).
 - `throttled: true` with `complete: true` means a start request arrived inside the 15-minute window; the client shows the last sync's result rather than an error.
 - `skipped: true` means the preflight found no change.
@@ -852,14 +859,17 @@ Effects run in a **single Firestore transaction**: update the session, set `feed
 | 401 | `AUTH_TOKEN_EXPIRED` | `exp` passed — client refreshes and retries once |
 | 403 | `ACCOUNT_DISABLED` | `user_authorization.is_active == false` |
 | 404 | `SESSION_NOT_FOUND` | Also returned when the session belongs to another user |
+| 404 | `ACTIVITY_NOT_FOUND` | `activity_id` is not in the catalog (§5.1) |
+| 404 | `USER_NOT_FOUND` | Profile missing after provisioning (should not happen in practice) |
 | 404 | `CONTENT_NOT_FOUND` | Not in cache, or no feed item for this user |
 | 404 | `SOURCE_NOT_FOUND` | |
 | 422 | `SOURCE_URL_UNPARSEABLE` | No playlist ID found in the supplied URL (§9.3) |
 | 422 | `SOURCE_UNSUPPORTED` | `WL` / `LL` / `HL` — not exposed by the Data API (§9.3) |
 | 404 | `SOURCE_NOT_ACCESSIBLE` | Playlist is private or does not exist |
-| 409 | `SOURCE_ALREADY_ADDED` | Existing source returned in `error.details` |
-| 409 | `ACTIVE_SESSION_EXISTS` | A non-terminal session already exists |
+| 409 | `SOURCE_ALREADY_ADDED` | Existing source ID returned in `error.details` as `{field: "source_id", issue: <id>}` |
+| 409 | `ACTIVE_SESSION_EXISTS` | A non-terminal session already exists; its ID is in `error.details` as `{field: "active_session_id", issue: <id>}` |
 | 409 | `SESSION_NOT_STARTED` | `complete` attempted from `created` |
+| 409 | `SESSION_ALREADY_STARTED` | Discard attempted on an in-progress session (abandon it instead) |
 | 409 | `SESSION_ALREADY_TERMINAL` | Transition attempted from `completed`/`abandoned` |
 | 422 | `DURATION_OUT_OF_RANGE` | Outside [300, 10800] |
 | 422 | `ACTIVITY_DURATION_MISMATCH` | Duration outside the activity's `[min, max]` |
@@ -872,9 +882,11 @@ Effects run in a **single Firestore transaction**: update the session, set `feed
 
 `SESSION_NOT_FOUND` is deliberately returned for another user's session rather than `403`. A `403` would confirm the ID exists — an enumeration oracle.
 
-### 9.8 `GET /healthz`
+This table mirrors `ERROR_CODES` in `backend/app/core/errors.py`. The contract suite (`backend/tests/contract/`) fails if the backend raises a code that isn't registered there, or if a contract example's status disagrees with it.
 
-Per the house contract, adapted to this stack (§14.3):
+### 9.8 `GET /health` (alias `/healthz`)
+
+Per the house contract, adapted to this stack (§14.3). Cloud Run reserves URL paths ending in `z`: a request for `/healthz` to a `run.app` URL gets a Google 404 and never reaches the container. External callers, such as the post-deploy smoke check and uptime monitors, use `/health`. Cloud Run's own startup and liveness probes connect to the container directly, so they can use either path.
 
 | Check | Critical | Method |
 |-------|:--------:|--------|
@@ -906,6 +918,8 @@ No cache or disk checks: this service has neither.
 
 Per-user limits: **60 requests/minute** general, **10/minute** on `POST /sources/{id}/sync`.
 
+Per-user limits are keyed by the uid of a **verified** token. They are enforced by a dependency that runs right after token verification, never from claims decoded out of an unverified token, since anyone could forge those to dodge a limit or spend another user's budget. In front of everything except `/healthz` sits a coarse per-IP flood guard (`rate_limit_ip`, 300/minute), which never looks at the token. The client IP is read from `X-Forwarded-For` only as far as `trusted_proxy_hops` allows (1 on Cloud Run). Authenticated responses carry the per-user values in the `X-RateLimit-*` headers, and unauthenticated ones carry the per-IP values.
+
 v1 uses an **instance-local** fixed-window limiter. Cloud Run runs multiple instances, so the effective limit is `instances × 60` — the headers are therefore approximate. This is a documented v1 compromise (§14.4): an accurate distributed limiter needs a Firestore or Redis counter write per request, which would roughly double the cost and latency of every call to protect against a threat v1 does not yet face. Cloud Armor edge rate limiting is the v1.1 hardening.
 
 ### 10.3 Configuration
@@ -916,8 +930,8 @@ v1 uses an **instance-local** fixed-window limiter. Cloud Run runs multiple inst
 |---------|--------|-----------------------|
 | `env` | Env | `local` \| `dev` \| `staging` \| `prod` |
 | `gcp_project_id` | Env | `activequeue-local` (placeholder until GCP exists) |
-| `firestore_emulator_host` | Env; **non-prod only** | `localhost:8080` |
-| `firebase_auth_emulator_host` | Env; **non-prod only** | `localhost:9099` |
+| `firestore_emulator_host` | Env; **`local` only** | `localhost:9090` when `env == "local"`, otherwise unset |
+| `firebase_auth_emulator_host` | Env; **`local` only** | `localhost:9099` when `env == "local"`, otherwise unset |
 | `content_provider` | Env | `fixture` \| `youtube` — see §8.4 |
 | `youtube_api_key` | Secret Manager → env at deploy | unset while `content_provider="fixture"` |
 | `max_items_per_source` | Default | `5000` (YouTube's own playlist cap) |
@@ -927,7 +941,7 @@ v1 uses an **instance-local** fixed-window limiter. Cloud Run runs multiple inst
 | `full_walk_interval_days` | Default | `7` |
 | `auth_cache_ttl_seconds` | Default | `60` |
 
-Startup asserts that **both emulator hosts are unset when `env == "prod"`.** A `FIRESTORE_EMULATOR_HOST` leaking into production would silently point the service at a nonexistent database and return empty results rather than errors — a failure mode that looks exactly like data loss. A leaked `FIREBASE_AUTH_EMULATOR_HOST` is worse: the Admin SDK stops verifying token signatures, so **any forged token is accepted**. That one is a full authentication bypass, and it is the single most important assertion in the codebase.
+Startup asserts that **both emulator hosts are unset in every deployed env (`dev`, `staging`, `prod`)**, since all three are internet-facing Cloud Run services. The localhost defaults apply only when `env == "local"`. A `FIRESTORE_EMULATOR_HOST` leaking into production would silently point the service at a nonexistent database and return empty results rather than errors — a failure mode that looks exactly like data loss. A leaked `FIREBASE_AUTH_EMULATOR_HOST` is worse: the Admin SDK stops verifying token signatures, so **any forged token is accepted**. That one is a full authentication bypass, and it is the single most important assertion in the codebase.
 
 ### 10.4 Local development without GCP
 

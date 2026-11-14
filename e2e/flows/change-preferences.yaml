@@ -1,0 +1,13 @@
+# Journey: change preferences. Skipped: the app has no preferences screen yet, only
+# PATCH /users/me/preferences on the API. Unskip (remove the tag) and finish it when
+# "Settings: preferences UI" lands: ClickUp 86bcyn043.
+appId: com.b1codes.activequeue
+name: Change preferences
+tags:
+  - skip
+---
+- runFlow:
+    file: common/new-user.yaml
+    env:
+      NAME: prefs
+- tapOn: "Settings, tab.*"

@@ -1,0 +1,38 @@
+# Journey: hide a queued video from its options menu; it stays hidden after a relaunch.
+appId: com.b1codes.activequeue
+name: Hide a feed item
+---
+- runFlow:
+    file: common/new-user.yaml
+    env:
+      NAME: hider
+- runFlow:
+    file: common/add-source.yaml
+    env:
+      SOURCE: fixture-small-playlist
+# UIKit drops touches on an alert until it has finished presenting, so each tap waits
+# for the screen to settle and is confirmed by what it should change.
+# Each attempt starts from the options button, so a lost tap reopens the alert.
+- retry:
+    maxRetries: 3
+    commands:
+      - tapOn:
+          text: "Options for Fixture Workout Video #15 — High Intensity Cardio"
+          optional: true
+      - extendedWaitUntil:
+          visible: "Hide from Queue"
+          timeout: 30000
+      - waitForAnimationToEnd
+      - tapOn:
+          text: "Hide from Queue"
+          optional: true
+      - extendedWaitUntil:
+          notVisible: "Fixture Workout Video #15 — High Intensity Cardio.*"
+          timeout: 30000
+- assertVisible: "Fixture Workout Video #14 — High Intensity Cardio.*"
+- launchApp:
+    stopApp: true
+- extendedWaitUntil:
+    visible: "Fixture Workout Video #14 — High Intensity Cardio.*"
+    timeout: 30000
+- assertNotVisible: "Fixture Workout Video #15 — High Intensity Cardio.*"

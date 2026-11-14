@@ -1,0 +1,4437 @@
+{
+  "components": {
+    "schemas": {
+      "ActivityListResponse": {
+        "description": "API response envelope content for GET /activities list.",
+        "properties": {
+          "activities": {
+            "items": {
+              "$ref": "#/components/schemas/ActivitySchema"
+            },
+            "title": "Activities",
+            "type": "array"
+          }
+        },
+        "required": [
+          "activities"
+        ],
+        "title": "ActivityListResponse",
+        "type": "object"
+      },
+      "ActivitySchema": {
+        "description": "API response schema for an Activity per SPEC \u00a79.5.",
+        "properties": {
+          "category": {
+            "title": "Category",
+            "type": "string"
+          },
+          "default_duration_seconds": {
+            "title": "Default Duration Seconds",
+            "type": "integer"
+          },
+          "icon_name": {
+            "title": "Icon Name",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "is_active": {
+            "title": "Is Active",
+            "type": "boolean"
+          },
+          "max_duration_seconds": {
+            "title": "Max Duration Seconds",
+            "type": "integer"
+          },
+          "min_duration_seconds": {
+            "title": "Min Duration Seconds",
+            "type": "integer"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "tracker": {
+            "title": "Tracker",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "category",
+          "tracker",
+          "min_duration_seconds",
+          "max_duration_seconds",
+          "default_duration_seconds",
+          "icon_name",
+          "is_active"
+        ],
+        "title": "ActivitySchema",
+        "type": "object"
+      },
+      "CompleteSessionRequest": {
+        "description": "Request payload for POST /sessions/{id}/complete per SPEC \u00a79.6.",
+        "properties": {
+          "external_workout_url": {
+            "anyOf": [
+              {
+                "maxLength": 2048,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "External workout URL (reserved for v1.1)",
+            "title": "External Workout Url"
+          },
+          "healthkit_uuid": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Apple HealthKit UUID (reserved for v1.1)",
+            "title": "Healthkit Uuid"
+          }
+        },
+        "title": "CompleteSessionRequest",
+        "type": "object"
+      },
+      "ContentMatchRequest": {
+        "description": "Request payload for POST /content/match per SPEC \u00a79.6.",
+        "properties": {
+          "content_id": {
+            "description": "Namespaced content ID, e.g. yt:video123 or fx:item1",
+            "maxLength": 200,
+            "minLength": 1,
+            "pattern": "^(?!\\.\\.?$)(?!__.*__$)[A-Za-z0-9_\\-.:]+$",
+            "title": "Content Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "content_id"
+        ],
+        "title": "ContentMatchRequest",
+        "type": "object"
+      },
+      "ContentMatchResponse": {
+        "description": "Response payload for POST /content/match per SPEC \u00a79.6.",
+        "properties": {
+          "content_id": {
+            "title": "Content Id",
+            "type": "string"
+          },
+          "duration_label": {
+            "title": "Duration Label",
+            "type": "string"
+          },
+          "duration_seconds": {
+            "title": "Duration Seconds",
+            "type": "integer"
+          },
+          "is_valid": {
+            "title": "Is Valid",
+            "type": "boolean"
+          },
+          "matching_activities": {
+            "items": {
+              "$ref": "#/components/schemas/ActivitySchema"
+            },
+            "title": "Matching Activities",
+            "type": "array"
+          },
+          "rejection_reason": {
+            "anyOf": [
+              {
+                "enum": [
+                  "duration_out_of_range",
+                  "no_matching_activity"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rejection Reason"
+          }
+        },
+        "required": [
+          "content_id",
+          "duration_seconds",
+          "duration_label",
+          "matching_activities",
+          "is_valid",
+          "rejection_reason"
+        ],
+        "title": "ContentMatchResponse",
+        "type": "object"
+      },
+      "CreateSessionRequest": {
+        "description": "Request payload for POST /sessions per SPEC \u00a79.5.",
+        "properties": {
+          "activity_id": {
+            "description": "ID of catalog activity, e.g. running or strength",
+            "maxLength": 100,
+            "minLength": 1,
+            "pattern": "^(?!\\.\\.?$)(?!__.*__$)[A-Za-z0-9_\\-.:]+$",
+            "title": "Activity Id",
+            "type": "string"
+          },
+          "content_id": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "minLength": 1,
+                "pattern": "^(?!\\.\\.?$)(?!__.*__$)[A-Za-z0-9_\\-.:]+$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Namespaced content ID if matched from content",
+            "title": "Content Id"
+          },
+          "match_mode": {
+            "description": "Session match mode: content_first or time_first",
+            "enum": [
+              "content_first",
+              "time_first"
+            ],
+            "title": "Match Mode",
+            "type": "string"
+          },
+          "target_duration_seconds": {
+            "anyOf": [
+              {
+                "maximum": 86400.0,
+                "minimum": 300.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Target duration in seconds for bare time-first sessions",
+            "title": "Target Duration Seconds"
+          }
+        },
+        "required": [
+          "activity_id",
+          "match_mode"
+        ],
+        "title": "CreateSessionRequest",
+        "type": "object"
+      },
+      "CreateSourceRequest": {
+        "description": "Request payload for adding a content source per SPEC \u00a79.3.",
+        "properties": {
+          "url_or_id": {
+            "description": "Pasted YouTube playlist/channel URL or raw playlist/channel ID",
+            "examples": [
+              "https://www.youtube.com/playlist?list=PL12345",
+              "PL12345"
+            ],
+            "maxLength": 2048,
+            "minLength": 1,
+            "title": "Url Or Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "url_or_id"
+        ],
+        "title": "CreateSourceRequest",
+        "type": "object"
+      },
+      "DeleteSourceResponse": {
+        "description": "API response payload for DELETE /sources/{source_id}.",
+        "properties": {
+          "deleted": {
+            "title": "Deleted",
+            "type": "boolean"
+          },
+          "source_id": {
+            "title": "Source Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "source_id",
+          "deleted"
+        ],
+        "title": "DeleteSourceResponse",
+        "type": "object"
+      },
+      "DiscardSessionResponse": {
+        "description": "Response payload for DELETE /sessions/{id} per Decision #6.",
+        "properties": {
+          "discarded": {
+            "title": "Discarded",
+            "type": "boolean"
+          },
+          "session_id": {
+            "title": "Session Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "session_id",
+          "discarded"
+        ],
+        "title": "DiscardSessionResponse",
+        "type": "object"
+      },
+      "ErrorBody": {
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "details": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/ErrorDetail"
+            },
+            "title": "Details",
+            "type": "array"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "message",
+          "details"
+        ],
+        "title": "ErrorBody",
+        "type": "object"
+      },
+      "ErrorDetail": {
+        "properties": {
+          "field": {
+            "title": "Field",
+            "type": "string"
+          },
+          "issue": {
+            "title": "Issue",
+            "type": "string"
+          }
+        },
+        "required": [
+          "field",
+          "issue"
+        ],
+        "title": "ErrorDetail",
+        "type": "object"
+      },
+      "ErrorEnvelope": {
+        "properties": {
+          "data": {
+            "title": "Data",
+            "type": "null"
+          },
+          "error": {
+            "$ref": "#/components/schemas/ErrorBody"
+          },
+          "status": {
+            "const": "error",
+            "default": "error",
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "data",
+          "error"
+        ],
+        "title": "ErrorEnvelope",
+        "type": "object"
+      },
+      "FeedItemSchema": {
+        "description": "API response schema for an enriched feed item per SPEC \u00a79.2.",
+        "properties": {
+          "consumed": {
+            "default": false,
+            "title": "Consumed",
+            "type": "boolean"
+          },
+          "content_id": {
+            "title": "Content Id",
+            "type": "string"
+          },
+          "duration_label": {
+            "title": "Duration Label",
+            "type": "string"
+          },
+          "duration_seconds": {
+            "title": "Duration Seconds",
+            "type": "integer"
+          },
+          "external_id": {
+            "title": "External Id",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "provider": {
+            "title": "Provider",
+            "type": "string"
+          },
+          "published_at": {
+            "format": "date-time",
+            "title": "Published At",
+            "type": "string"
+          },
+          "source_id": {
+            "title": "Source Id",
+            "type": "string"
+          },
+          "thumbnail_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Thumbnail Url"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "video_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Video Url"
+          }
+        },
+        "required": [
+          "id",
+          "content_id",
+          "source_id",
+          "title",
+          "provider",
+          "external_id",
+          "duration_seconds",
+          "duration_label",
+          "published_at",
+          "thumbnail_url",
+          "video_url",
+          "consumed"
+        ],
+        "title": "FeedItemSchema",
+        "type": "object"
+      },
+      "FeedResponse": {
+        "description": "API response payload for GET /feed per SPEC \u00a79.2.",
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/FeedItemSchema"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          },
+          "total_unconsumed": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Unconsumed"
+          }
+        },
+        "required": [
+          "items",
+          "next_cursor",
+          "total_unconsumed"
+        ],
+        "title": "FeedResponse",
+        "type": "object"
+      },
+      "FirestoreHealth": {
+        "properties": {
+          "latency_ms": {
+            "title": "Latency Ms",
+            "type": "number"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "latency_ms"
+        ],
+        "title": "FirestoreHealth",
+        "type": "object"
+      },
+      "HealthData": {
+        "description": "Payload of a healthy GET /healthz response (documents the wire shape in OpenAPI).",
+        "properties": {
+          "firestore": {
+            "$ref": "#/components/schemas/FirestoreHealth"
+          },
+          "provider": {
+            "$ref": "#/components/schemas/ProviderHealth"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "firestore",
+          "provider"
+        ],
+        "title": "HealthData",
+        "type": "object"
+      },
+      "HideFeedItemResponse": {
+        "description": "API response payload for POST /content/feed/{content_id}/hide.",
+        "properties": {
+          "content_id": {
+            "title": "Content Id",
+            "type": "string"
+          },
+          "hidden": {
+            "title": "Hidden",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "content_id",
+          "hidden"
+        ],
+        "title": "HideFeedItemResponse",
+        "type": "object"
+      },
+      "ProviderHealth": {
+        "properties": {
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "title": "ProviderHealth",
+        "type": "object"
+      },
+      "SessionListResponse": {
+        "description": "Response payload for GET /sessions list per SPEC \u00a79.5.",
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/SessionSchema"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "required": [
+          "items",
+          "next_cursor"
+        ],
+        "title": "SessionListResponse",
+        "type": "object"
+      },
+      "SessionSchema": {
+        "description": "API response schema for a session per SPEC \u00a79.5 & \u00a79.6.",
+        "properties": {
+          "abandoned_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Abandoned At"
+          },
+          "activity_id": {
+            "title": "Activity Id",
+            "type": "string"
+          },
+          "checklist_completed": {
+            "title": "Checklist Completed",
+            "type": "boolean"
+          },
+          "completed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Completed At"
+          },
+          "content_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Content Id"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "duration_seconds": {
+            "title": "Duration Seconds",
+            "type": "integer"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "match_mode": {
+            "enum": [
+              "content_first",
+              "time_first"
+            ],
+            "title": "Match Mode",
+            "type": "string"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At"
+          },
+          "status": {
+            "enum": [
+              "pending",
+              "in_progress",
+              "completed",
+              "abandoned"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          },
+          "user_id": {
+            "title": "User Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "user_id",
+          "activity_id",
+          "match_mode",
+          "content_id",
+          "duration_seconds",
+          "status",
+          "checklist_completed",
+          "started_at",
+          "completed_at",
+          "abandoned_at",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "SessionSchema",
+        "type": "object"
+      },
+      "SourceListResponse": {
+        "description": "API response payload for GET /sources list.",
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/SourceSchema"
+            },
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "SourceListResponse",
+        "type": "object"
+      },
+      "SourceSchema": {
+        "description": "API response schema for a content source per SPEC \u00a79.3.",
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "external_source_id": {
+            "title": "External Source Id",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "item_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Item Count"
+          },
+          "last_sync_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Sync At"
+          },
+          "provider": {
+            "title": "Provider",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "thumbnail_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Thumbnail Url"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "user_id": {
+            "title": "User Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "user_id",
+          "provider",
+          "external_source_id",
+          "title",
+          "description",
+          "item_count",
+          "thumbnail_url",
+          "status",
+          "last_sync_at",
+          "created_at"
+        ],
+        "title": "SourceSchema",
+        "type": "object"
+      },
+      "SuccessEnvelope_ActivityListResponse_": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/ActivityListResponse"
+          },
+          "error": {
+            "title": "Error",
+            "type": "null"
+          },
+          "status": {
+            "const": "success",
+            "default": "success",
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "data",
+          "error"
+        ],
+        "title": "SuccessEnvelope[ActivityListResponse]",
+        "type": "object"
+      },
+      "SuccessEnvelope_ContentMatchResponse_": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/ContentMatchResponse"
+          },
+          "error": {
+            "title": "Error",
+            "type": "null"
+          },
+          "status": {
+            "const": "success",
+            "default": "success",
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "data",
+          "error"
+        ],
+        "title": "SuccessEnvelope[ContentMatchResponse]",
+        "type": "object"
+      },
+      "SuccessEnvelope_DeleteSourceResponse_": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/DeleteSourceResponse"
+          },
+          "error": {
+            "title": "Error",
+            "type": "null"
+          },
+          "status": {
+            "const": "success",
+            "default": "success",
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "data",
+          "error"
+        ],
+        "title": "SuccessEnvelope[DeleteSourceResponse]",
+        "type": "object"
+      },
+      "SuccessEnvelope_DiscardSessionResponse_": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/DiscardSessionResponse"
+          },
+          "error": {
+            "title": "Error",
+            "type": "null"
+          },
+          "status": {
+            "const": "success",
+            "default": "success",
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "data",
+          "error"
+        ],
+        "title": "SuccessEnvelope[DiscardSessionResponse]",
+        "type": "object"
+      },
+      "SuccessEnvelope_FeedResponse_": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/FeedResponse"
+          },
+          "error": {
+            "title": "Error",
+            "type": "null"
+          },
+          "status": {
+            "const": "success",
+            "default": "success",
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "data",
+          "error"
+        ],
+        "title": "SuccessEnvelope[FeedResponse]",
+        "type": "object"
+      },
+      "SuccessEnvelope_HealthData_": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/HealthData"
+          },
+          "error": {
+            "title": "Error",
+            "type": "null"
+          },
+          "status": {
+            "const": "success",
+            "default": "success",
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "data",
+          "error"
+        ],
+        "title": "SuccessEnvelope[HealthData]",
+        "type": "object"
+      },
+      "SuccessEnvelope_HideFeedItemResponse_": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/HideFeedItemResponse"
+          },
+          "error": {
+            "title": "Error",
+            "type": "null"
+          },
+          "status": {
+            "const": "success",
+            "default": "success",
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "data",
+          "error"
+        ],
+        "title": "SuccessEnvelope[HideFeedItemResponse]",
+        "type": "object"
+      },
+      "SuccessEnvelope_SessionListResponse_": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/SessionListResponse"
+          },
+          "error": {
+            "title": "Error",
+            "type": "null"
+          },
+          "status": {
+            "const": "success",
+            "default": "success",
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "data",
+          "error"
+        ],
+        "title": "SuccessEnvelope[SessionListResponse]",
+        "type": "object"
+      },
+      "SuccessEnvelope_SessionSchema_": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/SessionSchema"
+          },
+          "error": {
+            "title": "Error",
+            "type": "null"
+          },
+          "status": {
+            "const": "success",
+            "default": "success",
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "data",
+          "error"
+        ],
+        "title": "SuccessEnvelope[SessionSchema]",
+        "type": "object"
+      },
+      "SuccessEnvelope_SourceListResponse_": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/SourceListResponse"
+          },
+          "error": {
+            "title": "Error",
+            "type": "null"
+          },
+          "status": {
+            "const": "success",
+            "default": "success",
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "data",
+          "error"
+        ],
+        "title": "SuccessEnvelope[SourceListResponse]",
+        "type": "object"
+      },
+      "SuccessEnvelope_SourceSchema_": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/SourceSchema"
+          },
+          "error": {
+            "title": "Error",
+            "type": "null"
+          },
+          "status": {
+            "const": "success",
+            "default": "success",
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "data",
+          "error"
+        ],
+        "title": "SuccessEnvelope[SourceSchema]",
+        "type": "object"
+      },
+      "SuccessEnvelope_SyncResponse_": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/SyncResponse"
+          },
+          "error": {
+            "title": "Error",
+            "type": "null"
+          },
+          "status": {
+            "const": "success",
+            "default": "success",
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "data",
+          "error"
+        ],
+        "title": "SuccessEnvelope[SyncResponse]",
+        "type": "object"
+      },
+      "SuccessEnvelope_TimeBlockListResponse_": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/TimeBlockListResponse"
+          },
+          "error": {
+            "title": "Error",
+            "type": "null"
+          },
+          "status": {
+            "const": "success",
+            "default": "success",
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "data",
+          "error"
+        ],
+        "title": "SuccessEnvelope[TimeBlockListResponse]",
+        "type": "object"
+      },
+      "SuccessEnvelope_TimeMatchResponse_": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/TimeMatchResponse"
+          },
+          "error": {
+            "title": "Error",
+            "type": "null"
+          },
+          "status": {
+            "const": "success",
+            "default": "success",
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "data",
+          "error"
+        ],
+        "title": "SuccessEnvelope[TimeMatchResponse]",
+        "type": "object"
+      },
+      "SuccessEnvelope_Union_SessionSchema__NoneType__": {
+        "properties": {
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SessionSchema"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "error": {
+            "title": "Error",
+            "type": "null"
+          },
+          "status": {
+            "const": "success",
+            "default": "success",
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "data",
+          "error"
+        ],
+        "title": "SuccessEnvelope[Union[SessionSchema, NoneType]]",
+        "type": "object"
+      },
+      "SuccessEnvelope_UserMeData_": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/UserMeData"
+          },
+          "error": {
+            "title": "Error",
+            "type": "null"
+          },
+          "status": {
+            "const": "success",
+            "default": "success",
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "data",
+          "error"
+        ],
+        "title": "SuccessEnvelope[UserMeData]",
+        "type": "object"
+      },
+      "SuccessEnvelope_UserSchema_": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/UserSchema"
+          },
+          "error": {
+            "title": "Error",
+            "type": "null"
+          },
+          "status": {
+            "const": "success",
+            "default": "success",
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "data",
+          "error"
+        ],
+        "title": "SuccessEnvelope[UserSchema]",
+        "type": "object"
+      },
+      "SyncResponse": {
+        "description": "API response payload for POST /sources/{source_id}/sync per SPEC \u00a79.4.",
+        "properties": {
+          "has_more": {
+            "title": "Has More",
+            "type": "boolean"
+          },
+          "items_synced": {
+            "title": "Items Synced",
+            "type": "integer"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          },
+          "next_page_token": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Page Token"
+          },
+          "source_id": {
+            "title": "Source Id",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "source_id",
+          "status",
+          "items_synced",
+          "has_more",
+          "next_page_token",
+          "message"
+        ],
+        "title": "SyncResponse",
+        "type": "object"
+      },
+      "TimeBlockListResponse": {
+        "description": "API response envelope content for GET /activities/time-blocks list.",
+        "properties": {
+          "time_blocks": {
+            "items": {
+              "$ref": "#/components/schemas/TimeBlockSchema"
+            },
+            "title": "Time Blocks",
+            "type": "array"
+          }
+        },
+        "required": [
+          "time_blocks"
+        ],
+        "title": "TimeBlockListResponse",
+        "type": "object"
+      },
+      "TimeBlockSchema": {
+        "description": "API response schema for a TimeBlock per SPEC \u00a75.3 & \u00a79.5.",
+        "properties": {
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "duration_seconds": {
+            "title": "Duration Seconds",
+            "type": "integer"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "label",
+          "duration_seconds",
+          "description"
+        ],
+        "title": "TimeBlockSchema",
+        "type": "object"
+      },
+      "TimeMatchRequest": {
+        "description": "Request payload for POST /content/match-time per SPEC \u00a79.6.",
+        "properties": {
+          "target_duration_seconds": {
+            "description": "Target session time block duration in seconds (300s - 10800s)",
+            "examples": [
+              1800
+            ],
+            "maximum": 10800.0,
+            "minimum": 300.0,
+            "title": "Target Duration Seconds",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "target_duration_seconds"
+        ],
+        "title": "TimeMatchRequest",
+        "type": "object"
+      },
+      "TimeMatchResponse": {
+        "description": "Response payload for POST /content/match-time per SPEC \u00a79.6.",
+        "properties": {
+          "is_valid": {
+            "title": "Is Valid",
+            "type": "boolean"
+          },
+          "matched_items": {
+            "items": {
+              "$ref": "#/components/schemas/FeedItemSchema"
+            },
+            "title": "Matched Items",
+            "type": "array"
+          },
+          "rejection_reason": {
+            "anyOf": [
+              {
+                "const": "no_content_in_window",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rejection Reason"
+          },
+          "target_duration_label": {
+            "title": "Target Duration Label",
+            "type": "string"
+          },
+          "target_duration_seconds": {
+            "title": "Target Duration Seconds",
+            "type": "integer"
+          },
+          "window_type": {
+            "anyOf": [
+              {
+                "enum": [
+                  "primary",
+                  "fallback"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Window Type"
+          }
+        },
+        "required": [
+          "target_duration_seconds",
+          "target_duration_label",
+          "matched_items",
+          "window_type",
+          "is_valid",
+          "rejection_reason"
+        ],
+        "title": "TimeMatchResponse",
+        "type": "object"
+      },
+      "UpdatePreferencesRequest": {
+        "description": "Request schema for PATCH /api/v1/users/me/preferences per SPEC \u00a74.2.",
+        "properties": {
+          "dark_mode": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dark Mode"
+          },
+          "default_time_block_seconds": {
+            "anyOf": [
+              {
+                "maximum": 86400.0,
+                "minimum": 300.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Time Block Seconds"
+          },
+          "hide_completed": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hide Completed"
+          },
+          "notifications_enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notifications Enabled"
+          },
+          "preferred_activity_types": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Preferred Activity Types"
+          },
+          "preferred_tracker_app": {
+            "anyOf": [
+              {
+                "maxLength": 50,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Preferred Tracker App"
+          },
+          "sync_enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sync Enabled"
+          }
+        },
+        "title": "UpdatePreferencesRequest",
+        "type": "object"
+      },
+      "UserAuthorizationSchema": {
+        "description": "API schema for UserAuthorization response.",
+        "properties": {
+          "disabled": {
+            "title": "Disabled",
+            "type": "boolean"
+          },
+          "role": {
+            "title": "Role",
+            "type": "string"
+          },
+          "scopes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Scopes",
+            "type": "array"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "uid": {
+            "title": "Uid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "uid",
+          "role",
+          "status",
+          "disabled",
+          "scopes"
+        ],
+        "title": "UserAuthorizationSchema",
+        "type": "object"
+      },
+      "UserMeData": {
+        "description": "Payload for GET /api/v1/users/me endpoint.",
+        "properties": {
+          "authorization": {
+            "$ref": "#/components/schemas/UserAuthorizationSchema"
+          },
+          "user": {
+            "$ref": "#/components/schemas/UserSchema"
+          }
+        },
+        "required": [
+          "user",
+          "authorization"
+        ],
+        "title": "UserMeData",
+        "type": "object"
+      },
+      "UserPreferences": {
+        "description": "User preferences stored inside users/{uid}.preferences document field per SPEC \u00a74.2.",
+        "properties": {
+          "dark_mode": {
+            "default": true,
+            "title": "Dark Mode",
+            "type": "boolean"
+          },
+          "default_time_block_seconds": {
+            "default": 2700,
+            "title": "Default Time Block Seconds",
+            "type": "integer"
+          },
+          "hide_completed": {
+            "default": false,
+            "title": "Hide Completed",
+            "type": "boolean"
+          },
+          "notifications_enabled": {
+            "default": true,
+            "title": "Notifications Enabled",
+            "type": "boolean"
+          },
+          "preferred_activity_types": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Preferred Activity Types",
+            "type": "array"
+          },
+          "preferred_tracker_app": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Preferred Tracker App"
+          },
+          "sync_enabled": {
+            "default": true,
+            "title": "Sync Enabled",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "preferred_activity_types",
+          "preferred_tracker_app",
+          "default_time_block_seconds",
+          "hide_completed",
+          "dark_mode",
+          "sync_enabled",
+          "notifications_enabled"
+        ],
+        "title": "UserPreferences",
+        "type": "object"
+      },
+      "UserSchema": {
+        "description": "API schema for User response.",
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "display_name": {
+            "title": "Display Name",
+            "type": "string"
+          },
+          "email": {
+            "title": "Email",
+            "type": "string"
+          },
+          "photo_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Photo Url"
+          },
+          "preferences": {
+            "$ref": "#/components/schemas/UserPreferences"
+          },
+          "uid": {
+            "title": "Uid",
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "uid",
+          "email",
+          "display_name",
+          "photo_url",
+          "created_at",
+          "updated_at",
+          "preferences"
+        ],
+        "title": "UserSchema",
+        "type": "object"
+      }
+    },
+    "securitySchemes": {
+      "HTTPBearer": {
+        "scheme": "bearer",
+        "type": "http"
+      }
+    }
+  },
+  "info": {
+    "title": "ActiveQueue API",
+    "version": "0.1.0"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/api/v1/activities": {
+      "get": {
+        "description": "Fetch static catalog of 9 predefined physical activities per SPEC \u00a75.1 & \u00a79.5.",
+        "operationId": "list_activities_api_v1_activities_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessEnvelope_ActivityListResponse_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: VALIDATION_FAILED"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: AUTH_TOKEN_EXPIRED, AUTH_TOKEN_INVALID, AUTH_TOKEN_MISSING"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: ACCOUNT_DISABLED"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: ACTIVITY_NOT_FOUND, CONTENT_NOT_FOUND, SESSION_NOT_FOUND, SOURCE_NOT_ACCESSIBLE, SOURCE_NOT_FOUND, USER_NOT_FOUND"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: ACTIVE_SESSION_EXISTS, SESSION_ALREADY_STARTED, SESSION_ALREADY_TERMINAL, SESSION_NOT_STARTED, SOURCE_ALREADY_ADDED"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: ACTIVITY_DURATION_MISMATCH, DURATION_OUT_OF_RANGE, SOURCE_LIMIT_REACHED, SOURCE_UNSUPPORTED, SOURCE_URL_UNPARSEABLE"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: RATE_LIMITED"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: INTERNAL_ERROR"
+          },
+          "501": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: FEATURE_NOT_AVAILABLE"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: PROVIDER_QUOTA_EXCEEDED, PROVIDER_UNAVAILABLE"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List predefined activities",
+        "tags": [
+          "activities"
+        ]
+      }
+    },
+    "/api/v1/activities/time-blocks": {
+      "get": {
+        "description": "Fetch static catalog of 7 predefined time blocks per SPEC \u00a75.3 & \u00a79.5.",
+        "operationId": "list_time_blocks_api_v1_activities_time_blocks_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessEnvelope_TimeBlockListResponse_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: VALIDATION_FAILED"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: AUTH_TOKEN_EXPIRED, AUTH_TOKEN_INVALID, AUTH_TOKEN_MISSING"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: ACCOUNT_DISABLED"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: ACTIVITY_NOT_FOUND, CONTENT_NOT_FOUND, SESSION_NOT_FOUND, SOURCE_NOT_ACCESSIBLE, SOURCE_NOT_FOUND, USER_NOT_FOUND"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: ACTIVE_SESSION_EXISTS, SESSION_ALREADY_STARTED, SESSION_ALREADY_TERMINAL, SESSION_NOT_STARTED, SOURCE_ALREADY_ADDED"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: ACTIVITY_DURATION_MISMATCH, DURATION_OUT_OF_RANGE, SOURCE_LIMIT_REACHED, SOURCE_UNSUPPORTED, SOURCE_URL_UNPARSEABLE"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: RATE_LIMITED"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: INTERNAL_ERROR"
+          },
+          "501": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: FEATURE_NOT_AVAILABLE"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: PROVIDER_QUOTA_EXCEEDED, PROVIDER_UNAVAILABLE"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List predefined time blocks",
+        "tags": [
+          "activities"
+        ]
+      }
+    },
+    "/api/v1/content/feed": {
+      "get": {
+        "description": "Fetch user unconsumed feed items with cursor pagination, duration filters, and server duration_label per SPEC \u00a79.2.",
+        "operationId": "get_user_feed_api_v1_content_feed_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 200,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
+            "in": "query",
+            "name": "min_duration",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maximum": 86400,
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Min Duration"
+            }
+          },
+          {
+            "in": "query",
+            "name": "max_duration",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maximum": 86400,
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Max Duration"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessEnvelope_FeedResponse_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: VALIDATION_FAILED"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: AUTH_TOKEN_EXPIRED, AUTH_TOKEN_INVALID, AUTH_TOKEN_MISSING"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: ACCOUNT_DISABLED"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: ACTIVITY_NOT_FOUND, CONTENT_NOT_FOUND, SESSION_NOT_FOUND, SOURCE_NOT_ACCESSIBLE, SOURCE_NOT_FOUND, USER_NOT_FOUND"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: ACTIVE_SESSION_EXISTS, SESSION_ALREADY_STARTED, SESSION_ALREADY_TERMINAL, SESSION_NOT_STARTED, SOURCE_ALREADY_ADDED"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: ACTIVITY_DURATION_MISMATCH, DURATION_OUT_OF_RANGE, SOURCE_LIMIT_REACHED, SOURCE_UNSUPPORTED, SOURCE_URL_UNPARSEABLE"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: RATE_LIMITED"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: INTERNAL_ERROR"
+          },
+          "501": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: FEATURE_NOT_AVAILABLE"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: PROVIDER_QUOTA_EXCEEDED, PROVIDER_UNAVAILABLE"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get user content feed",
+        "tags": [
+          "content"
+        ]
+      }
+    },
+    "/api/v1/content/feed/{content_id}/hide": {
+      "post": {
+        "description": "Mark feed item as consumed and update user consumed_content_ids for media consumed outside a workout per SPEC \u00a79.1 & \u00a79.2.",
+        "operationId": "hide_feed_item_api_v1_content_feed__content_id__hide_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "content_id",
+            "required": true,
+            "schema": {
+              "maxLength": 200,
+              "minLength": 1,
+              "pattern": "^(?!\\.\\.?$)(?!__.*__$)[A-Za-z0-9_\\-.:]+$",
+              "title": "Content Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessEnvelope_HideFeedItemResponse_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: VALIDATION_FAILED"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: AUTH_TOKEN_EXPIRED, AUTH_TOKEN_INVALID, AUTH_TOKEN_MISSING"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: ACCOUNT_DISABLED"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: ACTIVITY_NOT_FOUND, CONTENT_NOT_FOUND, SESSION_NOT_FOUND, SOURCE_NOT_ACCESSIBLE, SOURCE_NOT_FOUND, USER_NOT_FOUND"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: ACTIVE_SESSION_EXISTS, SESSION_ALREADY_STARTED, SESSION_ALREADY_TERMINAL, SESSION_NOT_STARTED, SOURCE_ALREADY_ADDED"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: ACTIVITY_DURATION_MISMATCH, DURATION_OUT_OF_RANGE, SOURCE_LIMIT_REACHED, SOURCE_UNSUPPORTED, SOURCE_URL_UNPARSEABLE"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: RATE_LIMITED"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: INTERNAL_ERROR"
+          },
+          "501": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: FEATURE_NOT_AVAILABLE"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: PROVIDER_QUOTA_EXCEEDED, PROVIDER_UNAVAILABLE"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Manually hide feed item",
+        "tags": [
+          "content"
+        ]
+      }
+    },
+    "/api/v1/content/match": {
+      "post": {
+        "description": "Match content item by content_id against activity catalog with distinct rejection reasons per SPEC \u00a75.2 & \u00a79.6.",
+        "operationId": "match_content_api_v1_content_match_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ContentMatchRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessEnvelope_ContentMatchResponse_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: VALIDATION_FAILED"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: AUTH_TOKEN_EXPIRED, AUTH_TOKEN_INVALID, AUTH_TOKEN_MISSING"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: ACCOUNT_DISABLED"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: ACTIVITY_NOT_FOUND, CONTENT_NOT_FOUND, SESSION_NOT_FOUND, SOURCE_NOT_ACCESSIBLE, SOURCE_NOT_FOUND, USER_NOT_FOUND"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: ACTIVE_SESSION_EXISTS, SESSION_ALREADY_STARTED, SESSION_ALREADY_TERMINAL, SESSION_NOT_STARTED, SOURCE_ALREADY_ADDED"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: ACTIVITY_DURATION_MISMATCH, DURATION_OUT_OF_RANGE, SOURCE_LIMIT_REACHED, SOURCE_UNSUPPORTED, SOURCE_URL_UNPARSEABLE"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: RATE_LIMITED"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: INTERNAL_ERROR"
+          },
+          "501": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: FEATURE_NOT_AVAILABLE"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: PROVIDER_QUOTA_EXCEEDED, PROVIDER_UNAVAILABLE"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Match content item to physical activity catalog",
+        "tags": [
+          "content"
+        ]
+      }
+    },
+    "/api/v1/content/match-time": {
+      "post": {
+        "description": "Match target time block duration against unconsumed feed items using asymmetric primary [B, B+300] and fallback [B-120, B) windows per SPEC \u00a75.3 & \u00a79.6.",
+        "operationId": "match_time_block_api_v1_content_match_time_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TimeMatchRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessEnvelope_TimeMatchResponse_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: VALIDATION_FAILED"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: AUTH_TOKEN_EXPIRED, AUTH_TOKEN_INVALID, AUTH_TOKEN_MISSING"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: ACCOUNT_DISABLED"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: ACTIVITY_NOT_FOUND, CONTENT_NOT_FOUND, SESSION_NOT_FOUND, SOURCE_NOT_ACCESSIBLE, SOURCE_NOT_FOUND, USER_NOT_FOUND"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: ACTIVE_SESSION_EXISTS, SESSION_ALREADY_STARTED, SESSION_ALREADY_TERMINAL, SESSION_NOT_STARTED, SOURCE_ALREADY_ADDED"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: ACTIVITY_DURATION_MISMATCH, DURATION_OUT_OF_RANGE, SOURCE_LIMIT_REACHED, SOURCE_UNSUPPORTED, SOURCE_URL_UNPARSEABLE"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: RATE_LIMITED"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: INTERNAL_ERROR"
+          },
+          "501": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: FEATURE_NOT_AVAILABLE"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: PROVIDER_QUOTA_EXCEEDED, PROVIDER_UNAVAILABLE"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Match time block duration to candidate feed items",
+        "tags": [
+          "content"
+        ]
+      }
+    },
+    "/api/v1/sessions": {
+      "get": {
+        "description": "Fetch paginated workout session history for authenticated user per SPEC \u00a79.5.",
+        "operationId": "get_user_sessions_api_v1_sessions_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 200,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 50,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessEnvelope_SessionListResponse_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: VALIDATION_FAILED"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: AUTH_TOKEN_EXPIRED, AUTH_TOKEN_INVALID, AUTH_TOKEN_MISSING"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: ACCOUNT_DISABLED"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: ACTIVITY_NOT_FOUND, CONTENT_NOT_FOUND, SESSION_NOT_FOUND, SOURCE_NOT_ACCESSIBLE, SOURCE_NOT_FOUND, USER_NOT_FOUND"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: ACTIVE_SESSION_EXISTS, SESSION_ALREADY_STARTED, SESSION_ALREADY_TERMINAL, SESSION_NOT_STARTED, SOURCE_ALREADY_ADDED"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: ACTIVITY_DURATION_MISMATCH, DURATION_OUT_OF_RANGE, SOURCE_LIMIT_REACHED, SOURCE_UNSUPPORTED, SOURCE_URL_UNPARSEABLE"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: RATE_LIMITED"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: INTERNAL_ERROR"
+          },
+          "501": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: FEATURE_NOT_AVAILABLE"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: PROVIDER_QUOTA_EXCEEDED, PROVIDER_UNAVAILABLE"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get user workout sessions history",
+        "tags": [
+          "sessions"
+        ]
+      },
+      "post": {
+        "description": "Create a new pending workout time-boxing session per SPEC \u00a77.1 & \u00a79.5.",
+        "operationId": "create_session_api_v1_sessions_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateSessionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessEnvelope_SessionSchema_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: VALIDATION_FAILED"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: AUTH_TOKEN_EXPIRED, AUTH_TOKEN_INVALID, AUTH_TOKEN_MISSING"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: ACCOUNT_DISABLED"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: ACTIVITY_NOT_FOUND, CONTENT_NOT_FOUND, SESSION_NOT_FOUND, SOURCE_NOT_ACCESSIBLE, SOURCE_NOT_FOUND, USER_NOT_FOUND"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: ACTIVE_SESSION_EXISTS, SESSION_ALREADY_STARTED, SESSION_ALREADY_TERMINAL, SESSION_NOT_STARTED, SOURCE_ALREADY_ADDED"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: ACTIVITY_DURATION_MISMATCH, DURATION_OUT_OF_RANGE, SOURCE_LIMIT_REACHED, SOURCE_UNSUPPORTED, SOURCE_URL_UNPARSEABLE"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: RATE_LIMITED"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: INTERNAL_ERROR"
+          },
+          "501": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: FEATURE_NOT_AVAILABLE"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: PROVIDER_QUOTA_EXCEEDED, PROVIDER_UNAVAILABLE"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Create a workout session",
+        "tags": [
+          "sessions"
+        ]
+      }
+    },
+    "/api/v1/sessions/active": {
+      "get": {
+        "description": "Fetch current non-terminal active session for authenticated user with lazy abandonment evaluation per SPEC \u00a77.2.",
+        "operationId": "get_active_session_api_v1_sessions_active_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessEnvelope_Union_SessionSchema__NoneType__"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: VALIDATION_FAILED"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: AUTH_TOKEN_EXPIRED, AUTH_TOKEN_INVALID, AUTH_TOKEN_MISSING"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: ACCOUNT_DISABLED"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: ACTIVITY_NOT_FOUND, CONTENT_NOT_FOUND, SESSION_NOT_FOUND, SOURCE_NOT_ACCESSIBLE, SOURCE_NOT_FOUND, USER_NOT_FOUND"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: ACTIVE_SESSION_EXISTS, SESSION_ALREADY_STARTED, SESSION_ALREADY_TERMINAL, SESSION_NOT_STARTED, SOURCE_ALREADY_ADDED"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: ACTIVITY_DURATION_MISMATCH, DURATION_OUT_OF_RANGE, SOURCE_LIMIT_REACHED, SOURCE_UNSUPPORTED, SOURCE_URL_UNPARSEABLE"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: RATE_LIMITED"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: INTERNAL_ERROR"
+          },
+          "501": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: FEATURE_NOT_AVAILABLE"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: PROVIDER_QUOTA_EXCEEDED, PROVIDER_UNAVAILABLE"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get user active session",
+        "tags": [
+          "sessions"
+        ]
+      }
+    },
+    "/api/v1/sessions/{session_id}": {
+      "delete": {
+        "description": "Hard delete a pending session per Decision #6 & SPEC \u00a79.5.",
+        "operationId": "discard_session_api_v1_sessions__session_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "maxLength": 200,
+              "minLength": 1,
+              "pattern": "^(?!\\.\\.?$)(?!__.*__$)[A-Za-z0-9_\\-.:]+$",
+              "title": "Session Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessEnvelope_DiscardSessionResponse_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: VALIDATION_FAILED"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: AUTH_TOKEN_EXPIRED, AUTH_TOKEN_INVALID, AUTH_TOKEN_MISSING"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: ACCOUNT_DISABLED"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: ACTIVITY_NOT_FOUND, CONTENT_NOT_FOUND, SESSION_NOT_FOUND, SOURCE_NOT_ACCESSIBLE, SOURCE_NOT_FOUND, USER_NOT_FOUND"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: ACTIVE_SESSION_EXISTS, SESSION_ALREADY_STARTED, SESSION_ALREADY_TERMINAL, SESSION_NOT_STARTED, SOURCE_ALREADY_ADDED"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: ACTIVITY_DURATION_MISMATCH, DURATION_OUT_OF_RANGE, SOURCE_LIMIT_REACHED, SOURCE_UNSUPPORTED, SOURCE_URL_UNPARSEABLE"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: RATE_LIMITED"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: INTERNAL_ERROR"
+          },
+          "501": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: FEATURE_NOT_AVAILABLE"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: PROVIDER_QUOTA_EXCEEDED, PROVIDER_UNAVAILABLE"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Discard a created session",
+        "tags": [
+          "sessions"
+        ]
+      }
+    },
+    "/api/v1/sessions/{session_id}/abandon": {
+      "post": {
+        "description": "Explicitly abandon a workout session per SPEC \u00a77.1 & \u00a79.5.",
+        "operationId": "abandon_session_api_v1_sessions__session_id__abandon_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "maxLength": 200,
+              "minLength": 1,
+              "pattern": "^(?!\\.\\.?$)(?!__.*__$)[A-Za-z0-9_\\-.:]+$",
+              "title": "Session Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessEnvelope_SessionSchema_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: VALIDATION_FAILED"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: AUTH_TOKEN_EXPIRED, AUTH_TOKEN_INVALID, AUTH_TOKEN_MISSING"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: ACCOUNT_DISABLED"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: ACTIVITY_NOT_FOUND, CONTENT_NOT_FOUND, SESSION_NOT_FOUND, SOURCE_NOT_ACCESSIBLE, SOURCE_NOT_FOUND, USER_NOT_FOUND"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: ACTIVE_SESSION_EXISTS, SESSION_ALREADY_STARTED, SESSION_ALREADY_TERMINAL, SESSION_NOT_STARTED, SOURCE_ALREADY_ADDED"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: ACTIVITY_DURATION_MISMATCH, DURATION_OUT_OF_RANGE, SOURCE_LIMIT_REACHED, SOURCE_UNSUPPORTED, SOURCE_URL_UNPARSEABLE"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: RATE_LIMITED"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: INTERNAL_ERROR"
+          },
+          "501": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: FEATURE_NOT_AVAILABLE"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: PROVIDER_QUOTA_EXCEEDED, PROVIDER_UNAVAILABLE"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Abandon a workout session",
+        "tags": [
+          "sessions"
+        ]
+      }
+    },
+    "/api/v1/sessions/{session_id}/complete": {
+      "post": {
+        "description": "Atomically complete a workout session, set feed item consumed, and arrayUnion content ID per SPEC \u00a77.1 & \u00a79.6.",
+        "operationId": "complete_session_api_v1_sessions__session_id__complete_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "maxLength": 200,
+              "minLength": 1,
+              "pattern": "^(?!\\.\\.?$)(?!__.*__$)[A-Za-z0-9_\\-.:]+$",
+              "title": "Session Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/CompleteSessionRequest"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessEnvelope_SessionSchema_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: VALIDATION_FAILED"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: AUTH_TOKEN_EXPIRED, AUTH_TOKEN_INVALID, AUTH_TOKEN_MISSING"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: ACCOUNT_DISABLED"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: ACTIVITY_NOT_FOUND, CONTENT_NOT_FOUND, SESSION_NOT_FOUND, SOURCE_NOT_ACCESSIBLE, SOURCE_NOT_FOUND, USER_NOT_FOUND"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: ACTIVE_SESSION_EXISTS, SESSION_ALREADY_STARTED, SESSION_ALREADY_TERMINAL, SESSION_NOT_STARTED, SOURCE_ALREADY_ADDED"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: ACTIVITY_DURATION_MISMATCH, DURATION_OUT_OF_RANGE, SOURCE_LIMIT_REACHED, SOURCE_UNSUPPORTED, SOURCE_URL_UNPARSEABLE"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: RATE_LIMITED"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: INTERNAL_ERROR"
+          },
+          "501": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: FEATURE_NOT_AVAILABLE"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: PROVIDER_QUOTA_EXCEEDED, PROVIDER_UNAVAILABLE"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Complete a workout session",
+        "tags": [
+          "sessions"
+        ]
+      }
+    },
+    "/api/v1/sessions/{session_id}/start": {
+      "post": {
+        "description": "Start a pending workout session (idempotent) per SPEC \u00a77.1 & \u00a79.5.",
+        "operationId": "start_session_api_v1_sessions__session_id__start_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "maxLength": 200,
+              "minLength": 1,
+              "pattern": "^(?!\\.\\.?$)(?!__.*__$)[A-Za-z0-9_\\-.:]+$",
+              "title": "Session Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessEnvelope_SessionSchema_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: VALIDATION_FAILED"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: AUTH_TOKEN_EXPIRED, AUTH_TOKEN_INVALID, AUTH_TOKEN_MISSING"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: ACCOUNT_DISABLED"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: ACTIVITY_NOT_FOUND, CONTENT_NOT_FOUND, SESSION_NOT_FOUND, SOURCE_NOT_ACCESSIBLE, SOURCE_NOT_FOUND, USER_NOT_FOUND"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: ACTIVE_SESSION_EXISTS, SESSION_ALREADY_STARTED, SESSION_ALREADY_TERMINAL, SESSION_NOT_STARTED, SOURCE_ALREADY_ADDED"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: ACTIVITY_DURATION_MISMATCH, DURATION_OUT_OF_RANGE, SOURCE_LIMIT_REACHED, SOURCE_UNSUPPORTED, SOURCE_URL_UNPARSEABLE"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: RATE_LIMITED"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: INTERNAL_ERROR"
+          },
+          "501": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: FEATURE_NOT_AVAILABLE"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: PROVIDER_QUOTA_EXCEEDED, PROVIDER_UNAVAILABLE"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Start a workout session",
+        "tags": [
+          "sessions"
+        ]
+      }
+    },
+    "/api/v1/sources": {
+      "get": {
+        "description": "Fetch all content sources registered by authenticated user per SPEC \u00a79.1 & \u00a79.3.",
+        "operationId": "get_user_sources_api_v1_sources_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessEnvelope_SourceListResponse_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: VALIDATION_FAILED"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: AUTH_TOKEN_EXPIRED, AUTH_TOKEN_INVALID, AUTH_TOKEN_MISSING"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: ACCOUNT_DISABLED"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: ACTIVITY_NOT_FOUND, CONTENT_NOT_FOUND, SESSION_NOT_FOUND, SOURCE_NOT_ACCESSIBLE, SOURCE_NOT_FOUND, USER_NOT_FOUND"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: ACTIVE_SESSION_EXISTS, SESSION_ALREADY_STARTED, SESSION_ALREADY_TERMINAL, SESSION_NOT_STARTED, SOURCE_ALREADY_ADDED"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: ACTIVITY_DURATION_MISMATCH, DURATION_OUT_OF_RANGE, SOURCE_LIMIT_REACHED, SOURCE_UNSUPPORTED, SOURCE_URL_UNPARSEABLE"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: RATE_LIMITED"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: INTERNAL_ERROR"
+          },
+          "501": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: FEATURE_NOT_AVAILABLE"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: PROVIDER_QUOTA_EXCEEDED, PROVIDER_UNAVAILABLE"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List content sources",
+        "tags": [
+          "content"
+        ]
+      },
+      "post": {
+        "description": "Add a YouTube playlist or channel URL/ID as a content source per SPEC \u00a79.3.",
+        "operationId": "create_source_api_v1_sources_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateSourceRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessEnvelope_SourceSchema_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: VALIDATION_FAILED"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: AUTH_TOKEN_EXPIRED, AUTH_TOKEN_INVALID, AUTH_TOKEN_MISSING"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: ACCOUNT_DISABLED"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: ACTIVITY_NOT_FOUND, CONTENT_NOT_FOUND, SESSION_NOT_FOUND, SOURCE_NOT_ACCESSIBLE, SOURCE_NOT_FOUND, USER_NOT_FOUND"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: ACTIVE_SESSION_EXISTS, SESSION_ALREADY_STARTED, SESSION_ALREADY_TERMINAL, SESSION_NOT_STARTED, SOURCE_ALREADY_ADDED"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: ACTIVITY_DURATION_MISMATCH, DURATION_OUT_OF_RANGE, SOURCE_LIMIT_REACHED, SOURCE_UNSUPPORTED, SOURCE_URL_UNPARSEABLE"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: RATE_LIMITED"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: INTERNAL_ERROR"
+          },
+          "501": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: FEATURE_NOT_AVAILABLE"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: PROVIDER_QUOTA_EXCEEDED, PROVIDER_UNAVAILABLE"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Add content source",
+        "tags": [
+          "content"
+        ]
+      }
+    },
+    "/api/v1/sources/{source_id}": {
+      "delete": {
+        "description": "Remove a content source for authenticated user per SPEC \u00a79.1.",
+        "operationId": "delete_source_api_v1_sources__source_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "source_id",
+            "required": true,
+            "schema": {
+              "maxLength": 200,
+              "minLength": 1,
+              "pattern": "^(?!\\.\\.?$)(?!__.*__$)[A-Za-z0-9_\\-.:]+$",
+              "title": "Source Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessEnvelope_DeleteSourceResponse_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: VALIDATION_FAILED"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: AUTH_TOKEN_EXPIRED, AUTH_TOKEN_INVALID, AUTH_TOKEN_MISSING"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: ACCOUNT_DISABLED"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: ACTIVITY_NOT_FOUND, CONTENT_NOT_FOUND, SESSION_NOT_FOUND, SOURCE_NOT_ACCESSIBLE, SOURCE_NOT_FOUND, USER_NOT_FOUND"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: ACTIVE_SESSION_EXISTS, SESSION_ALREADY_STARTED, SESSION_ALREADY_TERMINAL, SESSION_NOT_STARTED, SOURCE_ALREADY_ADDED"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: ACTIVITY_DURATION_MISMATCH, DURATION_OUT_OF_RANGE, SOURCE_LIMIT_REACHED, SOURCE_UNSUPPORTED, SOURCE_URL_UNPARSEABLE"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: RATE_LIMITED"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: INTERNAL_ERROR"
+          },
+          "501": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: FEATURE_NOT_AVAILABLE"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: PROVIDER_QUOTA_EXCEEDED, PROVIDER_UNAVAILABLE"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Remove a content source",
+        "tags": [
+          "content"
+        ]
+      }
+    },
+    "/api/v1/sources/{source_id}/sync": {
+      "post": {
+        "description": "Process one chunk (<= 5 pages / ~250 items) of resumable sync per SPEC \u00a79.4.",
+        "operationId": "sync_source_chunk_api_v1_sources__source_id__sync_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "source_id",
+            "required": true,
+            "schema": {
+              "maxLength": 200,
+              "minLength": 1,
+              "pattern": "^(?!\\.\\.?$)(?!__.*__$)[A-Za-z0-9_\\-.:]+$",
+              "title": "Source Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessEnvelope_SyncResponse_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: VALIDATION_FAILED"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: AUTH_TOKEN_EXPIRED, AUTH_TOKEN_INVALID, AUTH_TOKEN_MISSING"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: ACCOUNT_DISABLED"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: ACTIVITY_NOT_FOUND, CONTENT_NOT_FOUND, SESSION_NOT_FOUND, SOURCE_NOT_ACCESSIBLE, SOURCE_NOT_FOUND, USER_NOT_FOUND"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: ACTIVE_SESSION_EXISTS, SESSION_ALREADY_STARTED, SESSION_ALREADY_TERMINAL, SESSION_NOT_STARTED, SOURCE_ALREADY_ADDED"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: ACTIVITY_DURATION_MISMATCH, DURATION_OUT_OF_RANGE, SOURCE_LIMIT_REACHED, SOURCE_UNSUPPORTED, SOURCE_URL_UNPARSEABLE"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: RATE_LIMITED"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: INTERNAL_ERROR"
+          },
+          "501": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: FEATURE_NOT_AVAILABLE"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: PROVIDER_QUOTA_EXCEEDED, PROVIDER_UNAVAILABLE"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Trigger source sync chunk",
+        "tags": [
+          "content"
+        ]
+      }
+    },
+    "/api/v1/users/me": {
+      "get": {
+        "description": "GET /api/v1/users/me \u2014 Fetch current authenticated user profile & authorization.\n\nEnsures first-login user provisioning and validates account authorization status per SPEC \u00a74.2.",
+        "operationId": "get_current_user_profile_api_v1_users_me_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessEnvelope_UserMeData_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: VALIDATION_FAILED"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: AUTH_TOKEN_EXPIRED, AUTH_TOKEN_INVALID, AUTH_TOKEN_MISSING"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: ACCOUNT_DISABLED"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: ACTIVITY_NOT_FOUND, CONTENT_NOT_FOUND, SESSION_NOT_FOUND, SOURCE_NOT_ACCESSIBLE, SOURCE_NOT_FOUND, USER_NOT_FOUND"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: ACTIVE_SESSION_EXISTS, SESSION_ALREADY_STARTED, SESSION_ALREADY_TERMINAL, SESSION_NOT_STARTED, SOURCE_ALREADY_ADDED"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: ACTIVITY_DURATION_MISMATCH, DURATION_OUT_OF_RANGE, SOURCE_LIMIT_REACHED, SOURCE_UNSUPPORTED, SOURCE_URL_UNPARSEABLE"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: RATE_LIMITED"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: INTERNAL_ERROR"
+          },
+          "501": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: FEATURE_NOT_AVAILABLE"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: PROVIDER_QUOTA_EXCEEDED, PROVIDER_UNAVAILABLE"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Current User Profile",
+        "tags": [
+          "users"
+        ]
+      }
+    },
+    "/api/v1/users/me/preferences": {
+      "patch": {
+        "description": "PATCH /api/v1/users/me/preferences \u2014 Update user preferences per SPEC \u00a74.2.",
+        "operationId": "update_current_user_preferences_api_v1_users_me_preferences_patch",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdatePreferencesRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessEnvelope_UserSchema_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: VALIDATION_FAILED"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: AUTH_TOKEN_EXPIRED, AUTH_TOKEN_INVALID, AUTH_TOKEN_MISSING"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: ACCOUNT_DISABLED"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: ACTIVITY_NOT_FOUND, CONTENT_NOT_FOUND, SESSION_NOT_FOUND, SOURCE_NOT_ACCESSIBLE, SOURCE_NOT_FOUND, USER_NOT_FOUND"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: ACTIVE_SESSION_EXISTS, SESSION_ALREADY_STARTED, SESSION_ALREADY_TERMINAL, SESSION_NOT_STARTED, SOURCE_ALREADY_ADDED"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: ACTIVITY_DURATION_MISMATCH, DURATION_OUT_OF_RANGE, SOURCE_LIMIT_REACHED, SOURCE_UNSUPPORTED, SOURCE_URL_UNPARSEABLE"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: RATE_LIMITED"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: INTERNAL_ERROR"
+          },
+          "501": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: FEATURE_NOT_AVAILABLE"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. `error.code` is one of: PROVIDER_QUOTA_EXCEEDED, PROVIDER_UNAVAILABLE"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Update Current User Preferences",
+        "tags": [
+          "users"
+        ]
+      }
+    },
+    "/health": {
+      "get": {
+        "description": "GET /health (and /healthz) health check endpoint per SPEC \u00a79.8 & \u00a714.3.\n\nEvaluates Firestore connectivity by reading a sentinel document (critical).\nEvaluates provider reachability (non-critical, cached max once per minute).\n\nReturns:\n- 200 OK when Firestore is reachable (even if provider is degraded/offline).\n- 503 Service Unavailable when Firestore is unreachable.\n\nThe provider check MUST NEVER fail the endpoint: failing health during a YouTube\noutage would cause Cloud Run to cycle healthy instances, converting a partial\ndegradation into a full outage.",
+        "operationId": "health_check_health_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessEnvelope_HealthData_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Firestore is unreachable"
+          }
+        },
+        "summary": "Health Check",
+        "tags": [
+          "health"
+        ]
+      }
+    },
+    "/healthz": {
+      "get": {
+        "description": "GET /health (and /healthz) health check endpoint per SPEC \u00a79.8 & \u00a714.3.\n\nEvaluates Firestore connectivity by reading a sentinel document (critical).\nEvaluates provider reachability (non-critical, cached max once per minute).\n\nReturns:\n- 200 OK when Firestore is reachable (even if provider is degraded/offline).\n- 503 Service Unavailable when Firestore is unreachable.\n\nThe provider check MUST NEVER fail the endpoint: failing health during a YouTube\noutage would cause Cloud Run to cycle healthy instances, converting a partial\ndegradation into a full outage.",
+        "operationId": "health_check_healthz_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessEnvelope_HealthData_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Firestore is unreachable"
+          }
+        },
+        "summary": "Health Check",
+        "tags": [
+          "health"
+        ]
+      }
+    }
+  }
+}

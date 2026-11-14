@@ -1,0 +1,13 @@
+# A brand-new account, signed in on a freshly installed app.
+appId: com.b1codes.activequeue
+---
+- runScript:
+    file: create-account.js
+    env:
+      NAME: ${NAME}
+- launchApp:
+    clearState: true
+- runFlow:
+    file: sign-in.yaml
+    env:
+      NAME: ${NAME}

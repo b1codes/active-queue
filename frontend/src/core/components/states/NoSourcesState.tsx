@@ -1,5 +1,6 @@
 import React from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Text } from '../Text';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, rounded, spacing, typography } from '../../theme';
 
@@ -10,17 +11,13 @@ interface NoSourcesStateProps {
 
 export const NoSourcesState: React.FC<NoSourcesStateProps> = ({ onAddSourcePress }) => {
   return (
-    <View
-      style={styles.container}
-      accessible={true}
-      accessibilityLabel="No content sources added yet. Learn how to add a playlist."
-    >
-      <View style={styles.iconBadge}>
+    <View style={styles.container}>
+      <View style={styles.iconBadge} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
         <Ionicons name="tv-outline" size={30} color={colors.inkFaint} />
       </View>
 
 
-      <Text style={styles.title}>No Content Sources Added</Text>
+      <Text style={styles.title} accessibilityRole="header">No Content Sources Added</Text>
       <Text style={styles.description}>
         ActiveQueue syncs videos from public YouTube playlists to build your workout queue.
       </Text>
@@ -95,7 +92,7 @@ const styles = StyleSheet.create({
   },
   infoTitle: {
     ...typography.label,
-    color: colors.heatCore,
+    color: colors.heatCoreInk,
     marginBottom: spacing.xs,
   },
   infoBody: {

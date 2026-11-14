@@ -1,0 +1,61 @@
+{
+  "kind": "youtube#playlistItemListResponse",
+  "etag": "fixture",
+  "pageInfo": {
+    "totalResults": 5,
+    "resultsPerPage": 2
+  },
+  "items": [
+    {
+      "kind": "youtube#playlistItem",
+      "etag": "fixture",
+      "id": "PI_vidA001",
+      "snippet": {
+        "publishedAt": "2025-01-01T08:00:00Z",
+        "title": "Episode 1",
+        "description": "",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/vidA001/default.jpg"
+          }
+        },
+        "playlistId": "PLfixture123",
+        "position": 0,
+        "resourceId": {
+          "kind": "youtube#video",
+          "videoId": "vidA001"
+        }
+      },
+      "contentDetails": {
+        "videoId": "vidA001",
+        "videoPublishedAt": "2025-01-01T08:00:00Z"
+      }
+    },
+    {
+      "kind": "youtube#playlistItem",
+      "etag": "fixture",
+      "id": "PI_vidPriv1",
+      "snippet": {
+        "publishedAt": "2025-01-02T08:00:00Z",
+        "title": "Private video",
+        "description": "",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/vidPriv1/default.jpg"
+          }
+        },
+        "playlistId": "PLfixture123",
+        "position": 0,
+        "resourceId": {
+          "kind": "youtube#video",
+          "videoId": "vidPriv1"
+        }
+      },
+      "contentDetails": {
+        "videoId": "vidPriv1",
+        "videoPublishedAt": "2025-01-02T08:00:00Z"
+      }
+    }
+  ],
+  "nextPageToken": "TOKEN_P2"
+}

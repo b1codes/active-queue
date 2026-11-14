@@ -3,52 +3,32 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import Field, field_validator
 
+from app.core.dependencies import ActivityId, DocumentId
+from app.core.envelopes import DurationSeconds, RequestSchema, ResponseSchema
 from app.core.sanitizer import sanitize_identifier, sanitize_url
 from app.features.sessions.models import Session
 
 
-class CreateSessionRequest(BaseModel):
+class CreateSessionRequest(RequestSchema):
     """Request payload for POST /sessions per SPEC §9.5."""
 
-    activity_id: str = Field(
-        ...,
-        min_length=1,
-        max_length=100,
-        description="ID of catalog activity, e.g. running or strength",
+    activity_id: ActivityId = Field(
+        ..., description="ID of catalog activity, e.g. running or strength"
     )
     match_mode: Literal["content_first", "time_first"] = Field(
         ..., description="Session match mode: content_first or time_first"
     )
-    content_id: str | None = Field(
-        None, max_length=200, description="Namespaced content ID if matched from content"
+    content_id: DocumentId | None = Field(
+        None, description="Namespaced content ID if matched from content"
     )
-    target_duration_seconds: int | None = Field(
-        None,
-        ge=300,
-        le=86400,
-        description="Target duration in seconds for bare time-first sessions",
+    target_duration_seconds: DurationSeconds | None = Field(
+        None, description="Target duration in seconds for bare time-first sessions"
     )
 
-    @field_validator("activity_id")
-    @classmethod
-    def sanitize_act_id(cls, v: str) -> str:
-        sanitized = sanitize_identifier(v, max_length=100)
-        if not sanitized:
-            raise ValueError("activity_id must not be empty or contain invalid characters")
-        return sanitized
 
-    @field_validator("content_id")
-    @classmethod
-    def sanitize_cnt_id(cls, v: str | None) -> str | None:
-        if v is None:
-            return None
-        sanitized = sanitize_identifier(v, max_length=200)
-        return sanitized or None
-
-
-class CompleteSessionRequest(BaseModel):
+class CompleteSessionRequest(RequestSchema):
     """Request payload for POST /sessions/{id}/complete per SPEC §9.6."""
 
     external_workout_url: str | None = Field(
@@ -73,7 +53,7 @@ class CompleteSessionRequest(BaseModel):
         return sanitize_identifier(v, max_length=100)
 
 
-class SessionSchema(BaseModel):
+class SessionSchema(ResponseSchema):
     """API response schema for a session per SPEC §9.5 & §9.6."""
 
     id: str
@@ -110,8 +90,15 @@ class SessionSchema(BaseModel):
         )
 
 
-class SessionListResponse(BaseModel):
+class SessionListResponse(ResponseSchema):
     """Response payload for GET /sessions list per SPEC §9.5."""
 
     items: list[SessionSchema]
     next_cursor: str | None = None
+
+
+class DiscardSessionResponse(ResponseSchema):
+    """Response payload for DELETE /sessions/{id} per Decision #6."""
+
+    session_id: str
+    discarded: bool

@@ -8,6 +8,10 @@ export interface SessionState {
   currentStep: ChecklistStep;
   isLoading: boolean;
   error: string | null;
+  /** ApiError code behind `error`, e.g. ACTIVE_SESSION_EXISTS or SESSION_NOT_STARTED. */
+  errorCode: string | null;
+  /** For ACTIVE_SESSION_EXISTS: the session that blocks creation, so the UI can offer Resume. */
+  conflictSessionId: string | null;
   trackerError: string | null;
   mediaError: string | null;
 }
@@ -17,6 +21,8 @@ const initialState: SessionState = {
   currentStep: 1,
   isLoading: false,
   error: null,
+  errorCode: null,
+  conflictSessionId: null,
   trackerError: null,
   mediaError: null,
 };
@@ -36,24 +42,24 @@ export const sessionSlice = createSlice({
       state.currentSession = action.payload;
       state.currentStep = derivedStep;
       state.error = null;
+      state.errorCode = null;
     },
     skipTrackerStep: (state) => {
       state.currentStep = 2;
       state.trackerError = null;
     },
-    advanceStep: (state) => {
+    /**
+     * Advance one step. With `from`, only if the checklist is still on that step: two taps
+     * on "Open Tracker" both finish step 1, and the second must not also finish step 2
+     * (the media launch and server start), which would leave the session never started.
+     */
+    advanceStep: (state, action: PayloadAction<ChecklistStep | undefined>) => {
+      if (action.payload !== undefined && state.currentStep !== action.payload) return;
       if (state.currentStep < 3) {
         state.currentStep = (state.currentStep + 1) as ChecklistStep;
       }
     },
-    clearSession: (state) => {
-      state.currentSession = null;
-      state.currentStep = 1;
-      state.isLoading = false;
-      state.error = null;
-      state.trackerError = null;
-      state.mediaError = null;
-    },
+    clearSession: () => initialState,
   },
 });
 

@@ -10,6 +10,12 @@ from app.features.content.schemas import format_duration_label
 from app.features.content.service import ContentService
 
 
+def _user_repo(consumed: set[str] | None = None) -> AsyncMock:
+    repo = AsyncMock()
+    repo.get_consumed_content_ids.return_value = consumed or set()
+    return repo
+
+
 def test_format_duration_label_formatting() -> None:
     """format_duration_label formats duration_seconds into human readable labels per SPEC §9.2."""
     assert format_duration_label(2712) == "45m 12s"
@@ -48,7 +54,7 @@ async def test_get_user_feed_first_page_count_aggregation() -> None:
     mock_content_repo.get_user_feed_items_page = AsyncMock(return_value=([item], "token_xyz"))
     mock_content_repo.get_content_cache_batch = AsyncMock(return_value={"fx:1": cache_doc})
 
-    service = ContentService(mock_source_repo, mock_content_repo)
+    service = ContentService(mock_source_repo, mock_content_repo, _user_repo())
     res = await service.get_user_feed("u1", limit=10, cursor=None)
 
     assert res.total_unconsumed == 42
@@ -75,7 +81,7 @@ async def test_get_user_feed_subsequent_page_no_count() -> None:
     mock_content_repo.get_user_feed_items_page = AsyncMock(return_value=([item], None))
     mock_content_repo.get_content_cache_batch = AsyncMock(return_value={})
 
-    service = ContentService(mock_source_repo, mock_content_repo)
+    service = ContentService(mock_source_repo, mock_content_repo, _user_repo())
     res = await service.get_user_feed("u1", limit=10, cursor="encoded_cursor_str")
 
     assert res.total_unconsumed is None

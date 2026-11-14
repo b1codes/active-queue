@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import asyncio
 import re
 from datetime import UTC, datetime, timedelta
 
 from app.core.errors import NotFoundError, ProviderError, ValidationError
 from app.providers.base import (
     ContentProvider,
+    KnownLookup,
     PlaylistMetadata,
     PlaylistPage,
     RawContentItem,
@@ -38,6 +40,10 @@ EDGE_CASE_ITEMS = {
         video_url="https://www.youtube.com/watch?v=vid_livestream_30",
     ),
 }
+
+
+# Entries the real API would drop from videos.list.
+UNAVAILABLE_EXTERNAL_IDS = frozenset({"vid_private_10", "vid_deleted_20"})
 
 
 def _generate_fixture_items(count: int) -> list[RawContentItem]:
@@ -80,7 +86,13 @@ class FixtureProvider(ContentProvider):
 
     Allows running the full ActiveQueue application with zero GCP dependency, zero API keys,
     and zero network overhead.
+
+    `page_latency_ms` delays each playlist page, standing in for the Data API's round trip
+    (settings.fixture_page_latency_ms; 0 everywhere but the E2E stack).
     """
+
+    def __init__(self, page_latency_ms: int = 0) -> None:
+        self._page_latency_s = page_latency_ms / 1000
 
     async def validate_source_url(self, url: str) -> tuple[str, str]:
         """Validate URL and extract (provider_name, source_id).
@@ -166,8 +178,12 @@ class FixtureProvider(ContentProvider):
         source_id: str,
         page_token: str | None = None,
         max_results: int = 50,
+        *,
+        known: KnownLookup | None = None,
     ) -> PlaylistPage:
-        """Fetch paginated page of playlist items."""
+        """Fetch paginated page of playlist items. IDs `known` returns go in known_ids."""
+        if self._page_latency_s:
+            await asyncio.sleep(self._page_latency_s)
         if source_id == "fixture-quota-exceeded":
             raise ProviderError(
                 code="PROVIDER_QUOTA_EXCEEDED",
@@ -195,12 +211,28 @@ class FixtureProvider(ContentProvider):
                 offset = 0
 
         end_offset = min(offset + max_results, len(items_corpus))
-        page_items = items_corpus[offset:end_offset]
+        # Mirror YouTube: private/deleted entries occupy playlist slots but are absent
+        # from videos.list, so the provider omits them (SPEC §12.3). Live streams (P0D)
+        # are still returned, with duration 0.
+        page_items = [
+            item
+            for item in items_corpus[offset:end_offset]
+            if item.external_id not in UNAVAILABLE_EXTERNAL_IDS
+        ]
 
         next_token = str(end_offset) if end_offset < len(items_corpus) else None
+
+        # Like YouTube: the lookup sees every listed ID, unavailable ones included.
+        known_ids: list[str] = []
+        if known is not None:
+            listed = [item.external_id for item in items_corpus[offset:end_offset]]
+            already = set(await known(listed)) if listed else set()
+            known_ids = [i for i in listed if i in already]
+            page_items = [item for item in page_items if item.external_id not in already]
 
         return PlaylistPage(
             items=page_items,
             next_page_token=next_token,
             total_results=len(items_corpus),
+            known_ids=known_ids,
         )

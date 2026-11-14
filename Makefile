@@ -15,7 +15,9 @@ RESET   := \033[0m
         storybook storybook-ios storybook-android \
         docker-up docker-down docker-build emulators emulators-stop \
         seed-db seed \
-        test test-backend test-frontend \
+        check contracts test test-backend test-backend-fast test-emulator test-frontend \
+        test-firestore-rules test-container fuzz-api \
+        test-screenshots screenshots e2e protect-main \
         lint lint-backend lint-frontend \
         typecheck typecheck-backend typecheck-frontend \
         format format-backend \
@@ -48,9 +50,20 @@ help:
 	@echo "  $(GREEN)seed-db$(RESET)         Seed local Firestore and Auth emulators with mock test data"
 	@echo "  $(GREEN)seed$(RESET)            Alias for seed-db"
 	@echo ""
+	@echo "  $(GREEN)check$(RESET)             Run every CI gate locally (lint, types, tests, coverage)"
 	@echo "  $(GREEN)test$(RESET)              Run all unit tests (backend + frontend)"
-	@echo "  $(GREEN)test-backend$(RESET)      Run pytest suite with coverage in backend"
+	@echo "  $(GREEN)test-backend$(RESET)      Full pytest suite on test emulators + 95% coverage gate"
+	@echo "  $(GREEN)test-backend-fast$(RESET) Unit + mocked integration tests only (no emulators)"
+	@echo "  $(GREEN)test-emulator$(RESET)     Start test emulators (9190/9199) in the foreground"
 	@echo "  $(GREEN)test-frontend$(RESET)     Run Jest test suite in frontend"
+	@echo "  $(GREEN)test-firestore-rules$(RESET) Test the deployed Firestore rules on the emulator"
+	@echo "  $(GREEN)test-container$(RESET)    Lint, build, scan and smoke-test the API image"
+	@echo "  $(GREEN)fuzz-api$(RESET)          Long Schemathesis run on the test emulators (SEED=<n> replays)"
+	@echo "  $(GREEN)e2e$(RESET)               E2E journeys: Release app on a simulator + API + emulators (macOS)"
+	@echo "  $(GREEN)test-screenshots$(RESET)  Screenshot every story on both glass tiers and diff (macOS + Xcode)"
+	@echo "  $(GREEN)screenshots$(RESET)       Update screenshot baselines (RUN=<ci-run-id> takes a CI run's)"
+	@echo "  $(GREEN)contracts$(RESET)         Regenerate API contract files after an API change"
+	@echo "  $(GREEN)protect-main$(RESET)      Apply the main-branch ruleset (CHECK=1 compares it with the live one)"
 	@echo ""
 	@echo "  $(GREEN)lint$(RESET)              Run linting & typechecking across full stack"
 	@echo "  $(GREEN)lint-backend$(RESET)      Run ruff lint on backend"
@@ -181,15 +194,127 @@ seed: seed-db
 ## test: Run tests for both backend and frontend
 test: test-backend test-frontend
 
-## test-backend: Run pytest suite on backend with coverage report
-test-backend:
-	@echo "$(BLUE)Running backend pytest test suite...$(RESET)"
-	cd backend && uv run pytest
+## check: The same gates CI enforces (see docs/testing.md). Run before pushing.
+check:
+	@echo "$(BLUE)[1/7] Backend lint & format$(RESET)"
+	cd backend && uv run ruff check app tests && uv run ruff format --check app tests
+	@echo "$(BLUE)[2/7] Backend types (mypy --strict)$(RESET)"
+	cd backend && uv run mypy --strict app
+	@echo "$(BLUE)[3/7] Backend tests on test emulators + coverage gate$(RESET)"
+	$(MAKE) test-backend
+	@echo "$(BLUE)[4/7] Frontend contract types, lint & types$(RESET)"
+	cd frontend && npx -y openapi-typescript@$(OPENAPI_TS_VERSION) ../contracts/openapi.json \
+		-o src/__tests__/contracts/openapi.gen.ts && git diff --exit-code src/__tests__/contracts/openapi.gen.ts
+	cd frontend && pnpm lint && pnpm typecheck && npx -y expo-doctor@1.17.11
+	@echo "$(BLUE)[5/7] Frontend tests + coverage gate + untested-file check + bundle budget$(RESET)"
+	cd frontend && pnpm test:coverage && node scripts/check-untested-files.js coverage/coverage-final.json
+	cd frontend && npx expo export --platform ios --output-dir dist-ios >/dev/null && node scripts/check-bundle.js dist-ios
+	@echo "$(BLUE)[6/7] Firestore security rules$(RESET)"
+	$(MAKE) test-firestore-rules
+	@echo "$(BLUE)[7/7] Workflow lint (actionlint, via Docker)$(RESET)"
+	docker run --rm -v "$(CURDIR):/repo" -w /repo rhysd/actionlint:1.7.11 -color
+	@echo "$(GREEN)All CI gates passed locally.$(RESET)"
 
-## test-frontend: Run Jest test suite on frontend
+# Test emulators use firebase.test.json (Firestore 9190, Auth 9199) so a test run never
+# wipes the dev emulators started by `make local`. Requires Java 21+.
+FIREBASE_TOOLS  := npx -y firebase-tools@15.33.0
+OPENAPI_TS_VERSION := 7.13.0
+TEST_EMULATORS  := --config firebase.test.json --project demo-activequeue-local --only auth,firestore
+
+## test-backend: Full backend suite (unit + mocked + emulator tiers) with the coverage gate
+test-backend:
+	@echo "$(BLUE)Running backend pytest suite against the test emulators...$(RESET)"
+	$(FIREBASE_TOOLS) emulators:exec $(TEST_EMULATORS) \
+		"cd backend && REQUIRE_EMULATOR=1 uv run pytest --cov"
+
+## test-backend-fast: Unit + mocked integration tiers only (no emulators, no coverage gate)
+test-backend-fast:
+	cd backend && uv run pytest tests/unit tests/integration tests/contract
+
+## test-firestore-rules: Load the deployed firestore.rules into the Firestore emulator and
+## check that every client read and write is denied (SPEC §4.9).
+test-firestore-rules:
+	cd firestore-rules && npx -y pnpm@11.22.0 install --frozen-lockfile
+	$(FIREBASE_TOOLS) emulators:exec --config firebase.test.json --project demo-activequeue-local \
+		--only firestore "cd firestore-rules && node --test --test-reporter=spec rules.test.mjs"
+
+## test-container: hadolint, build and Trivy-scan the API image, then smoke-test it
+## (read-only) against the test emulators, and time its cold start, memory and k6 load
+## under Cloud Run's limits, as the `container` CI job does.
+HADOLINT := docker run --rm -i -v "$(CURDIR)/.hadolint.yaml:/.config/hadolint.yaml:ro" hadolint/hadolint:v2.14.0 hadolint -
+TRIVY    := docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v "$(HOME)/.cache/trivy:/root/.cache/trivy" aquasec/trivy:0.69.3
+test-container:
+	$(HADOLINT) < backend/Dockerfile
+	$(HADOLINT) < docker/firebase/Dockerfile
+	docker build -t activequeue-api:local backend
+	mkdir -p "$(HOME)/.cache/trivy"
+	$(TRIVY) image --scanners vuln --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 activequeue-api:local
+	$(FIREBASE_TOOLS) emulators:exec $(TEST_EMULATORS) "scripts/container-smoke.sh activequeue-api:local"
+	$(FIREBASE_TOOLS) emulators:exec $(TEST_EMULATORS) "scripts/container-perf.sh activequeue-api:local"
+
+## load-test: The nightly k6 API load test against the API on the test emulators
+## (loadtest/api.js). PROFILE=smoke runs the 45-second per-PR version. Results: loadtest/out/.
+PROFILE ?= local
+load-test:
+	$(FIREBASE_TOOLS) emulators:exec $(TEST_EMULATORS) "loadtest/run.sh $(PROFILE)"
+
+## fuzz-api: The nightly Schemathesis run, locally. `make fuzz-api SEED=123` replays a
+## nightly seed; FUZZ_MAX_EXAMPLES sets examples per operation (the PR run uses 25).
+FUZZ_MAX_EXAMPLES ?= 1000
+fuzz-api:
+	$(FIREBASE_TOOLS) emulators:exec $(TEST_EMULATORS) \
+		"cd backend && REQUIRE_EMULATOR=1 FUZZ_MAX_EXAMPLES=$(FUZZ_MAX_EXAMPLES) uv run pytest -p no:randomly \
+		tests/emulator/test_schemathesis_emulator.py $(if $(SEED),--hypothesis-seed=$(SEED))"
+
+## e2e: The E2E journeys (e2e/flows) with Maestro on an iOS simulator, against the API on
+## the test emulators with the fixture provider (docs/testing.md#e2e-tests). Needs macOS,
+## Xcode and Maestro (MAESTRO=<path> if it isn't on PATH). FLOWS=e2e/flows/x.yaml runs one.
+FLOWS ?=
+e2e:
+	cd frontend && scripts/ios-sim-build.sh e2e
+	$(FIREBASE_TOOLS) emulators:exec $(TEST_EMULATORS) "e2e/run.sh $(FLOWS)"
+
+## test-screenshots: Screenshot every Storybook story on the Tier 1 and Tier 3 glass and
+## diff against frontend/screenshots/baselines (docs/testing.md#visual-regression-tests).
+## Needs macOS with Xcode. Off the reference platform (screenshots/reference.json), pass
+## SCREENSHOT_ARGS=--off-reference to check the harness without failing on diffs.
+SCREENSHOT_ARGS ?=
+test-screenshots:
+	cd frontend && scripts/ios-sim-build.sh screenshots
+	cd frontend && node scripts/screenshots/capture.js $(SCREENSHOT_ARGS)
+
+## screenshots: Update the screenshot baselines. RUN=<ci-run-id> takes the captures from a
+## CI run (the reference platform); without it, captures locally (reference Xcode only).
+screenshots:
+ifdef RUN
+	frontend/scripts/screenshots/accept.sh $(RUN)
+else
+	cd frontend && scripts/ios-sim-build.sh screenshots
+	cd frontend && node scripts/screenshots/capture.js --update $(SCREENSHOT_ARGS)
+endif
+
+## test-emulator: Run the test emulators in the foreground (for iterating on tests/emulator)
+test-emulator:
+	$(FIREBASE_TOOLS) emulators:start $(TEST_EMULATORS)
+
+## contracts: Regenerate contracts/openapi.json and the frontend's generated contract types
+## after an intentional API change. Re-record interaction examples with
+## `UPDATE_CONTRACTS=1 make test-backend`.
+contracts:
+	@echo "$(BLUE)Regenerating API contract files...$(RESET)"
+	cd backend && UPDATE_CONTRACTS=1 uv run pytest -p no:randomly tests/contract/test_openapi_snapshot.py
+	cd frontend && npx -y openapi-typescript@$(OPENAPI_TS_VERSION) ../contracts/openapi.json \
+		-o src/__tests__/contracts/openapi.gen.ts
+
+## protect-main: Apply .github/rulesets/main.json to the repo (PRs only, `CI Passed` required,
+## no force push or deletion). `make protect-main CHECK=1` reports drift instead. Repo admin.
+protect-main:
+	scripts/protect-main.sh $(if $(CHECK),--check,)
+
+## test-frontend: Run Jest test suite on frontend (random order, coverage gate)
 test-frontend:
 	@echo "$(BLUE)Running frontend Jest test suite...$(RESET)"
-	cd frontend && pnpm test
+	cd frontend && pnpm test:coverage
 
 # ==============================================================================
 # LINTING & TYPE CHECKING
@@ -201,7 +326,7 @@ lint: lint-backend lint-frontend typecheck
 ## lint-backend: Run ruff linter on backend
 lint-backend:
 	@echo "$(BLUE)Linting backend with ruff...$(RESET)"
-	cd backend && uv run ruff check .
+	cd backend && uv run ruff check app tests
 
 ## lint-frontend: Run eslint on frontend
 lint-frontend:
@@ -214,7 +339,7 @@ typecheck: typecheck-backend typecheck-frontend
 ## typecheck-backend: Run mypy typechecker on backend
 typecheck-backend:
 	@echo "$(BLUE)Typechecking backend with mypy...$(RESET)"
-	cd backend && uv run mypy app
+	cd backend && uv run mypy --strict app
 
 ## typecheck-frontend: Run TypeScript compiler on frontend
 typecheck-frontend:

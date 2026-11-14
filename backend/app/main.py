@@ -3,11 +3,12 @@ from __future__ import annotations
 from contextlib import asynccontextmanager
 from typing import TYPE_CHECKING
 
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 from fastapi.exceptions import RequestValidationError
 from starlette.exceptions import HTTPException
 
 from app.core.config import settings
+from app.core.envelopes import ERROR_RESPONSES
 from app.core.firestore import close_firestore, init_firestore
 from app.core.logging import configure_logging
 from app.core.security import init_firebase_admin
@@ -22,14 +23,14 @@ from app.middleware.errors import (
     validation_error_handler,
 )
 from app.middleware.logging import RequestLoggingMiddleware
-from app.middleware.ratelimit import RateLimitMiddleware
+from app.middleware.ratelimit import RateLimitMiddleware, enforce_user_rate_limit
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
+async def lifespan(_app: FastAPI) -> AsyncGenerator[None]:
     """Startup and shutdown lifecycle for the FastAPI application."""
     configure_logging(debug=settings.debug, log_level=settings.log_level, env=settings.env)
     await init_firestore(settings)
@@ -56,8 +57,12 @@ app.add_middleware(RequestLoggingMiddleware)
 # Health check at root (unauthenticated, no /api/v1 prefix)
 app.include_router(health_router)
 
-# Feature routers under /api/v1
-app.include_router(users_router, prefix="/api/v1")
-app.include_router(content_router, prefix="/api/v1")
-app.include_router(activities_router, prefix="/api/v1")
-app.include_router(sessions_router, prefix="/api/v1")
+# Feature routers under /api/v1. Every one is authenticated, and the per-user rate limit
+# runs as soon as the token is verified (before any Firestore work).
+for feature_router in (users_router, content_router, activities_router, sessions_router):
+    app.include_router(
+        feature_router,
+        prefix="/api/v1",
+        responses=ERROR_RESPONSES,
+        dependencies=[Depends(enforce_user_rate_limit)],
+    )

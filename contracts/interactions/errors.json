@@ -1,0 +1,136 @@
+{
+  "description": "Cross-cutting auth, authorization, and rate-limit errors every client call can receive.",
+  "interactions": [
+    {
+      "id": "errors.token_missing",
+      "description": "No Authorization header",
+      "request": {
+        "method": "GET",
+        "path": "/api/v1/sessions/active",
+        "auth": "none"
+      },
+      "response": {
+        "status": 401,
+        "body": {
+          "status": "error",
+          "data": null,
+          "error": {
+            "code": "AUTH_TOKEN_MISSING",
+            "message": "Authorization header missing or invalid format",
+            "details": []
+          }
+        }
+      },
+      "consumers": [
+        "apiClient.error"
+      ]
+    },
+    {
+      "id": "errors.token_invalid",
+      "description": "Malformed token",
+      "request": {
+        "method": "GET",
+        "path": "/api/v1/sessions/active",
+        "auth": "invalid"
+      },
+      "response": {
+        "status": 401,
+        "body": {
+          "status": "error",
+          "data": null,
+          "error": {
+            "code": "AUTH_TOKEN_INVALID",
+            "message": "Auth token is invalid",
+            "details": []
+          }
+        }
+      },
+      "consumers": [
+        "apiClient.error"
+      ]
+    },
+    {
+      "id": "errors.token_expired",
+      "description": "Expired token: the client refreshes once and retries",
+      "request": {
+        "method": "GET",
+        "path": "/api/v1/sessions/active",
+        "auth": "expired"
+      },
+      "response": {
+        "status": 401,
+        "body": {
+          "status": "error",
+          "data": null,
+          "error": {
+            "code": "AUTH_TOKEN_EXPIRED",
+            "message": "Auth token has expired",
+            "details": []
+          }
+        }
+      },
+      "consumers": [
+        "apiClient.refresh"
+      ]
+    },
+    {
+      "id": "errors.account_disabled",
+      "description": "Disabled account",
+      "states": [
+        "alice's account is disabled"
+      ],
+      "request": {
+        "method": "GET",
+        "path": "/api/v1/sessions/active"
+      },
+      "response": {
+        "status": 403,
+        "body": {
+          "status": "error",
+          "data": null,
+          "error": {
+            "code": "ACCOUNT_DISABLED",
+            "message": "Account disabled",
+            "details": []
+          }
+        }
+      },
+      "consumers": [
+        "apiClient.error"
+      ]
+    },
+    {
+      "id": "errors.rate_limited",
+      "description": "Rate limit exceeded carries Retry-After",
+      "states": [
+        "alice has exhausted her rate limit"
+      ],
+      "request": {
+        "method": "GET",
+        "path": "/api/v1/sessions/active"
+      },
+      "response": {
+        "status": 429,
+        "headers": {
+          "Retry-After": "60"
+        },
+        "body": {
+          "status": "error",
+          "data": null,
+          "error": {
+            "code": "RATE_LIMITED",
+            "message": "Rate limit of 60 requests per minute exceeded for 'general' endpoints. Please try again in 23 seconds.",
+            "details": []
+          }
+        }
+      },
+      "consumers": [
+        "apiClient.error"
+      ],
+      "dynamic": [
+        "headers.Retry-After",
+        "error.message"
+      ]
+    }
+  ]
+}

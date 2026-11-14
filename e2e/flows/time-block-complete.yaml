@@ -1,0 +1,49 @@
+# Journey: time first (SPEC §5.3: a block B takes a video of B to B+5 min, else B-2 min to
+# B). The fixture videos run 5, 15, 25, 35 or 45 minutes, so a 60-minute block has no
+# match and a 45-minute block matches a 45:00 video. Start it, hand off to the media, come
+# back, mark it complete, and find it in History.
+appId: com.b1codes.activequeue
+name: Time block to a completed session
+---
+- runFlow:
+    file: common/new-user.yaml
+    env:
+      NAME: finisher
+- runFlow:
+    file: common/add-source.yaml
+    env:
+      SOURCE: fixture-small-playlist
+- tapOn: "Time Blocks, tab.*"
+- tapOn: "Target duration 60 min"
+- tapOn: "Activity Cycling / Spin Workout"
+- extendedWaitUntil:
+    visible: "Start a timer-only session"
+    timeout: 30000
+- assertNotVisible:
+    id: start-matched-session
+- tapOn: "Target duration 45 min"
+- extendedWaitUntil:
+    visible:
+      id: start-matched-session
+    timeout: 30000
+- assertVisible: "45m 0s"
+- waitForAnimationToEnd
+- retry:
+    maxRetries: 3
+    commands:
+      - tapOn:
+          id: start-matched-session
+          optional: true
+      - extendedWaitUntil:
+          visible: "Skip Tracker Step"
+          timeout: 30000
+- runFlow: common/hand-off.yaml
+- retry:
+    maxRetries: 3
+    commands:
+      - tapOn:
+          text: "Mark session complete"
+          optional: true
+      - extendedWaitUntil:
+          visible: "Completed cycling session, 45:00.*"
+          timeout: 30000

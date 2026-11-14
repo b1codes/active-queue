@@ -1,4 +1,4 @@
-import { store } from "@/store";
+import { resetUserScopedState, store } from "@/store";
 import { useAppSelector } from "@/store/hooks";
 import { setAuthState, clearError as clearAuthSliceError, AuthState } from "./authSlice";
 import {
@@ -8,6 +8,7 @@ import {
   onIdTokenChanged,
 } from "firebase/auth";
 import { auth } from "./firebase";
+import { isDevToolsEnabled } from "@/core/config/devTools";
 
 export interface AuthActions {
   initAuth: () => () => void;
@@ -21,6 +22,11 @@ export interface AuthActions {
 export function initAuth(): () => void {
   store.dispatch(setAuthState({ isLoading: true }));
   const unsubscribe = onIdTokenChanged(auth, async (currentUser) => {
+    // A different account (or none) means every user-scoped slice is stale.
+    const previousUid = store.getState().auth.user?.uid ?? null;
+    if ((currentUser?.uid ?? null) !== previousUid) {
+      store.dispatch(resetUserScopedState());
+    }
     if (currentUser) {
       try {
         const token = await currentUser.getIdToken();
@@ -65,6 +71,12 @@ export async function signInWithEmulator(
   email = "test@activequeue.dev",
   password = "password123"
 ): Promise<void> {
+  if (!isDevToolsEnabled()) {
+    // Defence in depth: the UI hides this outside dev builds, but the fallback below
+    // creates an account with a published password, so refuse outright.
+    store.dispatch(setAuthState({ error: "Emulator sign-in is only available in development" }));
+    return;
+  }
   store.dispatch(setAuthState({ isLoading: true, error: null }));
   try {
     await firebaseSignOut(auth);
@@ -109,6 +121,7 @@ export async function signOut(): Promise<void> {
   store.dispatch(setAuthState({ isLoading: true }));
   try {
     await firebaseSignOut(auth);
+    store.dispatch(resetUserScopedState());
     store.dispatch(
       setAuthState({
         user: null,

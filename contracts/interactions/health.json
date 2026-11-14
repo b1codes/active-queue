@@ -1,0 +1,67 @@
+{
+  "description": "Health check. /health is for external callers such as the post-deploy smoke check, because Cloud Run doesn't route paths ending in \"z\". /healthz is for Cloud Run's own probes.",
+  "interactions": [
+    {
+      "id": "health.ok",
+      "description": "Firestore reachable",
+      "request": {
+        "method": "GET",
+        "path": "/healthz",
+        "auth": "none"
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "status": "success",
+          "data": {
+            "status": "healthy",
+            "firestore": {
+              "status": "up",
+              "latency_ms": 1.17
+            },
+            "provider": {
+              "status": "up"
+            }
+          },
+          "error": null
+        }
+      },
+      "dynamic": [
+        "data.firestore.latency_ms"
+      ],
+      "consumers": [],
+      "consumer_note": "Called by Cloud Run's startup and liveness probes, which reach the container directly."
+    },
+    {
+      "id": "health.ok.external",
+      "description": "Firestore reachable, via the path Cloud Run routes from outside",
+      "request": {
+        "method": "GET",
+        "path": "/health",
+        "auth": "none"
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "status": "success",
+          "data": {
+            "status": "healthy",
+            "firestore": {
+              "status": "up",
+              "latency_ms": 1.17
+            },
+            "provider": {
+              "status": "up"
+            }
+          },
+          "error": null
+        }
+      },
+      "dynamic": [
+        "data.firestore.latency_ms"
+      ],
+      "consumers": [],
+      "consumer_note": "Called by scripts/smoke_test.py after each deploy, not the app."
+    }
+  ]
+}

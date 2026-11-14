@@ -1,0 +1,45 @@
+# Journey: two people on one phone. Alice adds a source and completes nothing; after she
+# signs out, Bob signs in and sees none of her sources, queue or history. Alice's data is
+# still there when she comes back.
+appId: com.b1codes.activequeue
+name: Two accounts on one device
+---
+- runScript:
+    file: common/create-account.js
+    env:
+      NAME: alice
+- runScript:
+    file: common/create-account.js
+    env:
+      NAME: bob
+- launchApp:
+    clearState: true
+- runFlow:
+    file: common/sign-in.yaml
+    env:
+      NAME: alice
+- runFlow:
+    file: common/add-source.yaml
+    env:
+      SOURCE: fixture-small-playlist
+- runFlow: common/sign-out.yaml
+- runFlow:
+    file: common/sign-in.yaml
+    env:
+      NAME: bob
+- extendedWaitUntil:
+    visible: "No Content Sources Added"
+    timeout: 30000
+- assertNotVisible: "Fixture Workout Video.*"
+- tapOn: "History, tab.*"
+- extendedWaitUntil:
+    visible: "No Sessions Yet"
+    timeout: 30000
+- runFlow: common/sign-out.yaml
+- runFlow:
+    file: common/sign-in.yaml
+    env:
+      NAME: alice
+- extendedWaitUntil:
+    visible: "Fixture Workout Video #15 — High Intensity Cardio.*"
+    timeout: 30000

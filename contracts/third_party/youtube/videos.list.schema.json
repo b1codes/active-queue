@@ -1,0 +1,72 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "YouTube Data API v3 videos.list (part=contentDetails,snippet)",
+  "description": "Fields YouTubeProvider reads to enrich playlist items. Private and deleted videos are simply absent from items.",
+  "type": "object",
+  "required": [
+    "items"
+  ],
+  "properties": {
+    "items": {
+      "type": "array",
+      "maxItems": 50,
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "snippet",
+          "contentDetails"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "snippet": {
+            "type": "object",
+            "required": [
+              "title",
+              "publishedAt"
+            ],
+            "properties": {
+              "title": {
+                "type": "string"
+              },
+              "publishedAt": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "thumbnails": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "object",
+                  "required": [
+                    "url"
+                  ],
+                  "properties": {
+                    "url": {
+                      "type": "string",
+                      "format": "uri"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "contentDetails": {
+            "type": "object",
+            "required": [
+              "duration"
+            ],
+            "properties": {
+              "duration": {
+                "type": "string",
+                "pattern": "^P(?:\\d+D)?(?:T(?:\\d+H)?(?:\\d+M)?(?:\\d+S)?)?$"
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

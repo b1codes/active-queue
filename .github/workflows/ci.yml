@@ -6,7 +6,49 @@ on:
   pull_request:
     branches: [main]
 
+# Least privilege by default; jobs that need more ask for it explicitly.
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Pinned tool versions (one place to bump). Python/Node match backend/Dockerfile and
+  # frontend's Expo toolchain; pnpm comes from frontend/package.json "packageManager".
+  PYTHON_VERSION: "3.12"
+  NODE_VERSION: "22"
+  UV_VERSION: "0.13.2"
+  FIREBASE_TOOLS_VERSION: "15.33.0"
+  TERRAFORM_VERSION: "1.9.0"
+  OPENAPI_TS_VERSION: "7.13.0"
+  OASDIFF_VERSION: "v1.34.1"
+  PIP_AUDIT_VERSION: "2.10.0"
+  GITLEAKS_VERSION: "v8.30.1"
+  HADOLINT_VERSION: "v2.14.0"
+  TRIVY_VERSION: "0.69.3"
+  TFLINT_VERSION: "v0.61.0"
+  SHELLCHECK_VERSION: "v0.10.0"
+  RUFF_VERSION: "0.16.2"
+  EXPO_DOCTOR_VERSION: "1.17.11"
+  # E2E UI driver (ClickUp 86bcxruy6): the release zip, checked against this digest.
+  MAESTRO_VERSION: "2.11.0"
+  MAESTRO_SHA256: "5384593cb4e7a106489e75a821d157dd43f4e438df6bc308b72e82c685e1283a"
+
 jobs:
+  workflows:
+    name: Workflow lint (actionlint)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Run actionlint
+        uses: docker://rhysd/actionlint:1.7.11
+        with:
+          args: -color
+
   backend:
     name: Backend (FastAPI)
     runs-on: ubuntu-latest
@@ -18,46 +60,59 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
+          python-version: ${{ env.PYTHON_VERSION }}
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v3
+        uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e  # v6.8.0
         with:
+          version: ${{ env.UV_VERSION }}
           enable-cache: true
+          cache-dependency-glob: backend/uv.lock
 
-      - name: Install Node.js & Firebase Emulators
+      - name: Set up Node.js (Firebase emulators)
         uses: actions/setup-node@v4
         with:
-          node-version: "22"
+          node-version: ${{ env.NODE_VERSION }}
 
-      - name: Install Firebase CLI
-        run: npm install -g firebase-tools
+      - name: Set up Java (Firestore emulator)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Cache Firebase emulator binaries
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/firebase/emulators
+          key: firebase-emulators-${{ env.FIREBASE_TOOLS_VERSION }}
 
       - name: Install backend dependencies
-        run: |
-          cd backend
-          uv sync --frozen
+        working-directory: backend
+        run: uv sync --frozen
 
-      - name: Run Ruff Lint & Format Checks
+      - name: Ruff lint & format check
+        working-directory: backend
         run: |
-          cd backend
           uv run ruff check app/ tests/
           uv run ruff format --check app/ tests/
 
-      - name: Run Mypy Type Checking
-        run: |
-          cd backend
-          uv run mypy --strict app/
+      - name: Mypy (strict)
+        working-directory: backend
+        run: uv run mypy --strict app/
 
-      - name: Run Pytest Suite & Coverage
+      - name: Pytest (unit + mocked + emulator tiers, random order) with coverage gate
+        # emulators:exec sets FIRESTORE_EMULATOR_HOST / FIREBASE_AUTH_EMULATOR_HOST.
+        # REQUIRE_EMULATOR=1 turns "emulators unreachable" into a failure, not a skip.
+        # pytest-randomly shuffles order and prints the seed for reproduction.
+        # The coverage threshold lives in backend/pyproject.toml ([tool.coverage.report]).
         env:
           ENV: local
           GCP_PROJECT_ID: demo-activequeue-local
-          FIRESTORE_EMULATOR_HOST: localhost:9090
-          FIREBASE_AUTH_EMULATOR_HOST: localhost:9099
+          REQUIRE_EMULATOR: "1"
         run: |
-          cd backend
-          uv run pytest --cov=app/features --cov-fail-under=80 tests/
+          npx -y "firebase-tools@${FIREBASE_TOOLS_VERSION}" emulators:exec \
+            --config firebase.test.json --project demo-activequeue-local --only auth,firestore \
+            "cd backend && uv run pytest --cov"
 
   frontend:
     name: Frontend (React Native Expo)
@@ -67,40 +122,289 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up pnpm
-        uses: pnpm/action-setup@v4
+      - name: Set up pnpm (version from package.json packageManager)
+        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320  # v4.4.0
         with:
-          version: 11.21.0
+          package_json_file: frontend/package.json
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "22"
-          cache: "pnpm"
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
           cache-dependency-path: frontend/pnpm-lock.yaml
 
       - name: Install frontend dependencies
-        run: |
-          cd frontend
-          pnpm install --frozen-lockfile
+        working-directory: frontend
+        run: pnpm install --frozen-lockfile
 
-      - name: Run ESLint
-        run: |
-          cd frontend
-          pnpm lint
+      - name: ESLint (flat config, typescript-eslint strict, zero warnings)
+        working-directory: frontend
+        run: pnpm lint
 
-      - name: Run TypeScript Type Check
+      - name: Contract types match contracts/openapi.json
+        # The generated types feed src/__tests__/contracts/types.contract.ts, which the
+        # TypeScript step checks against the app's hand-written API types.
+        working-directory: frontend
         run: |
-          cd frontend
-          pnpm typecheck
+          npx -y "openapi-typescript@${OPENAPI_TS_VERSION}" ../contracts/openapi.json \
+            -o src/__tests__/contracts/openapi.gen.ts
+          git diff --exit-code src/__tests__/contracts/openapi.gen.ts || {
+            echo "::error::openapi.gen.ts is stale. Run 'make contracts' and commit the result."
+            exit 1
+          }
 
-      - name: Run Jest Unit Tests
+      - name: TypeScript
+        working-directory: frontend
+        run: pnpm typecheck
+
+      - name: expo-doctor (SDK versions, config, native module checks)
+        # buildConfig.test.ts (in the Jest step) checks app.json/eas.json against the code.
+        working-directory: frontend
+        run: npx -y "expo-doctor@${EXPO_DOCTOR_VERSION}"
+
+      - name: Jest (random order) with coverage gate
+        # Thresholds: frontend/jest.config.js coverageThreshold, measured over every file in
+        # src/ and app/. check-untested-files fails if any file with code was never loaded.
+        working-directory: frontend
         run: |
-          cd frontend
-          pnpm test
+          pnpm test:coverage
+          node scripts/check-untested-files.js coverage/coverage-final.json
+
+      - name: Production iOS bundle within its startup budget
+        # Hermes maps the whole bundle at launch; its size is the startup cost a change
+        # controls. Fails over the budget, or if Storybook or test code ships.
+        working-directory: frontend
+        run: |
+          npx expo export --platform ios --output-dir dist-ios
+          node scripts/check-bundle.js dist-ios
+
+  firestore-rules:
+    name: Firestore security rules
+    # Loads the rules firebase.json deploys into the emulator and checks that every client
+    # read and write is denied (SPEC §4.9), including for owners and forged admin claims.
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up pnpm (version from package.json packageManager)
+        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320  # v4.4.0
+        with:
+          package_json_file: firestore-rules/package.json
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+          cache-dependency-path: firestore-rules/pnpm-lock.yaml
+
+      - name: Set up Java (Firestore emulator)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Cache Firebase emulator binaries
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/firebase/emulators
+          key: firebase-emulators-${{ env.FIREBASE_TOOLS_VERSION }}
+
+      - name: Install rules test dependencies
+        working-directory: firestore-rules
+        run: pnpm install --frozen-lockfile
+
+      - name: Rules tests on the Firestore emulator
+        run: |
+          npx -y "firebase-tools@${FIREBASE_TOOLS_VERSION}" emulators:exec \
+            --config firebase.test.json --project demo-activequeue-local --only firestore \
+            "cd firestore-rules && node --test --test-reporter=spec rules.test.mjs"
+
+  security-scans:
+    name: Dependency & secret scans
+    # Fails on known-vulnerable dependencies (high and above for npm, any for Python) and
+    # on committed secrets. Reviewed exceptions live next to the lockfiles:
+    # frontend/pnpm-workspace.yaml auditConfig.ignoreGhsas and .gitleaks.toml allowlists.
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository (full history for the secret scan)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e  # v6.8.0
+        with:
+          version: ${{ env.UV_VERSION }}
+
+      - name: pip-audit (backend lockfile, hashed)
+        working-directory: backend
+        run: |
+          uv export --frozen --no-emit-project --format requirements-txt \
+            -o "${RUNNER_TEMP}/requirements.txt"
+          uvx "pip-audit@${PIP_AUDIT_VERSION}" -r "${RUNNER_TEMP}/requirements.txt" \
+            --require-hashes --disable-pip --progress-spinner off
+
+      - name: Set up pnpm (version from package.json packageManager)
+        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320  # v4.4.0
+        with:
+          package_json_file: frontend/package.json
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: pnpm audit (frontend)
+        working-directory: frontend
+        run: pnpm audit --audit-level high
+
+      - name: pnpm audit (Firestore rules tests)
+        working-directory: firestore-rules
+        run: pnpm audit --audit-level high
+
+      - name: gitleaks (entire git history)
+        run: |
+          docker run --rm -v "${GITHUB_WORKSPACE}:/repo" \
+            "ghcr.io/gitleaks/gitleaks:${GITLEAKS_VERSION}" \
+            git /repo --config /repo/.gitleaks.toml --redact --no-banner
+
+  api-breaking:
+    name: API breaking changes (oasdiff)
+    # The installed app can't be updated in lockstep with the API, so a breaking change to
+    # contracts/openapi.json (removed or narrowed response field, new required request
+    # field, removed endpoint) fails the PR. Label the PR `api-breaking-ok` once the
+    # rollout plan is agreed, then re-run this job.
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Diff contracts/openapi.json against the base commit
+        env:
+          EVENT: ${{ github.event_name }}
+          BASE_REF: ${{ github.base_ref }}
+          BEFORE: ${{ github.event.before }}
+          ALLOW_BREAKING: ${{ contains(github.event.pull_request.labels.*.name, 'api-breaking-ok') }}
+        run: |
+          if [ "${EVENT}" = "pull_request" ]; then
+            base="$(git merge-base "origin/${BASE_REF}" HEAD)"
+          else
+            base="${BEFORE}"
+          fi
+          if ! git cat-file -e "${base}:contracts/openapi.json" 2>/dev/null; then
+            echo "::notice::No contracts/openapi.json at base ${base}; nothing to compare."
+            exit 0
+          fi
+          mkdir -p "${RUNNER_TEMP}/specs"
+          git show "${base}:contracts/openapi.json" > "${RUNNER_TEMP}/specs/base.json"
+          cp contracts/openapi.json "${RUNNER_TEMP}/specs/revision.json"
+          fail_on="ERR"
+          if [ "${ALLOW_BREAKING}" = "true" ]; then
+            echo "::warning::api-breaking-ok label set; reporting breaking changes without failing."
+            fail_on=""
+          fi
+          docker run --rm -v "${RUNNER_TEMP}/specs:/specs" "tufin/oasdiff:${OASDIFF_VERSION}" \
+            breaking /specs/base.json /specs/revision.json --format githubactions \
+            ${fail_on:+--fail-on "${fail_on}"}
+
+  container:
+    name: API container (hadolint, Trivy, smoke)
+    # Builds the image Cloud Run runs, then starts it read-only against the emulators and
+    # runs the same smoke check scripts/deploy.sh runs after a deploy.
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: hadolint (every Dockerfile)
+        run: |
+          for f in backend/Dockerfile docker/firebase/Dockerfile; do
+            echo "::group::${f}"
+            docker run --rm -i -v "${GITHUB_WORKSPACE}/.hadolint.yaml:/.config/hadolint.yaml:ro" \
+              "hadolint/hadolint:${HADOLINT_VERSION}" hadolint - < "${f}"
+            echo "::endgroup::"
+          done
+
+      - name: Build the API image
+        run: docker build -t activequeue-api:ci backend
+
+      - name: Image runs as an unprivileged user
+        run: |
+          user="$(docker inspect --format '{{.Config.User}}' activequeue-api:ci)"
+          if [ -z "${user}" ] || [ "${user}" = "0" ] || [ "${user}" = "root" ]; then
+            echo "::error::backend/Dockerfile must end with a non-root USER (got '${user}')."
+            exit 1
+          fi
+
+      - name: Cache the Trivy vulnerability DB
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/trivy
+          key: trivy-db-${{ env.TRIVY_VERSION }}-${{ github.run_id }}
+          restore-keys: trivy-db-${{ env.TRIVY_VERSION }}-
+
+      - name: Trivy image scan (fixable HIGH and CRITICAL fail)
+        # Create the cache dir first: a missing bind-mount source is created root-owned,
+        # which would leave ~/.cache unwritable for the Firebase emulator download below.
+        run: |
+          mkdir -p "${HOME}/.cache/trivy"
+          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
+            -v "${HOME}/.cache/trivy:/root/.cache/trivy" \
+            "aquasec/trivy:${TRIVY_VERSION}" image --scanners vuln \
+            --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 activequeue-api:ci
+
+      - name: Set up Node.js (Firebase emulators)
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Set up Java (Firestore emulator)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Cache Firebase emulator binaries
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/firebase/emulators
+          key: firebase-emulators-${{ env.FIREBASE_TOOLS_VERSION }}
+
+      - name: Smoke check the running container
+        # --read-only proves the container installs nothing at startup. The smoke script
+        # signs in through the Auth emulator; deploy.sh uses a signed custom token instead.
+        run: |
+          npx -y "firebase-tools@${FIREBASE_TOOLS_VERSION}" emulators:exec \
+            --config firebase.test.json --project demo-activequeue-local --only auth,firestore \
+            "scripts/container-smoke.sh activequeue-api:ci"
+
+      - name: Cold start, memory and k6 load smoke (Cloud Run's 1 vCPU / 512 MiB)
+        # Times docker run -> /healthz 200 and the first signed-in request, then runs the
+        # k6 smoke profile (loadtest/api.js) while sampling memory. Budgets are in the
+        # script. Fails on a 5xx, a throttled legitimate user, an unthrottled abuser or
+        # flood, an OOM kill, or a blown budget.
+        run: |
+          npx -y "firebase-tools@${FIREBASE_TOOLS_VERSION}" emulators:exec \
+            --config firebase.test.json --project demo-activequeue-local --only auth,firestore \
+            "scripts/container-perf.sh activequeue-api:ci"
+
+      - name: Load smoke summary
+        if: always()
+        run: |
+          if [ -f loadtest/out/summary.json ]; then
+            python3 loadtest/summary.py loadtest/out/summary.json "k6 load smoke (API image)" >> "${GITHUB_STEP_SUMMARY}"
+          fi
 
   terraform:
-    name: Infrastructure (Terraform)
+    name: Infrastructure (Terraform, deploy script)
+    # Every root and the module, not just infra/: `terraform validate` isn't recursive.
+    # `plan` still needs GCP credentials (SPEC §12.5); `terraform test` with a mocked
+    # provider checks the module's behavior without them.
     runs-on: ubuntu-latest
 
     steps:
@@ -108,22 +412,241 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Set up Terraform
-        uses: hashicorp/setup-terraform@v3
+        uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd  # v3.1.2
         with:
-          terraform_version: "1.9.0"
+          terraform_version: ${{ env.TERRAFORM_VERSION }}
+          terraform_wrapper: false
 
-      - name: Terraform Format Check
-        run: |
-          cd infra
-          terraform fmt -check
+      - name: Terraform format check
+        working-directory: infra
+        run: terraform fmt -check -recursive
 
-      - name: Terraform Init
+      - name: Terraform init + validate (each environment, locked providers)
+        working-directory: infra
         run: |
-          cd infra
-          terraform init -backend=false
+          for env in dev staging prod; do
+            echo "::group::${env}"
+            terraform -chdir="environments/${env}" init -backend=false -input=false -lockfile=readonly
+            terraform -chdir="environments/${env}" validate
+            echo "::endgroup::"
+          done
 
-      - name: Terraform Validate
-        # NOTE (SPEC §12.5): `terraform plan` is EXCLUDED until M6 because it requires real GCP credentials.
+      - name: Terraform test (module, mocked Google provider)
+        working-directory: infra/modules/activequeue_app
         run: |
-          cd infra
-          terraform validate
+          terraform init -backend=false -input=false
+          terraform test
+
+      - name: tflint (recursive, Google ruleset)
+        env:
+          GITHUB_TOKEN: ${{ github.token }}  # plugin download rate limit
+        run: |
+          mkdir -p "${RUNNER_TEMP}/tflint-plugins"
+          tflint() {
+            docker run --rm -v "${GITHUB_WORKSPACE}/infra:/data" -w /data \
+              -v "${RUNNER_TEMP}/tflint-plugins:/plugins" -e TFLINT_PLUGIN_DIR=/plugins \
+              -e GITHUB_TOKEN "ghcr.io/terraform-linters/tflint:${TFLINT_VERSION}" "$@"
+          }
+          tflint --init --config /data/.tflint.hcl
+          tflint --recursive --config /data/.tflint.hcl --format compact
+
+      - name: Deploy script and smoke check tests (stdlib unittest, stubbed gcloud)
+        run: python3 -m unittest discover -s scripts/tests -v
+
+      - name: Lint scripts (shellcheck, Ruff)
+        run: |
+          docker run --rm -v "${GITHUB_WORKSPACE}:/mnt" -w /mnt \
+            "koalaman/shellcheck:${SHELLCHECK_VERSION}" scripts/*.sh loadtest/*.sh \
+            frontend/scripts/*.sh frontend/scripts/screenshots/*.sh e2e/*.sh
+          pipx run "ruff==${RUFF_VERSION}" check scripts loadtest
+          pipx run "ruff==${RUFF_VERSION}" format --check scripts loadtest
+
+      - name: Trivy config scan (Terraform + Dockerfiles)
+        run: |
+          docker run --rm -v "${GITHUB_WORKSPACE}:/repo:ro" "aquasec/trivy:${TRIVY_VERSION}" \
+            config --exit-code 1 --severity HIGH,CRITICAL \
+            --skip-dirs /repo/frontend/node_modules --skip-dirs /repo/firestore-rules/node_modules \
+            /repo
+
+  screenshots:
+    name: Visual regression (Storybook screenshots, iOS simulator)
+    # The reference platform for frontend/screenshots/baselines (reference.json): this
+    # runner image, its Xcode and simulator. Every story on the Tier 1 (native liquid glass)
+    # and Tier 3 (Skia) glass, diffed pixel for pixel. On a failure, the "screenshots"
+    # artifact holds actual/, diff/ and report.json; after review, `make screenshots
+    # RUN=<run-id>` takes them as the new baselines. See docs/testing.md.
+    runs-on: macos-26
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Select the reference Xcode
+        run: |
+          xcode=$(python3 -c 'import json; print(json.load(open("frontend/screenshots/reference.json"))["xcode"])')
+          sudo xcode-select -s "/Applications/Xcode_${xcode}.app"
+          xcodebuild -version
+
+      - name: Set up pnpm (version from package.json packageManager)
+        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320  # v4.4.0
+        with:
+          package_json_file: frontend/package.json
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: pnpm install --frozen-lockfile
+
+      - name: Cache CocoaPods downloads
+        uses: actions/cache@v4
+        with:
+          path: ~/Library/Caches/CocoaPods
+          key: pods-${{ runner.os }}-${{ hashFiles('frontend/pnpm-lock.yaml', 'frontend/app.json') }}
+          restore-keys: pods-${{ runner.os }}-
+
+      - name: Build the screenshot harness (Release, simulator)
+        working-directory: frontend
+        run: scripts/ios-sim-build.sh screenshots
+
+      - name: Capture and diff every story
+        working-directory: frontend
+        run: node scripts/screenshots/capture.js
+
+      - name: Upload captures and diffs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: screenshots
+          path: frontend/build/screenshots/
+          if-no-files-found: ignore
+          retention-days: 14
+
+      - name: Upload the Xcode build log
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: screenshots-xcodebuild-log
+          path: frontend/build/xcodebuild-screenshots.log
+          if-no-files-found: ignore
+          retention-days: 7
+
+  e2e:
+    name: E2E journeys (Maestro, iOS simulator, API + emulators)
+    # The Release app on a fresh simulator against the real API (fixture provider) and
+    # the Firebase emulators. e2e/run.sh starts from empty emulators every run. On a
+    # failure the "e2e" artifact holds each flow's screenshots and view hierarchy, the
+    # JUnit report and the API log. See docs/testing.md#e2e-tests.
+    runs-on: macos-26
+    timeout-minutes: 75
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up pnpm (version from package.json packageManager)
+        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320  # v4.4.0
+        with:
+          package_json_file: frontend/package.json
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e  # v6.8.0
+        with:
+          version: ${{ env.UV_VERSION }}
+
+      - name: Set up Java (Firestore emulator, Maestro)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Cache Firebase emulator binaries
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/firebase/emulators
+          key: firebase-emulators-${{ env.FIREBASE_TOOLS_VERSION }}
+
+      - name: Cache CocoaPods downloads
+        uses: actions/cache@v4
+        with:
+          path: ~/Library/Caches/CocoaPods
+          key: pods-${{ runner.os }}-${{ hashFiles('frontend/pnpm-lock.yaml', 'frontend/app.json') }}
+          restore-keys: pods-${{ runner.os }}-
+
+      - name: Install dependencies
+        run: |
+          (cd frontend && pnpm install --frozen-lockfile)
+          (cd backend && uv sync --frozen)
+
+      - name: Install Maestro (pinned, checksum verified)
+        run: |
+          zip="${RUNNER_TEMP}/maestro.zip"
+          curl -fsSL -o "$zip" \
+            "https://github.com/mobile-dev-inc/maestro/releases/download/cli-${MAESTRO_VERSION}/maestro.zip"
+          echo "${MAESTRO_SHA256}  ${zip}" | shasum -a 256 -c -
+          unzip -q "$zip" -d "${RUNNER_TEMP}"
+          echo "MAESTRO=${RUNNER_TEMP}/maestro/bin/maestro" >> "$GITHUB_ENV"
+
+      - name: Build the app for the E2E stack (Release, simulator)
+        working-directory: frontend
+        run: scripts/ios-sim-build.sh e2e
+
+      - name: Run the journeys
+        run: |
+          npx -y "firebase-tools@${FIREBASE_TOOLS_VERSION}" emulators:exec \
+            --config firebase.test.json --project demo-activequeue-local --only auth,firestore \
+            "e2e/run.sh"
+
+      - name: Upload reports, screenshots and the API log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e
+          path: frontend/build/e2e/
+          if-no-files-found: ignore
+          retention-days: 14
+
+      - name: Upload the Xcode build log
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-xcodebuild-log
+          path: frontend/build/xcodebuild-e2e.log
+          if-no-files-found: ignore
+          retention-days: 7
+
+  # Single required status check for branch protection (ClickUp 86bbb7ru0). Add every new
+  # job to `needs`; this fails if any of them failed or was cancelled, and is never skipped.
+  ci-passed:
+    name: CI Passed
+    if: always()
+    needs: [workflows, backend, frontend, firestore-rules, security-scans, api-breaking, container, terraform, screenshots, e2e]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check required jobs
+        env:
+          RESULTS: ${{ toJSON(needs.*.result) }}
+        run: |
+          echo "Job results: ${RESULTS}"
+          if echo "${RESULTS}" | grep -qE '"(failure|cancelled|skipped)"'; then
+            echo "::error::One or more required CI jobs did not succeed."
+            exit 1
+          fi

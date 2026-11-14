@@ -1,15 +1,16 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
+  AccessibilityInfo,
   ActivityIndicator,
   KeyboardAvoidingView,
   Modal,
   Platform,
   StyleSheet,
-  Text,
   TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
+import { Text } from '../../../core/components/Text';
 import { LiquidGlassSurface } from '../../../core/components';
 import { WatchLaterRejectedState } from '../../../core/components/states';
 import { colors, rounded, spacing, typography } from '../../../core/theme';
@@ -22,13 +23,11 @@ interface AddSourceModalProps {
 
 export const AddSourceModal: React.FC<AddSourceModalProps> = ({ visible, onClose }) => {
   const [urlOrId, setUrlOrId] = useState('');
-  const { addSource, isAddingSource, addSourceError, clearErrors } = useQueueStore();
+  const { addSource, isAddingSource, addSourceError, addSourceErrorCode, clearErrors } =
+    useQueueStore();
 
-  const isWatchLaterError =
-    addSourceError &&
-    (addSourceError.includes('Watch Later') ||
-      addSourceError.includes('SOURCE_UNSUPPORTED') ||
-      addSourceError.includes('system playlist'));
+  // Keyed on the SPEC §9.7 code, not the message text, which the server may reword.
+  const isWatchLaterError = addSourceErrorCode === 'SOURCE_UNSUPPORTED';
 
   const handleAdd = async () => {
     if (!urlOrId.trim()) {
@@ -47,6 +46,12 @@ export const AddSourceModal: React.FC<AddSourceModalProps> = ({ visible, onClose
     onClose();
   };
 
+  // iOS doesn't speak a new alert by itself, and VoiceOver focus stays on Add Source after
+  // a failed submit, so the reason would otherwise go unheard.
+  useEffect(() => {
+    if (visible && addSourceError) AccessibilityInfo.announceForAccessibility(addSourceError);
+  }, [visible, addSourceError]);
+
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={handleClose}>
       {/* Full-screen scrim — counts as 1 layer against the 2-blur-layer guardrail in
@@ -57,7 +62,9 @@ export const AddSourceModal: React.FC<AddSourceModalProps> = ({ visible, onClose
           style={styles.overlay}
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         >
-          <View style={styles.modalContent}>
+          {/* The Modal is its own window, which confines VoiceOver to the sheet. The escape
+              gesture (two-finger Z) dismisses it, as it would a native sheet. */}
+          <View style={styles.modalContent} onAccessibilityEscape={handleClose}>
             {isWatchLaterError ? (
               <WatchLaterRejectedState
                 onDismissPress={() => {
@@ -67,7 +74,9 @@ export const AddSourceModal: React.FC<AddSourceModalProps> = ({ visible, onClose
               />
             ) : (
               <>
-                <Text style={styles.title}>Add Content Source</Text>
+                <Text style={styles.title} accessibilityRole="header">
+                  Add Content Source
+                </Text>
                 <Text style={styles.description}>
                   Paste a YouTube playlist URL (e.g. youtube.com/playlist?list=PL...) or raw playlist ID.
                 </Text>
@@ -83,9 +92,15 @@ export const AddSourceModal: React.FC<AddSourceModalProps> = ({ visible, onClose
                   }}
                   autoCapitalize="none"
                   autoCorrect={false}
+                  accessibilityLabel="YouTube playlist URL or ID"
+                  testID="add-source-url"
                 />
 
-                {addSourceError ? <Text style={styles.errorText}>{addSourceError}</Text> : null}
+                {addSourceError ? (
+                  <Text style={styles.errorText} accessibilityRole="alert" accessibilityLiveRegion="polite">
+                    {addSourceError}
+                  </Text>
+                ) : null}
 
                 <View style={styles.buttonRow}>
                   <TouchableOpacity
@@ -106,6 +121,10 @@ export const AddSourceModal: React.FC<AddSourceModalProps> = ({ visible, onClose
                     accessible={true}
                     accessibilityRole="button"
                     accessibilityLabel="Add source"
+                    accessibilityState={{
+                      disabled: isAddingSource || !urlOrId.trim(),
+                      busy: isAddingSource,
+                    }}
                   >
                     {isAddingSource ? (
                       <ActivityIndicator color={colors.void} size="small" />
@@ -166,7 +185,7 @@ const styles = StyleSheet.create({
   },
   errorText: {
     ...typography.bodySm,
-    color: colors.heatCore,
+    color: colors.heatCoreInk,
     marginTop: spacing.xs,
   },
   buttonRow: {

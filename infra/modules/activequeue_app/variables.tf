@@ -16,8 +16,12 @@ variable "env" {
 
 variable "container_image" {
   type        = string
-  description = "Docker image URI for Cloud Run"
-  default     = "us-central1-docker.pkg.dev/activequeue-local/activequeue-api/api:latest"
+  description = "Immutable image reference for Cloud Run (registry/api@sha256:...), set by scripts/deploy.sh"
+
+  validation {
+    condition     = can(regex("@sha256:[0-9a-f]{64}$", var.container_image))
+    error_message = "container_image must be pinned by digest (…/api@sha256:<digest>), not a mutable tag such as :latest."
+  }
 }
 
 variable "min_instances" {
@@ -47,13 +51,11 @@ variable "custom_auth_domain" {
 variable "google_oauth_client_id" {
   type        = string
   description = "Environment-specific Google OAuth Client ID"
-  default     = "dummy-google-client-id.apps.googleusercontent.com"
 }
 
 variable "google_oauth_client_secret" {
   type        = string
   description = "Environment-specific Google OAuth Client Secret"
-  default     = "dummy-google-client-secret"
   sensitive   = true
 }
 
@@ -63,21 +65,14 @@ variable "apple_services_id" {
   default     = "com.activequeue.auth"
 }
 
-variable "apple_team_id" {
-  type        = string
-  description = "Apple Developer Team ID"
-  default     = "ABC123XYZ8"
-}
-
-variable "apple_key_id" {
-  type        = string
-  description = "Apple OAuth Key ID"
-  default     = "KEY123XYZ8"
-}
-
 variable "apple_client_secret" {
   type        = string
   description = "Apple OAuth Client Secret / Generated JWT"
-  default     = "dummy-apple-client-secret"
   sensitive   = true
+}
+
+variable "smoke_test_signers" {
+  type        = list(string)
+  description = "IAM members (user:… or serviceAccount:…) allowed to sign the post-deploy smoke test's custom token"
+  default     = []
 }

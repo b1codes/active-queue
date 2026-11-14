@@ -1,20 +1,23 @@
 from __future__ import annotations
 
 import re
-from datetime import UTC, datetime
-from typing import Any
+from datetime import UTC, datetime, timedelta
+from typing import TYPE_CHECKING, Any
 
 import structlog
 
 from app.core.config import settings
+from app.core.envelopes import ErrorDetail
 from app.core.errors import ConflictError, NotFoundError, ProviderError, ValidationError
 from app.features.activities.schemas import ActivitySchema
 from app.features.content.matcher import (
+    TIME_MATCH_RESULT_LIMIT,
     match_content_to_activities,
     match_time_block_asymmetric,
+    time_match_windows,
 )
 from app.features.content.models import ContentCacheItem, FeedItem, Source
-from app.features.content.repository import ContentRepository, SourceRepository, decode_cursor
+from app.features.content.repository import decode_cursor
 from app.features.content.schemas import (
     ContentMatchResponse,
     FeedItemSchema,
@@ -27,6 +30,10 @@ from app.features.content.schemas import (
 )
 from app.providers.base import format_content_id, parse_content_id
 from app.providers.factory import get_provider
+
+if TYPE_CHECKING:
+    from app.features.content.repository import ContentRepository, SourceRepository
+    from app.features.users.repository import UserRepository
 
 logger = structlog.get_logger(__name__)
 
@@ -58,10 +65,12 @@ class ContentService:
     def __init__(
         self,
         source_repo: SourceRepository,
-        content_repo: ContentRepository | None = None,
+        content_repo: ContentRepository,
+        user_repo: UserRepository,
     ) -> None:
         self._source_repo = source_repo
         self._content_repo = content_repo
+        self._user_repo = user_repo
 
     async def add_source(self, user_id: str, url_or_id: str) -> Source:
         """Add a new content source for user_id with strict validation per SPEC §9.3."""
@@ -109,9 +118,12 @@ class ContentService:
             user_id, provider_name, external_id
         )
         if duplicate:
+            # SPEC §9.7: the existing source travels in error.details so the client can
+            # jump to it instead of showing a dead-end error.
             raise ConflictError(
                 code="SOURCE_ALREADY_ADDED",
                 message="Source has already been added to your account",
+                details=[ErrorDetail(field="source_id", issue=duplicate.id)],
             )
 
         try:
@@ -186,8 +198,13 @@ class ContentService:
                 )
                 source.status = "active"
                 source.next_page_token = None
+                # The abandoned walk may have recorded the new item count; forget it so
+                # the preflight can't call the half-walked playlist unchanged.
+                source.item_count = None
 
         is_resuming = bool(source.next_page_token)
+        items_processed = source.sync_items_processed if is_resuming else 0
+        walk_updates: dict[str, Any] = {}
         provider_impl = get_provider(source.provider)
 
         if not is_resuming:
@@ -263,19 +280,48 @@ class ContentService:
                     message="No changes detected in preflight check",
                 )
 
+            # Record the count this walk is answering to. Without it the preflight compares
+            # against the count from when the source was added, so after any change to the
+            # playlist it never again says "unchanged" and every start is a full walk.
+            walk_updates["item_count"] = meta.item_count
+
+        # feed_items.consumed is a projection of the user's durable consumed record
+        # (SPEC §4.7): re-syncs and re-added playlists must not resurface watched items.
+        consumed_ids = await self._user_repo.get_consumed_content_ids(user_id)
+
+        # content_cache is shared by every user, so details another sync already fetched
+        # cost no quota (SPEC §8.2 step 4). Entries older than the TTL are refetched.
+        cached: dict[str, ContentCacheItem] = {}
+        fresh_after = now - timedelta(days=settings.content_cache_ttl_days)
+
+        async def known(external_ids: list[str]) -> set[str]:
+            found = await self._content_repo.get_content_cache_batch(
+                [format_content_id(source.provider, e) for e in external_ids]
+            )
+            hits = {
+                c.external_id: c
+                for c in found.values()
+                if c.is_available and c.updated_at >= fresh_after
+            }
+            cached.update(hits)
+            return set(hits)
+
         current_token = source.next_page_token
         chunk_cache_items: list[ContentCacheItem] = []
         chunk_feed_items: list[FeedItem] = []
 
         pages_fetched = 0
         total_items_in_chunk = 0
+        skipped_unplayable = 0
 
-        while pages_fetched < settings.pages_per_chunk:
+        cap = settings.max_items_per_source
+        while pages_fetched < settings.pages_per_chunk and items_processed < cap:
             try:
                 page = await provider_impl.fetch_playlist_items(
                     source.external_source_id,
                     page_token=current_token,
-                    max_results=50,
+                    max_results=min(50, cap - items_processed),
+                    known=known,
                 )
             except ProviderError as err:
                 if err.code == "PROVIDER_QUOTA_EXCEEDED":
@@ -295,14 +341,14 @@ class ContentService:
                         },
                     )
                     raise
-                logger.error("sync_fetch_error", source_id=source_id, error=str(err))
+                logger.exception("sync_fetch_error", source_id=source_id)
                 await self._source_repo.update_source(
                     source.id,
                     {"status": "error", "error_message": str(err), "updated_at": now},
                 )
                 raise
             except Exception as err:
-                logger.error("sync_fetch_error", source_id=source_id, error=str(err))
+                logger.exception("sync_fetch_error", source_id=source_id)
                 await self._source_repo.update_source(
                     source.id,
                     {"status": "error", "error_message": str(err), "updated_at": now},
@@ -310,8 +356,29 @@ class ContentService:
                 raise
 
             pages_fetched += 1
+            items_processed += len(page.items) + len(page.known_ids)
+
+            chunk_feed_items.extend(
+                FeedItem(
+                    id=f"{user_id}_{hit.content_id}",
+                    user_id=user_id,
+                    content_id=hit.content_id,
+                    source_id=source.id,
+                    published_at=hit.published_at,
+                    duration_seconds=hit.duration_seconds,
+                    consumed=hit.content_id in consumed_ids,
+                    created_at=now,
+                    updated_at=now,
+                )
+                for hit in (cached[external_id] for external_id in page.known_ids)
+            )
 
             for raw in page.items:
+                if raw.duration_seconds <= 0:
+                    # Live streams (P0D) and anything without a duration can't be
+                    # time-boxed; keep them out of the feed and the cache.
+                    skipped_unplayable += 1
+                    continue
                 cid = format_content_id(source.provider, raw.external_id)
 
                 cache_item = ContentCacheItem(
@@ -323,7 +390,7 @@ class ContentService:
                     published_at=raw.published_at,
                     thumbnail_url=raw.thumbnail_url,
                     video_url=raw.video_url,
-                    is_available=(raw.duration_seconds > 0 or "Private" not in raw.title),
+                    is_available=True,
                     created_at=now,
                     updated_at=now,
                 )
@@ -336,28 +403,33 @@ class ContentService:
                     source_id=source.id,
                     published_at=raw.published_at,
                     duration_seconds=raw.duration_seconds,
-                    consumed=False,
+                    consumed=cid in consumed_ids,
                     created_at=now,
                     updated_at=now,
                 )
                 chunk_feed_items.append(feed_item)
 
-            total_items_in_chunk += len(page.items)
+            total_items_in_chunk = len(chunk_feed_items)
             current_token = page.next_page_token
 
             if not current_token:
                 break
 
-        if self._content_repo:
-            await self._content_repo.upsert_content_cache_batch(chunk_cache_items)
-            await self._content_repo.upsert_feed_items_batch(chunk_feed_items)
+        if current_token and items_processed >= cap:
+            logger.warning("sync_item_cap_reached", source_id=source_id, cap=cap)
+            current_token = None
+
+        await self._content_repo.upsert_content_cache_batch(chunk_cache_items)
+        await self._content_repo.upsert_feed_items_batch(chunk_feed_items)
 
         is_complete = current_token is None
         new_status = "active" if is_complete else "syncing"
 
-        update_dict = {
+        update_dict: dict[str, Any] = {
+            **walk_updates,
             "status": new_status,
             "next_page_token": current_token,
+            "sync_items_processed": 0 if is_complete else items_processed,
             "updated_at": now,
         }
         if is_complete:
@@ -369,6 +441,7 @@ class ContentService:
             "sync_chunk_completed",
             source_id=source_id,
             items_synced=total_items_in_chunk,
+            skipped_unplayable=skipped_unplayable,
             has_more=not is_complete,
             next_page_token=current_token,
         )
@@ -391,19 +464,16 @@ class ContentService:
         max_duration: int | None = None,
     ) -> FeedResponse:
         """Fetch user feed items with cursor pagination, duration filters, and server duration_label per SPEC §9.2."""
-        if not self._content_repo:
-            return FeedResponse(items=[], next_cursor=None, total_unconsumed=0)
-
         total_unconsumed: int | None = None
         if cursor is None:
             total_unconsumed = await self._content_repo.get_user_feed_count(user_id)
 
-        cursor_dt = decode_cursor(cursor) if cursor else None
+        feed_cursor = decode_cursor(cursor) if cursor else None
 
         feed_items, next_cursor = await self._content_repo.get_user_feed_items_page(
             user_id=user_id,
             limit=limit,
-            cursor_dt=cursor_dt,
+            cursor=feed_cursor,
             min_duration=min_duration,
             max_duration=max_duration,
         )
@@ -456,22 +526,11 @@ class ContentService:
 
     async def hide_feed_item(self, user_id: str, content_id: str) -> dict[str, Any]:
         """Manually hide feed item per SPEC §9.1 & §9.2."""
-        if not self._content_repo:
-            raise NotFoundError(
-                code="CONTENT_NOT_FOUND",
-                message=f"Feed item '{content_id}' not found",
-            )
         await self._content_repo.hide_feed_item(user_id, content_id)
         return {"content_id": content_id, "hidden": True}
 
     async def match_content(self, content_id: str) -> ContentMatchResponse:
         """Match content duration against activity catalog with distinct rejection reasons per SPEC §5.2 & §9.6."""
-        if not self._content_repo:
-            raise NotFoundError(
-                code="CONTENT_NOT_FOUND",
-                message=f"Content '{content_id}' not found",
-            )
-
         cache_doc = await self._content_repo.get_content_cache(content_id)
         if not cache_doc:
             raise NotFoundError(
@@ -496,18 +555,24 @@ class ContentService:
         self, user_id: str, target_duration_seconds: int
     ) -> TimeMatchResponse:
         """Match target time block duration against user feed using asymmetric windows per SPEC §5.3 & §9.6."""
-        if not self._content_repo:
-            return TimeMatchResponse(
-                target_duration_seconds=target_duration_seconds,
-                target_duration_label=format_duration_label(target_duration_seconds),
-                matched_items=[],
-                window_type=None,
-                is_valid=False,
-                rejection_reason="no_content_in_window",
+        # Query each window directly, closest to the block first. Reading the feed and
+        # filtering in memory would need every unconsumed item: any fixed cap on that read
+        # (ordered by duration) would hide the longer windows from users with a big feed.
+        (primary_min, primary_max), (fallback_min, fallback_max) = time_match_windows(
+            target_duration_seconds
+        )
+        candidates = await self._content_repo.get_unconsumed_feed_items_in_range(
+            user_id, primary_min, primary_max, limit=TIME_MATCH_RESULT_LIMIT
+        )
+        if not candidates:
+            candidates = await self._content_repo.get_unconsumed_feed_items_in_range(
+                user_id,
+                fallback_min,
+                fallback_max,
+                limit=TIME_MATCH_RESULT_LIMIT,
+                descending=True,
             )
-
-        unconsumed = await self._content_repo.get_all_unconsumed_feed_items(user_id)
-        match_res = match_time_block_asymmetric(target_duration_seconds, unconsumed)
+        match_res = match_time_block_asymmetric(target_duration_seconds, candidates)
 
         if not match_res.matched_items:
             return TimeMatchResponse(

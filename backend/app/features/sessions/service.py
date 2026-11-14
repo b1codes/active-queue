@@ -30,7 +30,7 @@ class SessionService:
     - Bare time-first duration validated against predefined 7-block allowlist.
     - Single active session guardrail (ACTIVE_SESSION_EXISTS, 409).
     - Idempotent session start preserving original started_at timestamp.
-    - Single transaction session completion (updates session, feed_item.consumed, and user.consumed_content).
+    - Single transaction session completion (updates session, feed_item.consumed, and user.consumed_content_ids).
     - Idempotent completion (completing completed session returns 200).
     - Completing pending session returns SESSION_NOT_STARTED (409).
     - Lazy abandonment evaluation on read (now > created_at + duration_seconds + 24h).

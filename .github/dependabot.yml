@@ -1,0 +1,65 @@
+# Dependabot version updates, weekly and grouped so they arrive as a few reviewable PRs.
+# Security updates (the immediate PRs for new advisories) are enabled in repo settings.
+version: 2
+updates:
+  - package-ecosystem: uv
+    directory: /backend
+    schedule:
+      interval: weekly
+      day: monday
+    groups:
+      python-minor-and-patch:
+        update-types: [minor, patch]
+    open-pull-requests-limit: 5
+
+  - package-ecosystem: npm
+    directory: /frontend
+    schedule:
+      interval: weekly
+      day: monday
+    # Expo SDK packages move together via `npx expo install --fix`; a lone bump breaks
+    # the SDK's version contract, so Dependabot leaves them alone.
+    ignore:
+      - dependency-name: "expo"
+      - dependency-name: "expo-*"
+      - dependency-name: "react-native"
+      - dependency-name: "react"
+      - dependency-name: "react-dom"
+      - dependency-name: "jest-expo"
+      - dependency-name: "babel-preset-expo"
+      - dependency-name: "eslint-config-expo"
+    groups:
+      npm-minor-and-patch:
+        update-types: [minor, patch]
+    open-pull-requests-limit: 5
+
+  - package-ecosystem: npm
+    directory: /firestore-rules
+    schedule:
+      interval: weekly
+      day: monday
+    groups:
+      rules-tests:
+        patterns: ["*"]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    groups:
+      actions:
+        patterns: ["*"]
+
+  - package-ecosystem: docker
+    directory: /backend
+    schedule:
+      interval: weekly
+      day: monday
+
+  - package-ecosystem: terraform
+    # Each root has its own lock file; /infra itself has no configuration.
+    directories: ["/infra/environments/*", "/infra/modules/*"]
+    schedule:
+      interval: weekly
+      day: monday

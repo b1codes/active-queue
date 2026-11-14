@@ -3,10 +3,10 @@ import {
   Alert,
   Image,
   StyleSheet,
-  Text,
   TouchableOpacity,
   View,
 } from 'react-native';
+import { Text } from '../../../core/components/Text';
 import { Ionicons } from '@expo/vector-icons';
 import { ThermalGlowTouchable } from '../../../core/components';
 import { colors, rounded, spacing, typography } from '../../../core/theme';
@@ -16,6 +16,8 @@ import { FeedItem } from '../types';
 interface FeedCardProps {
   item: FeedItem;
   isMatched?: boolean;
+  /** Tap: open the content-first match for this item. */
+  onPress?: (item: FeedItem) => void;
 }
 
 /**
@@ -37,8 +39,12 @@ function formatTabularDuration(seconds: number, fallbackLabel?: string): string 
   return '--:--';
 }
 
-export const FeedCard: React.FC<FeedCardProps> = memo(({ item, isMatched = false }) => {
+export const FeedCard: React.FC<FeedCardProps> = memo(({ item, isMatched = false, onPress }) => {
   const hideFeedItem = useQueueStore((state) => state.hideFeedItem);
+
+  const handlePress = useCallback(() => {
+    if (onPress) onPress(item);
+  }, [onPress, item]);
 
   const handleHide = useCallback(() => {
     if (item?.content_id) {
@@ -84,13 +90,15 @@ export const FeedCard: React.FC<FeedCardProps> = memo(({ item, isMatched = false
     <View style={styles.cardContainer}>
       <View style={[styles.card, isMatched && styles.cardMatched]}>
         <ThermalGlowTouchable
+          testID={`feed-card-${item?.content_id}`}
           style={styles.cardMainTouchable}
+          onPress={handlePress}
           onLongPress={showOptions}
           borderRadius={rounded.md}
           accessible={true}
           accessibilityRole="button"
           accessibilityLabel={`${safeTitle}, duration ${formattedDuration}, from ${safeProvider}${isMatched ? ', duration matched' : ''}`}
-          accessibilityHint="Double tap to view, long press for options"
+          accessibilityHint="Double tap to pick an activity, long press for options"
         >
           {/* Thumbnail with 16:9 Aspect Ratio & Refractive Edge */}
           {item?.thumbnail_url ? (

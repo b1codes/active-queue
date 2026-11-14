@@ -10,6 +10,8 @@ from app.core.errors import NotFoundError
 from app.main import app
 
 if TYPE_CHECKING:
+    from collections.abc import Iterator
+
     from httpx import AsyncClient
 
 dummy_router = APIRouter(prefix="/test-errors")
@@ -36,7 +38,19 @@ async def trigger_http_error() -> None:
     raise HTTPException(status_code=401, detail="Unauthorized token missing")
 
 
-app.include_router(dummy_router)
+@pytest.fixture(autouse=True)
+def _dummy_routes() -> Iterator[None]:
+    """Mount the error-raising routes on the real app for this module only.
+
+    Mounting at import time leaked /test-errors/* into every later test (including the
+    OpenAPI snapshot in tests/contract), depending on collection order.
+    """
+    before = list(app.router.routes)
+    app.include_router(dummy_router)
+    app.openapi_schema = None
+    yield
+    app.router.routes[:] = before
+    app.openapi_schema = None
 
 
 @pytest.mark.asyncio
@@ -87,3 +101,13 @@ async def test_http_exception_handler_envelope(client: AsyncClient) -> None:
     data = response.json()
     assert data["status"] == "error"
     assert data["error"]["code"] == "AUTH_TOKEN_MISSING"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("method", ["TRACE", "PUT", "PATCH"])
+async def test_method_not_allowed_lists_allowed_methods(client: AsyncClient, method: str) -> None:
+    """A 405 keeps Starlette's `Allow` header (RFC 9110 §15.5.6). Found by Schemathesis."""
+    response = await client.request(method, "/api/v1/sessions")
+    assert response.status_code == 405
+    assert set(response.headers["allow"].replace(" ", "").split(",")) == {"GET", "POST"}
+    assert response.json()["status"] == "error"

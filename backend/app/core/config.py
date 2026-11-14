@@ -2,7 +2,11 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+LOCAL_FIRESTORE_EMULATOR_HOST = "localhost:9090"
+LOCAL_AUTH_EMULATOR_HOST = "localhost:9099"
 
 
 class Settings(BaseSettings):
@@ -13,11 +17,19 @@ class Settings(BaseSettings):
 
     env: Literal["local", "dev", "staging", "prod"] = "local"
     gcp_project_id: str = "demo-activequeue-local"
-    firestore_emulator_host: str | None = "localhost:9090"
-    firebase_auth_emulator_host: str | None = "localhost:9099"
+    # Emulator hosts default to the dev emulators only when env == "local" (see
+    # model_post_init). Every deployed env defaults to None, so a Cloud Run service that
+    # sets ENV but no emulator variables talks to real Firestore and verifies signatures.
+    firestore_emulator_host: str | None = None
+    firebase_auth_emulator_host: str | None = None
     content_provider: Literal["fixture", "youtube"] = "fixture"
+    # Fixture provider only: delay per playlist page, so a local stack syncs at a real
+    # YouTube page's pace (~100-300 ms) and the app's sync progress can be watched. The
+    # E2E stack sets it (e2e/run.sh); tests and dev leave it at 0.
+    fixture_page_latency_ms: int = Field(default=0, ge=0, le=5000)
     youtube_api_key: str | None = None
     max_items_per_source: int = 5000
+    content_cache_ttl_days: int = 30
     pages_per_chunk: int = 5
     sync_throttle_seconds: int = 900
     sync_stall_timeout_seconds: int = 3600
@@ -27,6 +39,12 @@ class Settings(BaseSettings):
     rate_limit_sync: int = 10
     rate_limit_heavy: int = 30
     rate_limit_window_seconds: int = 60
+    # Per-IP flood guard, applied before any token work. Generous because carrier-grade
+    # NAT puts many legitimate users behind one address; per-user limits do the real work.
+    rate_limit_ip: int = 300
+    # How many proxies in front of the app append to X-Forwarded-For. Cloud Run's front
+    # end appends the caller's address, so 1 there; 0 locally (use the TCP peer).
+    trusted_proxy_hops: int = 0
     debug: bool = False
     log_level: str = "INFO"
 
@@ -35,27 +53,41 @@ class Settings(BaseSettings):
     )
 
     def model_post_init(self, __context: Any) -> None:
-        """Asserts that emulator hosts are completely UNSET when env == 'prod'.
+        """Default the emulator hosts for local dev, and refuse them in any deployed env.
 
         CRITICAL SECURITY ASSERTION (SPEC §10.3):
-        - A leaked FIRESTORE_EMULATOR_HOST in production silently returns empty results
-          instead of errors — a failure mode that looks like data loss.
-        - A leaked FIREBASE_AUTH_EMULATOR_HOST in production causes Firebase Admin SDK
-          to stop verifying signatures, accepting ANY forged token — a full auth bypass.
+        - A leaked FIRESTORE_EMULATOR_HOST silently returns empty results instead of
+          errors, a failure mode that looks like data loss.
+        - A leaked FIREBASE_AUTH_EMULATOR_HOST makes the Firebase Admin SDK stop
+          verifying signatures, so ANY forged token is accepted: a full auth bypass.
+
+        dev, staging and prod are all internet-facing Cloud Run services, so the
+        assertion covers every env except "local". The localhost defaults apply only
+        when env == "local" and the host was not passed explicitly (an explicit None
+        keeps the emulator off).
         """
-        if self.env == "prod":
-            if self.firestore_emulator_host is not None:
-                msg = (
-                    "CRITICAL SECURITY GUARDRAIL: FIRESTORE_EMULATOR_HOST must be UNSET "
-                    "when env == 'prod'. Leaked emulator host causes silent data loss."
-                )
-                raise ValueError(msg)
-            if self.firebase_auth_emulator_host is not None:
-                msg = (
-                    "CRITICAL SECURITY GUARDRAIL: FIREBASE_AUTH_EMULATOR_HOST must be UNSET "
-                    "when env == 'prod'. Leaked emulator host allows full auth bypass."
-                )
-                raise ValueError(msg)
+        if self.env == "local":
+            if "firestore_emulator_host" not in self.model_fields_set:
+                self.firestore_emulator_host = LOCAL_FIRESTORE_EMULATOR_HOST
+            if "firebase_auth_emulator_host" not in self.model_fields_set:
+                self.firebase_auth_emulator_host = LOCAL_AUTH_EMULATOR_HOST
+            return
+
+        if self.env == "prod" and self.debug:
+            msg = "DEBUG must be false when env == 'prod' (verbose console logs, DEBUG level)."
+            raise ValueError(msg)
+        if self.firestore_emulator_host is not None:
+            msg = (
+                "CRITICAL SECURITY GUARDRAIL: FIRESTORE_EMULATOR_HOST must be UNSET "
+                f"when env == '{self.env}'. Leaked emulator host causes silent data loss."
+            )
+            raise ValueError(msg)
+        if self.firebase_auth_emulator_host is not None:
+            msg = (
+                "CRITICAL SECURITY GUARDRAIL: FIREBASE_AUTH_EMULATOR_HOST must be UNSET "
+                f"when env == '{self.env}'. Leaked emulator host allows full auth bypass."
+            )
+            raise ValueError(msg)
 
 
 settings = Settings()

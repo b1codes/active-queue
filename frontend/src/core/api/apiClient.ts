@@ -2,6 +2,9 @@ import { useAuthStore } from "@/features/auth/authStore";
 
 const BASE_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:8080";
 
+/** ApiError.code when the request never reached the server (offline etc.). */
+export const NETWORK_UNAVAILABLE = "NETWORK_UNAVAILABLE";
+
 export interface ApiErrorDetail {
   field: string;
   issue: string;
@@ -30,6 +33,10 @@ export class ApiError extends Error {
 
   get isRateLimited(): boolean {
     return this.status === 429 || this.code === "RATE_LIMITED";
+  }
+
+  get isNetworkError(): boolean {
+    return this.code === NETWORK_UNAVAILABLE;
   }
 }
 
@@ -71,10 +78,22 @@ export async function apiClient<T>(
     headers["Authorization"] = `Bearer ${idToken}`;
   }
 
-  const response = await fetch(url, {
-    ...options,
-    headers,
-  });
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      ...options,
+      headers,
+    });
+  } catch (err: unknown) {
+    // fetch only rejects when no HTTP response arrived at all (offline, DNS, TLS, server
+    // down). Surface that as one typed code so screens can show the SPEC §11.3 Offline
+    // state instead of treating it like an empty feed.
+    throw new ApiError(
+      NETWORK_UNAVAILABLE,
+      err instanceof Error ? err.message : "Network request failed",
+      0
+    );
+  }
 
   const json: ApiResponseEnvelope<T> = await response.json().catch(() => ({
     status: "error" as const,

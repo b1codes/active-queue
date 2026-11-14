@@ -138,14 +138,9 @@ async def test_youtube_provider_fetch_playlist_items_with_silent_private_video()
     with patch("httpx.AsyncClient.get", side_effect=[mock_items_resp, mock_videos_resp]):
         page = await provider.fetch_playlist_items("PL123")
 
-    assert len(page.items) == 2
+    # The private video is silently absent from videos.list, so it is omitted entirely
+    # (not emitted with a null duration and a fabricated timestamp).
+    assert [i.external_id for i in page.items] == ["vid1"]
     assert page.next_page_token == "token_next"
     assert page.total_results == 2
-
-    # Public video
-    assert page.items[0].external_id == "vid1"
     assert page.items[0].duration_seconds == 900  # 15 mins
-
-    # Silent missing private video
-    assert page.items[1].external_id == "vid2_private"
-    assert page.items[1].duration_seconds == 0

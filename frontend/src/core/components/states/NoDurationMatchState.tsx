@@ -1,5 +1,6 @@
 import React from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Text } from '../Text';
 import { colors, rounded, spacing, typography } from '../../theme';
 
 interface NoDurationMatchStateProps {
@@ -23,16 +24,12 @@ export const NoDurationMatchState: React.FC<NoDurationMatchStateProps> = ({
   }
 
   return (
-    <View
-      style={styles.container}
-      accessible={true}
-      accessibilityLabel={`No duration match. ${message}`}
-    >
-      <View style={styles.iconBadge}>
-        <Text style={styles.iconText}>⏱️</Text>
+    <View style={styles.container}>
+      <View style={styles.iconBadge} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+        <Text style={styles.iconText} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">⏱️</Text>
       </View>
 
-      <Text style={styles.title}>No Duration Match Found</Text>
+      <Text style={styles.title} accessibilityRole="header">No Duration Match Found</Text>
 
       {durationLabel ? (
         <View style={styles.chip}>

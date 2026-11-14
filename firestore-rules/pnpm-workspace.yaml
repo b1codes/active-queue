@@ -1,0 +1,8 @@
+# Neither postinstall is needed to run the rules tests; keep install scripts off.
+allowBuilds:
+  '@firebase/util': false
+  protobufjs: false
+# @firebase/firestore pins @grpc/grpc-js ~1.9, below the fix for GHSA-m9gg-hp2v-232j.
+# This package runs Firestore over gRPC in Node, so take the patched release.
+overrides:
+  '@grpc/grpc-js': ^1.13.6

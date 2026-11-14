@@ -1,5 +1,6 @@
 import React from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Text } from '../Text';
 import { colors, rounded, spacing, typography } from '../../theme';
 
 interface WatchLaterRejectedStateProps {
@@ -12,14 +13,10 @@ export const WatchLaterRejectedState: React.FC<WatchLaterRejectedStateProps> = (
   onCreateCustomGuidePress,
 }) => {
   return (
-    <View
-      style={styles.card}
-      accessible={true}
-      accessibilityLabel="Watch Later system playlist cannot be synced due to YouTube API platform restrictions. Create a custom YouTube playlist instead."
-    >
+    <View style={styles.card}>
       <View style={styles.headerRow}>
-        <Text style={styles.icon}>🚫</Text>
-        <Text style={styles.title}>System Playlist Restricted</Text>
+        <Text style={styles.icon} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">🚫</Text>
+        <Text style={styles.title} accessibilityRole="header">System Playlist Restricted</Text>
       </View>
 
       <Text style={styles.body}>
@@ -83,7 +80,7 @@ const styles = StyleSheet.create({
   },
   title: {
     ...typography.label,
-    color: colors.heatCore,
+    color: colors.heatCoreInk,
     fontSize: 16,
     fontWeight: 'bold',
   },

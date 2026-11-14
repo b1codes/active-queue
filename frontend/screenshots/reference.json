@@ -1,0 +1,25 @@
+{
+  "comment": "The one platform baselines are captured on: the CI screenshots job (macos-26-arm64). An app linked against another Xcode SDK can render differently even on the same simulator, so a run elsewhere can check the harness but not compare against baselines (docs/testing.md#visual-regression-tests).",
+  "xcode": "26.6",
+  "device": "iPhone 17 Pro",
+  "runtime": "iOS 26.5",
+  "channelTolerance": 3,
+  "masks": [
+    {
+      "name": "Dynamic Island",
+      "why": "System UI, not the app: iOS sometimes draws the island into a simulator screenshot around a launch and sometimes doesn't. Pixels, iPhone 17 Pro (1206x2622).",
+      "x": 400,
+      "y": 24,
+      "width": 406,
+      "height": 144
+    },
+    {
+      "name": "Screenshot corner",
+      "why": "Xcode 27's simctl io screenshot blacks out a 3x3 block at the top-left corner; Xcode 26.6 (CI) doesn't. Masked so local off-reference runs show only real differences.",
+      "x": 0,
+      "y": 0,
+      "width": 4,
+      "height": 4
+    }
+  ]
+}

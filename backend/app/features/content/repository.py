@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import base64
+import json
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
@@ -17,18 +19,38 @@ if TYPE_CHECKING:
 logger = structlog.get_logger(__name__)
 
 
-def encode_cursor(dt: datetime) -> str:
-    """Encode datetime cursor to base64 string."""
-    iso_str = dt.isoformat()
-    return base64.urlsafe_b64encode(iso_str.encode("utf-8")).decode("utf-8")
+# Upper bound on feed_items documents read per GET /content/feed request when a duration
+# filter is active. Keeps reads per request bounded; the cursor resumes the scan.
+MAX_FEED_SCAN_PER_REQUEST = 500
 
 
-def decode_cursor(cursor_str: str) -> datetime | None:
-    """Decode base64 cursor string into datetime object."""
+@dataclass(frozen=True)
+class FeedCursor:
+    """Position in the feed scan: (published_at, feed doc id) of the last document read.
+
+    The doc id breaks ties between items with identical published_at, which a
+    timestamp-only startAfter would silently skip.
+    """
+
+    published_at: datetime
+    doc_id: str | None = None
+
+
+def encode_cursor(dt: datetime, doc_id: str | None = None) -> str:
+    """Encode a feed cursor to an opaque base64 string."""
+    raw = json.dumps({"t": dt.isoformat(), "id": doc_id}) if doc_id else dt.isoformat()
+    return base64.urlsafe_b64encode(raw.encode("utf-8")).decode("utf-8")
+
+
+def decode_cursor(cursor_str: str) -> FeedCursor | None:
+    """Decode an opaque cursor. Accepts the legacy timestamp-only format too."""
     try:
         raw_str = base64.urlsafe_b64decode(cursor_str.encode("utf-8")).decode("utf-8")
-        return datetime.fromisoformat(raw_str)
-    except Exception:
+        if raw_str.startswith("{"):
+            payload = json.loads(raw_str)
+            return FeedCursor(datetime.fromisoformat(payload["t"]), str(payload["id"]))
+        return FeedCursor(datetime.fromisoformat(raw_str))
+    except (ValueError, KeyError, TypeError):  # bad base64/UTF-8/JSON/ISO all raise these
         return None
 
 
@@ -58,7 +80,7 @@ class SourceRepository:
         """Fetch all active/syncing sources for a user."""
         query = (
             self._client.collection("sources")
-            .where(field_path="user_id", op_string="==", value=user_id)
+            .where(filter=FieldFilter("user_id", "==", user_id))
             .order_by("updated_at", direction="DESCENDING")
         )
         snapshots = await query.get()
@@ -70,9 +92,9 @@ class SourceRepository:
         """Check if user has already added a source by provider + external_source_id."""
         query = (
             self._client.collection("sources")
-            .where(field_path="user_id", op_string="==", value=user_id)
-            .where(field_path="provider", op_string="==", value=provider)
-            .where(field_path="external_source_id", op_string="==", value=external_source_id)
+            .where(filter=FieldFilter("user_id", "==", user_id))
+            .where(filter=FieldFilter("provider", "==", provider))
+            .where(filter=FieldFilter("external_source_id", "==", external_source_id))
             .limit(1)
         )
         snapshots = await query.get()
@@ -172,62 +194,103 @@ class ContentRepository:
         self,
         user_id: str,
         limit: int = 20,
-        cursor_dt: datetime | None = None,
+        cursor: FeedCursor | None = None,
         min_duration: int | None = None,
         max_duration: int | None = None,
     ) -> tuple[list[FeedItem], str | None]:
-        """Fetch paginated unconsumed feed items for user_id using cursor-based pagination."""
+        """Fetch paginated unconsumed feed items for user_id using cursor-based pagination.
+
+        Ordered newest first with the doc id as tiebreaker. Duration filters are applied
+        in memory, so the query keeps scanning (in batches, up to
+        MAX_FEED_SCAN_PER_REQUEST docs) until it finds `limit` matches or runs out.
+        next_cursor is non-null whenever unscanned documents remain, even if this page
+        holds fewer than `limit` items; clients page until next_cursor is null.
+        """
+        tie_break = cursor is None or cursor.doc_id is not None
         query = (
             self._client.collection("feed_items")
             .where(filter=FieldFilter("user_id", "==", user_id))
             .where(filter=FieldFilter("consumed", "==", False))
             .order_by("published_at", direction="DESCENDING")
         )
+        if tie_break:
+            query = query.order_by("__name__", direction="DESCENDING")
 
-        if cursor_dt is not None:
-            query = query.start_after({"published_at": cursor_dt})
+        filtered = min_duration is not None or max_duration is not None
+        batch_size = 100 if filtered else limit + 1
 
-        fetch_limit = (
-            limit + 1 if (min_duration is None and max_duration is None) else min(limit * 3, 100)
-        )
-        query = query.limit(fetch_limit)
-
-        snapshots = await query.get()
         results: list[FeedItem] = []
-        for snap in snapshots:
-            data = snap.to_dict() or {}
-            item = FeedItem.from_firestore(data)
+        position = cursor
+        scanned = 0
+        while True:
+            page_query = query
+            if position is not None:
+                page_query = page_query.start_after(self._cursor_values(position, tie_break))
+            snapshots = await page_query.limit(batch_size).get()
 
-            if min_duration is not None and item.duration_seconds < min_duration:
-                continue
-            if max_duration is not None and item.duration_seconds > max_duration:
-                continue
+            for snap in snapshots:
+                item = FeedItem.from_firestore(snap.to_dict() or {})
+                scanned += 1
+                if (min_duration is not None and item.duration_seconds < min_duration) or (
+                    max_duration is not None and item.duration_seconds > max_duration
+                ):
+                    position = FeedCursor(item.published_at, snap.id)
+                    continue
+                if len(results) == limit:
+                    # A further match exists, so there is definitely a next page.
+                    last = results[-1]
+                    return results, encode_cursor(last.published_at, last.id)
+                results.append(item)
+                position = FeedCursor(item.published_at, snap.id)
 
-            results.append(item)
-            if len(results) == limit:
+            if len(snapshots) < batch_size:
+                return results, None  # exhausted
+            if scanned >= MAX_FEED_SCAN_PER_REQUEST or not filtered:
                 break
 
-        next_cursor: str | None = None
-        if len(results) == limit and len(snapshots) > limit:
-            last_item = results[-1]
-            next_cursor = encode_cursor(last_item.published_at)
+        if len(results) == limit:
+            last = results[-1]
+            return results, encode_cursor(last.published_at, last.id)
+        if position is None:  # pragma: no cover - a scan that read nothing has exhausted
+            return results, None
+        return results, encode_cursor(position.published_at, position.doc_id)
 
-        return results, next_cursor
+    def _cursor_values(self, cursor: FeedCursor, tie_break: bool) -> dict[str, Any]:
+        values: dict[str, Any] = {"published_at": cursor.published_at}
+        if tie_break and cursor.doc_id:
+            values["__name__"] = self._client.collection("feed_items").document(cursor.doc_id)
+        return values
 
-    async def get_all_unconsumed_feed_items(self, user_id: str) -> list[FeedItem]:
-        """Fetch all unconsumed feed items for user_id to perform time-first matching."""
+    async def get_unconsumed_feed_items_in_range(
+        self,
+        user_id: str,
+        min_duration: int,
+        max_duration: int,
+        *,
+        limit: int,
+        descending: bool = False,
+    ) -> list[FeedItem]:
+        """Unconsumed feed items with min_duration <= duration_seconds <= max_duration.
+
+        Ordered by duration (ascending, or descending), at most `limit` of them, so the
+        reads are bounded by the result, not by the size of the user's feed.
+        """
+        if min_duration > max_duration:
+            return []
         query = (
             self._client.collection("feed_items")
-            .where(field_path="user_id", op_string="==", value=user_id)
-            .where(field_path="consumed", op_string="==", value=False)
-            .order_by("duration_seconds", direction="ASCENDING")
-            .limit(250)
+            .where(filter=FieldFilter("user_id", "==", user_id))
+            .where(filter=FieldFilter("consumed", "==", False))
+            .where(filter=FieldFilter("duration_seconds", ">=", min_duration))
+            .where(filter=FieldFilter("duration_seconds", "<=", max_duration))
+            .order_by("duration_seconds", direction="DESCENDING" if descending else "ASCENDING")
+            .limit(limit)
         )
         snapshots = await query.get()
         return [FeedItem.from_firestore(snap.to_dict() or {}) for snap in snapshots]
 
     async def hide_feed_item(self, user_id: str, content_id: str) -> None:
-        """Manually hide feed item by setting consumed = True and adding content_id to user consumed_content per SPEC §9.1 & §9.2."""
+        """Manually hide feed item by setting consumed = True and adding content_id to user consumed_content_ids per SPEC §9.1 & §9.2."""
         feed_doc_id = f"{user_id}_{content_id}"
         feed_ref = self._client.collection("feed_items").document(feed_doc_id)
         user_ref = self._client.collection("users").document(user_id)
@@ -242,9 +305,11 @@ class ContentRepository:
         now = datetime.now(UTC)
         batch = self._client.batch()
         batch.update(feed_ref, {"consumed": True, "updated_at": now})
-        batch.update(
+        # merge=True: lands even if users/{uid} was never provisioned.
+        batch.set(
             user_ref,
-            {"consumed_content": ArrayUnion([content_id]), "updated_at": now},
+            {"consumed_content_ids": ArrayUnion([content_id]), "updated_at": now},
+            merge=True,
         )
 
         await batch.commit()

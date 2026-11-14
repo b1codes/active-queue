@@ -1,5 +1,6 @@
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
+import { Text } from '../Text';
 import { colors, rounded, spacing, typography } from '../../theme';
 
 export const ProviderQuotaBanner: React.FC = () => {
