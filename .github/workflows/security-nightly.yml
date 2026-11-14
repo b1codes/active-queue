@@ -27,7 +27,7 @@ jobs:
 
       - name: Checkout repository
         if: env.STAGING_API_URL != ''
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: ZAP API scan
         if: env.STAGING_API_URL != ''
