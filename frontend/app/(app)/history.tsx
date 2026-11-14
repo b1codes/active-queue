@@ -11,6 +11,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { GlassHeader, useGlassHeaderHeight } from '@/core/components';
 import { colors, fontScale, rounded, spacing, typography } from '@/core/theme';
+import { formatDuration } from '@/core/utils';
 import { listSessions, type Session } from '@/features/sessions/sessionApi';
 
 const STATUS_META: Record<Session['status'], { label: string; icon: string; color: string }> = {
@@ -19,11 +20,6 @@ const STATUS_META: Record<Session['status'], { label: string; icon: string; colo
   in_progress: { label: 'In progress', icon: 'play-circle-outline', color: colors.heatCore },
   pending: { label: 'Not started', icon: 'time-outline', color: colors.inkSecondary },
 };
-
-function formatDuration(seconds: number): string {
-  const mins = Math.floor(seconds / 60);
-  return `${mins}:${String(seconds % 60).padStart(2, '0')}`;
-}
 
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });

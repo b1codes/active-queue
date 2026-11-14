@@ -165,6 +165,45 @@ describe('BlocksScreen (time-first, SPEC §5.3)', () => {
     });
   });
 
+  it('proposes the best match the chosen activity accepts, not just the top match', async () => {
+    // HIIT accepts the 30 min block, but not the 33:20 top match, which the server would
+    // reject: a media session's duration is the item's.
+    const api = mockApi({
+      'GET /api/v1/activities/time-blocks': catalog['GET /api/v1/activities/time-blocks'],
+      'GET /api/v1/activities': { data: { activities: [activity('hiit', 600, 1800, 'HIIT')] } },
+      'POST /api/v1/content/match-time': matched([
+        feedItem(1, { duration_seconds: 2000, duration_label: '33m 20s' }),
+        feedItem(2, { duration_seconds: 1800, duration_label: '30m 0s' }),
+      ]),
+      'POST /api/v1/sessions': { status: 201, data: session({ id: 's_tf' }) },
+    });
+    await renderWithProviders(<BlocksScreen />);
+    await screen.findByText('Fixture Workout Video #2');
+    expect(screen.queryByText('Fixture Workout Video #1')).toBeNull();
+    await fireEvent(screen.getByTestId('start-matched-session'), 'accessibilityAction', {
+      nativeEvent: { actionName: 'activate' },
+    });
+    await waitFor(() => expect(router.push).toHaveBeenCalled());
+    expect(api.callsTo('POST', '/api/v1/sessions')[0].body).toMatchObject({
+      activity_id: 'hiit',
+      content_id: 'fx:fx_vid_2',
+    });
+  });
+
+  it("explains when every match is outside the activity's range", async () => {
+    mockApi({
+      'GET /api/v1/activities/time-blocks': catalog['GET /api/v1/activities/time-blocks'],
+      'GET /api/v1/activities': { data: { activities: [activity('hiit', 600, 1800, 'HIIT')] } },
+      'POST /api/v1/content/match-time': matched([
+        feedItem(1, { duration_seconds: 2000, duration_label: '33m 20s' }),
+      ]),
+    });
+    await renderWithProviders(<BlocksScreen />);
+    expect(await screen.findByText(/none of it is within HIIT's duration range/)).toBeTruthy();
+    expect(screen.queryByTestId('start-matched-session')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Start a timer-only session' })).toBeTruthy();
+  });
+
   it('shows the no-match state and still allows a timer-only session', async () => {
     const api = mockApi({
       ...catalog,

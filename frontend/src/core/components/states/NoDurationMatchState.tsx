@@ -6,12 +6,15 @@ import { colors, rounded, spacing, typography } from '../../theme';
 interface NoDurationMatchStateProps {
   durationLabel?: string;
   rejectionReason?: string;
+  /** Names the activity for the 'outside_activity_range' reason. */
+  activityName?: string;
   onResetPress?: () => void;
 }
 
 export const NoDurationMatchState: React.FC<NoDurationMatchStateProps> = ({
   durationLabel,
   rejectionReason,
+  activityName,
   onResetPress,
 }) => {
   let message = 'No workout items match the requested duration window.';
@@ -19,6 +22,8 @@ export const NoDurationMatchState: React.FC<NoDurationMatchStateProps> = ({
     message = 'Media duration must be between 5 minutes (300s) and 3 hours (10,800s) for workout sessions.';
   } else if (rejectionReason === 'no_matching_activity') {
     message = 'No activity in the catalog supports workouts of this exact duration.';
+  } else if (rejectionReason === 'outside_activity_range') {
+    message = `Media fits this time block, but none of it is within ${activityName ?? "this activity"}'s duration range. Pick another activity or start a timer-only session.`;
   } else if (rejectionReason === 'no_content_in_window') {
     message = 'No unconsumed feed items fit within the primary [B, B+5m] or fallback [B-2m, B] duration windows.';
   }

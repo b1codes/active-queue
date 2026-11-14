@@ -10,6 +10,7 @@ import { Text } from '../../../core/components/Text';
 import { Ionicons } from '@expo/vector-icons';
 import { ThermalGlowTouchable } from '../../../core/components';
 import { colors, rounded, spacing, typography } from '../../../core/theme';
+import { formatDuration } from '../../../core/utils';
 import { useQueueStore } from '../queueStore';
 import { FeedItem } from '../types';
 
@@ -26,12 +27,7 @@ interface FeedCardProps {
  */
 function formatTabularDuration(seconds: number, fallbackLabel?: string): string {
   if (seconds && seconds > 0) {
-    const hrs = Math.floor(seconds / 3600);
-    const mins = Math.floor((seconds % 3600) / 60);
-    const secs = seconds % 60;
-    const mStr = hrs > 0 ? String(mins).padStart(2, '0') : String(mins);
-    const sStr = String(secs).padStart(2, '0');
-    return hrs > 0 ? `${hrs}:${mStr}:${sStr}` : `${mStr}:${sStr}`;
+    return formatDuration(seconds);
   }
   if (fallbackLabel && fallbackLabel.includes(':')) {
     return fallbackLabel.trim();

@@ -22,12 +22,12 @@ import {
 } from '@/features/matching/matchingApi';
 import { useSessionStore } from '@/features/sessions/sessionStore';
 import { useIsMounted } from '@/core/hooks';
+import { formatDuration } from '@/core/utils';
 
 const DEFAULT_BLOCK_SECONDS = 1800;
 
-function tabular(seconds: number): string {
-  const mins = Math.floor(seconds / 60);
-  return `${mins}:${String(seconds % 60).padStart(2, '0')}`;
+function accepts(activity: Activity, seconds: number): boolean {
+  return activity.min_duration_seconds <= seconds && seconds <= activity.max_duration_seconds;
 }
 
 /**
@@ -69,9 +69,7 @@ export default function BlocksScreen() {
   // reject anything else with ACTIVITY_DURATION_MISMATCH.
   const fittingActivities = useMemo(
     () =>
-      (activities ?? []).filter(
-        (a) => a.min_duration_seconds <= selectedDuration && selectedDuration <= a.max_duration_seconds
-      ),
+      (activities ?? []).filter((a) => accepts(a, selectedDuration)),
     [activities, selectedDuration]
   );
 
@@ -113,7 +111,16 @@ export default function BlocksScreen() {
     }
   };
 
-  const topItem = match?.matched_items[0] ?? null;
+  // A media session's duration is the item's, not the block's (the window allows +300s /
+  // -120s), and the server validates the activity against it. So propose the best match
+  // the chosen activity also accepts, rather than one that would come back
+  // ACTIVITY_DURATION_MISMATCH.
+  const activity = fittingActivities.find((a) => a.id === selectedActivity) ?? null;
+  const matchedItems = match?.matched_items ?? [];
+  const topItem = activity
+    ? (matchedItems.find((item) => accepts(activity, item.duration_seconds)) ?? null)
+    : (matchedItems[0] ?? null);
+  const matchesOutsideActivity = matchedItems.length > 0 && topItem === null;
 
   return (
     <View style={styles.container}>
@@ -171,7 +178,7 @@ export default function BlocksScreen() {
                         isSelected ? styles.durationButtonTextSelected : styles.durationButtonTextUnselected,
                       ]}
                     >
-                      {tabular(block.duration_seconds)}
+                      {formatDuration(block.duration_seconds)}
                     </Text>
                   </TouchableOpacity>
                 );
@@ -252,7 +259,7 @@ export default function BlocksScreen() {
                       <Ionicons name="sparkles" size={14} color={colors.heatCore} />
                     </View>
                     <Text style={styles.matchBadgeText}>
-                      {match?.window_type === 'fallback' ? 'Slightly shorter' : 'Fits'} {tabular(selectedDuration)}
+                      {match?.window_type === 'fallback' ? 'Slightly shorter' : 'Fits'} {formatDuration(selectedDuration)}
                     </Text>
                   </View>
                   <View style={styles.durationPillMatched}>
@@ -277,13 +284,14 @@ export default function BlocksScreen() {
                   accessibilityRole="button"
                   accessibilityLabel="Start session with matched media"
                 >
-                  <Text style={styles.startButtonText}>Start Session ({tabular(selectedDuration)})</Text>
+                  <Text style={styles.startButtonText}>Start Session ({formatDuration(selectedDuration)})</Text>
                 </ThermalGlowTouchable>
               </View>
             ) : (
               <NoDurationMatchState
-                durationLabel={tabular(selectedDuration)}
-                rejectionReason="no_content_in_window"
+                durationLabel={formatDuration(selectedDuration)}
+                rejectionReason={matchesOutsideActivity ? 'outside_activity_range' : 'no_content_in_window'}
+                activityName={activity?.name}
               />
             )}
 
