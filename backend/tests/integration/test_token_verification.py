@@ -313,7 +313,9 @@ async def test_missing_auth_iam_role_fails_open_but_logs_an_error(
     # What a deployed API sees when its service account lacks roles/firebaseauth.viewer.
     monkeypatch.setattr(
         "app.core.security.fetch_account_status",
-        _record(auth.InsufficientPermissionError("caller lacks firebaseauth.users.get", None, None), []),
+        _record(
+            auth.InsufficientPermissionError("caller lacks firebaseauth.users.get", None, None), []
+        ),
     )
     with patch("app.core.security.logger") as log:
         assert await _get(client, _sign(_claims())) == (200, "OK")
